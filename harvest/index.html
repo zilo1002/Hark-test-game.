@@ -3,26 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#F4C553">
+<meta name="theme-color" content="#7CCB3E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="screen-orientation" content="landscape">
 <title>半亩·丰收</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23F4C553'/%3E%3Cellipse cx='16' cy='17' rx='8' ry='10' fill='%23FFF3D6' stroke='%23C9A066' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%237CCB3E'/%3E%3Cpath d='M10 20q6 -14 12 0z' fill='%23F2486E'/%3E%3Crect x='15' y='19' width='2' height='8' fill='%233E8F25'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <canvas id="cv"></canvas>
 
 <div id="hud" class="hidden">
-  <div class="coin" id="coin"><span class="billIco"></span><b id="money">0</b></div>
-  <div class="goal">
-    <div class="lv" id="lvName">第 1 关</div>
-    <div class="gtext" id="goalText"></div>
-    <div class="bar"><i id="goalBar"></i><span id="goalNum"></span></div>
+  <div class="hl">
+    <div class="lvBadge" id="lvBadge">等级 1</div>
+    <div class="goal">
+      <div class="gtext" id="goalText"></div>
+      <div class="bar"><i id="goalBar"></i><span id="goalNum"></span></div>
+    </div>
   </div>
-  <div class="hbtns">
-    <button class="ibtn" id="btnHome" aria-label="回到农场"><svg viewBox="0 0 24 24"><path d="M3 11 12 3l9 8v10h-6v-6H9v6H3z"/></svg></button>
-    <button class="ibtn" id="btnGear" aria-label="设置"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 5-.1-3 2-1.6-2-3.4-2.4.9a8 8 0 0 0-2.5-1.5L15 1.5h-4l-.4 2.4A8 8 0 0 0 8 5.4l-2.4-.9-2 3.4 2 1.6a8 8 0 0 0 0 3l-2 1.6 2 3.4 2.4-.9a8 8 0 0 0 2.6 1.5l.4 2.4h4l.4-2.4a8 8 0 0 0 2.5-1.5l2.4.9 2-3.4z"/></svg></button>
+  <div class="hr">
+    <div class="coin" id="coin"><span class="billIco"></span><b id="money">0</b></div>
+    <button class="xbtn" id="btnPause" aria-label="暂停"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
 </div>
 
@@ -31,19 +33,28 @@
 
 <div id="home" class="screen hidden">
   <div class="topbar">
-    <div class="title">我的农场</div>
+    <div class="title">我的庄园</div>
     <div class="starPill"><span>★</span><b id="starCount">0</b></div>
     <button class="ibtn" id="hGear" aria-label="设置"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 5-.1-3 2-1.6-2-3.4-2.4.9a8 8 0 0 0-2.5-1.5L15 1.5h-4l-.4 2.4A8 8 0 0 0 8 5.4l-2.4-.9-2 3.4 2 1.6a8 8 0 0 0 0 3l-2 1.6 2 3.4 2.4-.9a8 8 0 0 0 2.6 1.5l.4 2.4h4l.4-2.4a8 8 0 0 0 2.5-1.5l2.4.9 2-3.4z"/></svg></button>
   </div>
   <div class="panel">
-    <div class="phead">用星星修好农场 <span id="restoreHint"></span></div>
+    <div class="phead">用星星修复庄园 <span id="restoreHint"></span></div>
     <div class="restore" id="restoreList"></div>
     <button class="big" id="btnPlay">开始 第 1 关</button>
     <button class="small" id="btnLevels">选择关卡</button>
   </div>
 </div>
 
-<div id="levels" class="modal hidden"><div class="card">
+<div id="pause" class="modal hidden"><div class="card">
+  <h2>暂停</h2>
+  <div class="note center" id="pauseInfo"></div>
+  <button class="big" id="btnResume">继续</button>
+  <button class="small" id="btnPSettings">设置</button>
+  <button class="small" id="btnPLevels">选择关卡</button>
+  <button class="small warm" id="btnHome">回到庄园</button>
+</div></div>
+
+<div id="levels" class="modal hidden"><div class="card wide">
   <h2>选择关卡</h2>
   <div class="grid" id="levelGrid"></div>
   <button class="small" data-close>关闭</button>

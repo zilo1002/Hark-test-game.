@@ -39,8 +39,17 @@ export function person(g, t, walk, moving, o) {
   else { g.roundRect(-5.4, -22, 10.8, 12.5, 3); }
   g.fillStyle = armC; g.fill(); g.strokeStyle = OL; g.lineWidth = 1.2; g.stroke();
   if (o.apron && !o.back) { rr(g, -3.2, -18, 6.4, 8, 2, '#FFFFFF', null); }
+  if (o.vest) { g.fillStyle = o.vest; g.beginPath(); if (o.back) g.roundRect(-5.4, -21.5, 10.8, 10, 3); else { g.moveTo(-5.4, -21); g.lineTo(-1.2, -21); g.lineTo(0, -13); g.lineTo(1.2, -21); g.lineTo(5.4, -21); g.lineTo(5.4, -11); g.lineTo(-5.4, -11); g.closePath(); } g.fill(); g.strokeStyle = OL; g.lineWidth = 0.9; g.stroke(); }
+  if (o.bowtie && !o.back) { g.fillStyle = '#D8262E'; g.beginPath(); g.moveTo(0, -21); g.lineTo(-2.6, -22.6); g.lineTo(-2.6, -19.4); g.closePath(); g.moveTo(0, -21); g.lineTo(2.6, -22.6); g.lineTo(2.6, -19.4); g.closePath(); g.fill(); }
   if (o.overalls) { rr(g, -4.2, -17, 8.4, 7.5, 1.5, o.overalls, OL, 0.9); g.fillStyle = '#FFE07A'; g.beginPath(); g.arc(-2.6, -16, 0.9, 0, 6.3); g.arc(2.6, -16, 0.9, 0, 6.3); g.fill(); }
   if (!o.back) { drawArm(-1); drawArm(1); }
+  if (o.sickle && !up) {
+    const a = o.cutting ? Math.sin(t * 22) * 0.9 : 0.2;
+    g.save(); g.translate(7.5, -13); g.rotate(a);
+    g.strokeStyle = '#7A4A22'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 7); g.stroke();
+    g.strokeStyle = '#D9DEE6'; g.lineWidth = 1.5; g.beginPath(); g.arc(-3.2, 7, 3.6, -0.2, Math.PI * 0.95); g.stroke();
+    g.restore();
+  }
   // head
   circ(g, 0, -29, 7.4, COL.skin, OL);
   g.fillStyle = o.hair || COL.hair;
@@ -66,11 +75,14 @@ export function person(g, t, walk, moving, o) {
   return 38 - bob;   // z where a carried stack sits
 }
 
-export const GIRL = { dress: '#F2553A', apron: true, pigtails: true, hair: '#7A3E1D' };
-export const BOY = { shirt: '#F7F1E1', overalls: '#3D7FD9', pants: '#3D7FD9', hat: true, hair: '#5A3414' };
-const CUST_SHIRTS = ['#6BC4FF', '#FF9F43', '#A77BFF', '#FF6FA8', '#4CD08A', '#FFD23F'];
-const CUST_HAIR = ['#3A2210', '#7A3E1D', '#C58B3C', '#222222', '#9B5A2A', '#5B3A1A'];
-export function customerStyle(h) { return { shirt: CUST_SHIRTS[h % 6], hair: CUST_HAIR[(h * 5) % 6], pants: h % 2 ? '#4A5A8A' : '#6B4A2E', seed: h }; }
+// the player: a cartoon head gardener (white shirt, red vest, bow tie)
+export const HERO = { shirt: '#FFFFFF', vest: '#C8352A', bowtie: true, pants: '#2D3A5A', hair: '#7A3E1D' };
+export const GIRL = HERO;
+// hired gardeners: white shirt, blue overalls, sickle
+export const BOY = { shirt: '#F7F5EE', overalls: '#3567C8', pants: '#3567C8', hair: '#5A3414', sickle: true };
+const CUST_SHIRTS = ['#6BC4FF', '#FF9F43', '#A77BFF', '#FF6FA8', '#4CD08A', '#FFD23F', '#F2F2F2', '#E8452C'];
+const CUST_HAIR = ['#3A2210', '#7A3E1D', '#C58B3C', '#222222', '#9B5A2A', '#5B3A1A', '#E8D8B0', '#2A2A3A'];
+export function customerStyle(h) { return { shirt: CUST_SHIRTS[h % 8], hair: CUST_HAIR[(h * 5) % 8], pants: ['#4A5A8A', '#6B4A2E', '#3A3A48', '#7A6A9A'][h % 4], dress: h % 3 === 2 ? CUST_SHIRTS[(h + 3) % 8] : null, seed: h }; }
 
 export function hen(g, t, lay, seed) {
   shadow(g, 10, 3.6);
@@ -128,7 +140,7 @@ export function mower(g, t, moving, walk) {
   wheel(g, -6, -6, 6.2); wheel(g, 11, -4, 4);
   // body
   g.beginPath(); g.moveTo(-10, -9); g.lineTo(14, -9); g.quadraticCurveTo(18, -9, 17, -14); g.lineTo(13, -19); g.lineTo(-6, -19); g.quadraticCurveTo(-11, -19, -11, -14); g.closePath();
-  const gr = g.createLinearGradient(0, -19, 0, -9); gr.addColorStop(0, '#FF6A4D'); gr.addColorStop(1, '#D8331E');
+  const gr = g.createLinearGradient(0, -19, 0, -9); gr.addColorStop(0, '#5ED45A'); gr.addColorStop(1, '#2E9A34');
   g.fillStyle = gr; g.fill(); g.strokeStyle = COL.outline; g.lineWidth = 1.2; g.stroke();
   rr(g, 8, -17, 7, 3, 1, '#FFE07A', null);
   // steering column + wheel
@@ -139,12 +151,11 @@ export function mower(g, t, moving, walk) {
   g.restore();
   // seated girl (upper body)
   g.save(); g.translate(-3, -19 + jig);
-  rr(g, -4.6, -12, 9.2, 11, 3, '#F2553A', COL.outline, 1.1);
+  rr(g, -4.6, -12, 9.2, 11, 3, '#FFFFFF', COL.outline, 1.1); rr(g, -4.6, -11, 9.2, 7, 2, '#C8352A', null);
   g.strokeStyle = COL.outline; g.lineWidth = 4.4; g.lineCap = 'round'; g.beginPath(); g.moveTo(3, -9); g.lineTo(11, -8); g.stroke();
   g.strokeStyle = COL.skin; g.lineWidth = 2.8; g.stroke();
   circ(g, 0, -18, 6.8, COL.skin, COL.outline, 1.1);
   g.fillStyle = COL.hair; g.beginPath(); g.arc(0, -19, 7, Math.PI * 1.02, Math.PI * 1.98); g.quadraticCurveTo(3, -20, 1, -22.5); g.quadraticCurveTo(-3, -19.5, -6.8, -18); g.closePath(); g.fill();
-  for (const s of [-1, 1]) { circ(g, s * 7, -16.5, 2.6, COL.hair, COL.outline, 0.9); }
   g.fillStyle = '#3A2210'; g.beginPath(); g.ellipse(1.5, -17.6, 0.9, 1.2, 0, 0, 6.3); g.ellipse(4.6, -17.6, 0.9, 1.2, 0, 0, 6.3); g.fill();
   g.restore();
   return [-27, 18];
@@ -169,43 +180,3 @@ export function cart(g, t, moving, walk) {
   return [-4, 15];
 }
 
-export function stall(g, t, item, bump, flip) {
-  // wooden stand with striped awning; drawn facing the camera
-  shadow(g, 44, 9);
-  g.fillStyle = COL.woodDark; for (const x of [-36, 36]) g.fillRect(x - 1.6, -50, 3.2, 50);
-  rr(g, -40, -22, 80, 22, 3, '#D08B4C', COL.outline, 1.4);
-  g.fillStyle = '#B87536'; for (let i = -3; i <= 3; i++) g.fillRect(i * 11 - 0.6, -21, 1.2, 20);
-  rr(g, -42, -26, 84, 6, 2.5, '#E7A866', COL.outline, 1.2);
-  // awning
-  const sq = 1 + bump * 0.06;
-  g.save(); g.translate(0, -50); g.scale(sq, 1 / sq);
-  for (let i = 0; i < 8; i++) {
-    g.fillStyle = i % 2 ? '#FFFFFF' : COL.red;
-    g.beginPath(); g.moveTo(-44 + i * 11, -8); g.lineTo(-33 + i * 11, -8); g.lineTo(-33 + i * 11, 4); g.quadraticCurveTo(-38.5 + i * 11, 9, -44 + i * 11, 4); g.closePath(); g.fill();
-  }
-  g.strokeStyle = COL.outline; g.lineWidth = 1.3; g.strokeRect(-44, -12, 88, 4);
-  g.fillStyle = '#C93A22'; g.fillRect(-44, -12, 88, 4);
-  g.restore();
-}
-
-export function machine(g, t, work, kind) {
-  shadow(g, 42, 10);
-  const shake = work ? Math.sin(t * 40) * 0.8 : 0;
-  g.save(); g.translate(shake, 0);
-  const body = kind === 'ketchup' ? ['#FF7A5C', '#D93A22'] : ['#7FD0FF', '#2F8EDB'];
-  const gr = g.createLinearGradient(0, -46, 0, 0); gr.addColorStop(0, body[0]); gr.addColorStop(1, body[1]);
-  rr(g, -36, -42, 72, 42, 6, gr, COL.outline, 1.5);
-  rr(g, -30, -36, 26, 18, 4, '#FFFFFF', COL.outline, 1);
-  // chimney
-  rr(g, 18, -58, 10, 18, 2, '#8A8A99', COL.outline, 1.2);
-  // hopper on the input side
-  g.fillStyle = '#B5B5C6'; g.strokeStyle = COL.outline; g.lineWidth = 1.2;
-  g.beginPath(); g.moveTo(-44, -54); g.lineTo(-22, -54); g.lineTo(-27, -40); g.lineTo(-39, -40); g.closePath(); g.fill(); g.stroke();
-  // gear
-  g.save(); g.translate(14, -22); g.rotate(work ? t * 4 : 0);
-  g.fillStyle = '#FFD23F'; g.strokeStyle = COL.outline; g.lineWidth = 1;
-  g.beginPath(); for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8, r = i % 2 ? 6 : 8; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); g.fill(); g.stroke();
-  circ(g, 0, 0, 2.4, '#8A6A10', null);
-  g.restore();
-  g.restore();
-}

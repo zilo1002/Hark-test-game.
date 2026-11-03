@@ -45,12 +45,21 @@ export class Input {
     if (x || y) this.everMoved = true;
     return [x, y];
   }
-  draw(g) {
-    if (!this.active) return;
-    const dx = this.cx - this.ox, dy = this.cy - this.oy, d = Math.hypot(dx, dy), k = d > this.R ? this.R / d : 1;
-    g.fillStyle = 'rgba(255,255,255,0.22)'; g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 3;
-    g.beginPath(); g.arc(this.ox, this.oy, this.R, 0, Math.PI * 2); g.fill(); g.stroke();
-    g.fillStyle = 'rgba(0,0,0,0.15)'; g.beginPath(); g.arc(this.ox + dx * k, this.oy + dy * k + 3, 24, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(this.ox + dx * k, this.oy + dy * k, 24, 0, Math.PI * 2); g.fill();
+  // translucent pad: rests bottom-left (like the reference) and jumps under the finger while dragging
+  draw(g, W, H, show = true) {
+    if (!show && !this.active) return;
+    let ox, oy, kx = 0, ky = 0;
+    if (this.active) {
+      const dx = this.cx - this.ox, dy = this.cy - this.oy, d = Math.hypot(dx, dy), k = d > this.R ? this.R / d : 1;
+      ox = this.ox; oy = this.oy; kx = dx * k; ky = dy * k;
+    } else {
+      ox = Math.min(W * 0.14, 100) + 10; oy = H - Math.min(H * 0.2, 96) - 10;
+    }
+    g.globalAlpha = this.active ? 1 : 0.55;
+    g.fillStyle = 'rgba(255,255,255,0.18)'; g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 3;
+    g.beginPath(); g.arc(ox, oy, this.R, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(0,0,0,0.12)'; g.beginPath(); g.arc(ox + kx, oy + ky + 3, 24, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.92)'; g.beginPath(); g.arc(ox + kx, oy + ky, 24, 0, Math.PI * 2); g.fill();
+    g.globalAlpha = 1;
   }
 }

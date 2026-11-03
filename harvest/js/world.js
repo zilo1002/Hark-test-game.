@@ -35,10 +35,9 @@ export class Pile {
   iy(y) { return Math.min(this.rows - 1, Math.max(0, Math.floor((y - this.y) / this.ch))); }
   cx(i) { return this.x + ((i % this.cols) + 0.5) * this.cw; }
   cy(i) { return this.y + (((i / this.cols) | 0) + 0.5) * this.ch; }
-  // a walkable point near cell i (keeps clear of the yard fences)
   safe(i) {
     const m = 16;
-    return { x: Math.min(this.x + this.w - m, Math.max(this.x + m, this.cx(i))), y: Math.min(this.y + this.h - 6, Math.max(this.y + m, this.cy(i))) };
+    return { x: Math.min(this.x + this.w - 6, Math.max(this.x + m, this.cx(i))), y: Math.min(this.y + this.h - 6, Math.max(this.y + m, this.cy(i))) };
   }
   full() { return this.total + this.pending >= this.cap; }
   add(x, y, rnd) {
@@ -59,7 +58,6 @@ export class Pile {
     hs[i]++; this.total++; this.bump[i] = 1;
     return i;
   }
-  // remove the highest item within radius r of (x,y). Returns the cell index or -1.
   take(x, y, r) {
     if (this.total <= 0) return -1;
     if (x + r < this.x || x - r > this.x + this.w || y + r < this.y || y - r > this.y + this.h) return -1;
@@ -87,7 +85,6 @@ export class Pile {
     const nb = [c > 0 ? i - 1 : -1, c < C - 1 ? i + 1 : -1, r > 0 ? i - C : -1, r < R - 1 ? i + C : -1];
     for (const j of nb) if (j >= 0 && hs[j] - hs[i] > s) { hs[j]--; hs[i]++; this.bump[j] = 1; this.bump[i] = 1; }
   }
-  // best cell to walk into from (px,py): tall and near. Cached briefly.
   hottest(px, py, t) {
     if (this.total <= 0) return -1;
     if (t - this._hotT < 0.35 && this._hot >= 0 && this.hs[this._hot] > 0) return this._hot;
@@ -100,23 +97,62 @@ export class Pile {
     this._hot = best; this._hotT = t;
     return best;
   }
-  prefill(n, rnd, biasTop) {
+  prefill(n, rnd, biasFar) {
     for (let k = 0; k < n && this.total < this.cap; k++) {
-      const x = this.x + rnd() * this.w;
-      const y = this.y + (biasTop ? Math.pow(rnd(), 2.2) : rnd()) * this.h;
-      this.add(x, y, rnd);
+      // biasFar: heap up toward the nests on the north and west sides
+      const u = biasFar ? Math.pow(rnd(), 1.8) : rnd(), v = biasFar ? Math.pow(rnd(), 1.8) : rnd();
+      this.add(this.x + u * this.w, this.y + v * this.h, rnd);
     }
     this.bump.fill(0);
   }
 }
 
 // ---------------------------------------------------------------------------
+// Field: a dense grid of individual plants (thousands). g[i] is growth 0..1;
+// 1 = in bloom and cuttable. Cut plants drop to 0 (stubble) and regrow.
+export class Field {
+  constructor(o, rnd) {
+    const cr = CFG.crops[o.crop];
+    Object.assign(this, o);
+    this.kind = 'field'; this.item = o.crop; this.hidden = !!o.hidden; this.appearT = -9;
+    this.cols = Math.max(1, Math.floor(o.w / o.gap)); this.rows = Math.max(1, Math.floor(o.h / o.gap));
+    this.w = this.cols * o.gap; this.h = this.rows * o.gap;
+    const n = this.n = this.cols * this.rows;
+    this.g = new Float32Array(n).fill(1);
+    this.jx = new Int8Array(n); this.jy = new Int8Array(n); this.v = new Uint8Array(n); this.pop = new Float32Array(n);
+    for (let i = 0; i < n; i++) { this.jx[i] = Math.round((rnd() - 0.5) * 60); this.jy[i] = Math.round((rnd() - 0.5) * 60); this.v[i] = (rnd() * 4) | 0; }
+    this.ripe = n; this.grow = cr.grow; this.spill = cr.spill || 0; this.pile = null;
+  }
+  px(i) { return this.x + ((i % this.cols) + 0.5 + this.jx[i] / 300) * this.gap; }
+  py(i) { return this.y + (((i / this.cols) | 0) + 0.5 + this.jy[i] / 300) * this.gap; }
+  // nearest ripe plant (coarse stride for speed on big fields)
+  nearestRipe(x, y) {
+    if (this.ripe <= 0) return -1;
+    const C = this.cols, R = this.rows, s = this.n > 1500 ? 2 : 1;
+    let best = -1, bd = 1e18;
+    for (let r = 0; r < R; r += s) for (let c = (r / s) & 1 ? 1 : 0; c < C; c += s) {
+      const i = r * C + c; if (this.g[i] < 1) continue;
+      const dx = this.x + (c + 0.5) * this.gap - x, dy = this.y + (r + 0.5) * this.gap - y, dd = dx * dx + dy * dy;
+      if (dd < bd) { bd = dd; best = i; }
+    }
+    if (best < 0) for (let i = 0; i < this.n; i++) if (this.g[i] >= 1) { const dd = d2(this.px(i), this.py(i), x, y); if (dd < bd) { bd = dd; best = i; } }
+    return best;
+  }
+  sprout(rnd, t) {
+    // a freshly planted plot: everything pops in as seedlings and blooms in a wave
+    for (let i = 0; i < this.n; i++) { const c = i % this.cols, r = (i / this.cols) | 0; this.g[i] = 0.25 + 0.45 * (1 - (c + r) / (this.cols + this.rows)) + rnd() * 0.08; }
+    this.ripe = 0; this.appearT = t;
+  }
+}
+
+// ---------------------------------------------------------------------------
 function makeCollector(kind, x, y) {
-  return { kind, x, y, vx: 0, vy: 0, face: 1, moving: false, walk: 0,
-           speed: 0, cap: 0, pickR: 0, harvestR: 0, pickRate: 0, dropRate: 0,
-           stack: [], incoming: 0, pickAcc: 0, dropAcc: 0, sway: 0, fullFlag: false, vehicle: false,
+  return { kind, x, y, vx: 0, vy: 0, face: 1, moving: false, walk: 0, dirY: 0,
+           speed: 0, cap: 0, pickR: 0, harvestR: 0, cutRate: 0, pickRate: 0, dropRate: 0,
+           stack: [], incoming: 0, pickAcc: 0, dropAcc: 0, cutAcc: 0, cutT: -9, sway: 0, fullFlag: false, vehicle: false,
            sources: null, canPick: true, canDrop: true, only: null };
 }
+const itemPrice = (t) => CFG.items[t].price;
 
 export class World {
   constructor(levelIndex, opts = {}) {
@@ -133,7 +169,9 @@ export class World {
     this.piles = []; this.tiles = []; this.workers = []; this.customers = []; this.solids = [];
     this.fly = []; this.flyFree = [];
     this.gmode = 'collect';
+    this.deco = this.L.deco || {};
     for (const o of this.L.objects) this.build(o);
+    for (const p of this.procs) p.outObj = p.outTo ? this.objs[p.outTo] : null;
     this.L.tiles.forEach((t, i) => this.tiles.push({ ...t, order: i, paid: 0, bought: 0, done: false, visible: false,
       price0: t.price, payFx: 0, appearT: -9, cool: 0 }));
     this.player = makeCollector('player', this.L.start[0], this.L.start[1]);
@@ -148,15 +186,9 @@ export class World {
   build(o) {
     const base = { ...o, hidden: !!o.hidden, appearT: -9 };
     if (o.type === 'field') {
-      const cr = CFG.crops[o.crop];
-      const f = { ...base, kind: 'field', w: o.cols * o.gap, h: o.rows * o.gap, plants: [], spill: cr.spill || 0,
-                  grow: cr.grow, yieldN: cr.yield || 0, item: o.crop, pile: null };
-      for (let r = 0; r < o.rows; r++) for (let c = 0; c < o.cols; c++) {
-        f.plants.push({ x: o.x + (c + 0.5) * o.gap + (this.rnd() - 0.5) * 4, y: o.y + (r + 0.5) * o.gap + (this.rnd() - 0.5) * 4,
-                        g: 1, pop: 0, ph: this.rnd() * 6.28 });
-      }
+      const f = new Field(o, this.rnd);
       if (f.spill) {
-        f.pile = new Pile(o.crop, o.x, o.y, f.w, f.h);
+        f.pile = new Pile(o.crop, f.x, f.y, f.w, f.h);
         if (o.prefill) f.pile.prefill(o.prefill, this.rnd, false);
         this.piles.push(f.pile); f.pile.owner = f;
       }
@@ -164,13 +196,10 @@ export class World {
     } else if (o.type === 'coop') {
       const pr = CFG.producers[o.producer];
       const c = { ...base, kind: 'coop', period: pr.period, burst: pr.burst, slots: [], pile: new Pile(o.item, o.x, o.y, o.w, o.h, o.cap) };
-      // slots along the top fence, then down both sides (outside the fence)
-      const topN = Math.floor((o.w - 24) / 36) + 1, sp = (o.w - 24) / Math.max(1, topN - 1);
-      for (let i = 0; i < topN; i++) c.slots.push({ x: o.x + 12 + i * sp, y: o.y - 22, side: 0 });
-      for (let i = 0; ; i++) {
-        const y = o.y + 26 + i * 40; if (y > o.y + o.h - 30) break;
-        c.slots.push({ x: o.x - 26, y, side: -1 }); c.slots.push({ x: o.x + o.w + 26, y, side: 1 });
-      }
+      // nest boxes along the north fence (side 0) and the west fence (side -1)
+      const topN = Math.floor((o.w - 20) / 34) + 1, sp = (o.w - 20) / Math.max(1, topN - 1);
+      for (let i = 0; i < topN; i++) c.slots.push({ x: o.x + 10 + i * sp, y: o.y - 16, side: 0 });
+      for (let i = 0; ; i++) { const y = o.y + 30 + i * 34; if (y > o.y + o.h - 16) break; c.slots.push({ x: o.x - 16, y, side: -1 }); }
       c.max = Math.min(o.max, c.slots.length);
       c.n = Math.min(o.n, c.max);
       c.hens = c.slots.map((s) => ({ ...s, t: this.rnd() * pr.period, lay: 0, appearT: -9 }));
@@ -178,35 +207,40 @@ export class World {
       c.pile.owner = c;
       this.piles.push(c.pile); this.coops.push(c); this.objs[o.id] = c;
     } else if (o.type === 'counter') {
-      const K = CFG.counter, f = o.flip ? -1 : 1;
-      const cu = CFG.customer;
-      const c = { ...base, kind: 'counter', f, stock: 0, incoming: 0, queue: [], cash: 0, cashier: false, spawnT: 0.5,
-                  price: o.price ?? CFG.items[o.item].price, interval: cu.interval, serveRate: cu.serveRate, buyAcc: 0,
-                  zone: rectAt(o.x + f * K.zoneDx, o.y + K.zoneDy, K.zoneW, K.zoneH),
-                  serve: { x: o.x + f * K.serveDx, y: o.y + K.serveDy },
-                  cashPos: { x: o.x + f * K.cashDx, y: o.y + K.cashDy },
-                  spawn: { x: f > 0 ? this.W + 40 : -40, y: o.y - 70 },
-                  exit: { x: f > 0 ? this.W + 40 : -40, y: o.y + 110 }, bumpT: 0 };
+      const K = CFG.counter, cu = CFG.customer;
+      const c = { ...base, kind: 'counter', stock: [], incoming: 0, queue: [], cash: 0, cashier: false, spawnT: 0.5,
+                  interval: cu.interval, serveRate: cu.serveRate, buyAcc: 0,
+                  desk: rectAt(o.x, o.y, K.deskW, K.deskD),
+                  zone: rectAt(o.x + K.zoneDx, o.y + K.zoneDy, K.zoneW, K.zoneH),
+                  serve: { x: o.x + K.serveDx, y: o.y },
+                  cashPos: { x: o.x + K.cashDx, y: o.y + K.cashDy },
+                  spawn: { x: this.W + 70, y: o.y },
+                  exitA: { x: o.x + K.serveDx + 30, y: o.y + 40 },
+                  exit: { x: this.W + 70, y: o.y + 40 }, bumpT: 0 };
       this.counters.push(c); this.objs[o.id] = c;
     } else if (o.type === 'proc') {
       const P = CFG.proc;
-      const p = { ...base, kind: 'proc', inItem: o.in, outItem: o.out, buf: 0, inc: 0, out: 0, outInc: 0, timer: 0, work: 0,
-                  inZone: rectAt(o.x - P.zoneDx, o.y + P.zoneDy, P.zoneW, P.zoneH),
-                  outZone: rectAt(o.x + P.zoneDx, o.y + P.zoneDy, P.zoneW, P.zoneH) };
+      const p = { ...base, kind: 'proc', inItem: o.in, outItem: o.out, buf: 0, inc: 0, timer: 0, work: 0, outInc: 0,
+                  body: rectAt(o.x, o.y, P.bodyW, P.bodyD),
+                  inZone: rectAt(o.x + P.zoneDx, o.y, P.zoneW, P.zoneH) };
       this.procs.push(p); this.objs[o.id] = p;
     }
   }
 
+  // customer gates in the east wall (render draws the openings, logic keeps customers in lanes)
+  gates() { return this.counters.filter((c) => !c.hidden || this.tiles.some((t) => t.effect.show && t.effect.show.includes(c.id))).map((c) => [c.y - 34, c.y + 66]); }
+
   rebuildSolids() {
     const s = [];
-    const K = CFG.counter, P = CFG.proc;
-    for (const c of this.counters) if (!c.hidden) s.push(rectAt(c.x, c.y, K.standW, K.standH));
-    for (const p of this.procs) if (!p.hidden) s.push(rectAt(p.x, p.y, P.bodyW, P.bodyH));
+    for (const c of this.counters) if (!c.hidden) s.push(c.desk);
+    for (const p of this.procs) if (!p.hidden) s.push(p.body);
     for (const c of this.coops) if (!c.hidden) {
-      s.push({ x: c.x - 10, y: c.y - 44, w: c.w + 20, h: 32 });           // top fence + nests
-      s.push({ x: c.x - 10, y: c.y - 10, w: 10, h: c.h + 10 });           // left fence
-      s.push({ x: c.x + c.w, y: c.y - 10, w: 10, h: c.h + 10 });          // right fence
+      s.push({ x: c.x - 26, y: c.y - 30, w: c.w + 32, h: 22 });           // north fence + nests
+      s.push({ x: c.x - 30, y: c.y - 30, w: 22, h: c.h + 30 });           // west fence + nests
     }
+    for (const h of this.deco.hedges || []) s.push({ x: h[0], y: h[1], w: h[2], h: h[3] });
+    for (const t of this.deco.trees || []) s.push(rectAt(t[0], t[1], 18, 18));
+    if (this.deco.barn) s.push(rectAt(this.deco.barn[0], this.deco.barn[1], 76, 56));
     this.solids = s;
   }
 
@@ -215,24 +249,27 @@ export class World {
     if (p.vehicle) {
       const V = CFG.vehicle;
       p.speed = V.speed + u.speed; p.cap = V.cap + u.cap * V.capMul; p.pickR = V.pickR + u.radius;
-      p.harvestR = V.harvestR + u.radius * 0.6; p.pickRate = V.pickRate; p.dropRate = V.dropRate;
+      p.harvestR = V.harvestR + u.radius * 0.6; p.cutRate = V.cutRate; p.pickRate = V.pickRate; p.dropRate = V.dropRate;
     } else {
       const P = CFG.player;
       p.speed = P.speed + u.speed; p.cap = P.cap + u.cap; p.pickR = P.pickR + u.radius;
-      p.harvestR = P.harvestR + u.radius * 0.6; p.pickRate = P.pickRate + u.radius; p.dropRate = P.dropRate + u.cap * 0.2;
+      p.harvestR = P.harvestR + u.radius; p.cutRate = P.cutRate + u.radius * 6;
+      p.pickRate = P.pickRate + u.radius; p.dropRate = P.dropRate + u.cap * 0.25;
     }
     for (const w of this.workers) {
       const Wk = CFG.worker;
       w.speed = Wk.speed + u.wspeed; w.cap = Wk.cap + u.wcap; w.pickR = Wk.pickR; w.harvestR = Wk.harvestR;
-      w.pickRate = Wk.pickRate; w.dropRate = Wk.dropRate;
+      w.cutRate = Wk.cutRate; w.pickRate = Wk.pickRate; w.dropRate = Wk.dropRate;
     }
   }
 
   // ---- flying items ------------------------------------------------------
-  launch(type, kind, x0, y0, z0, ref, tx, ty, tz, dur) {
+  launch(type, kind, x0, y0, z0, ref, tx, ty, tz, dur, spray) {
     const f = this.flyFree.pop() || {};
     f.type = type; f.kind = kind; f.x0 = x0; f.y0 = y0; f.z0 = z0; f.ref = ref; f.tx = tx; f.ty = ty; f.tz = tz;
     f.t = 0; f.dur = dur * (0.85 + this.rnd() * 0.3); f.active = true;
+    // spray: blooms burst up and sideways before arcing onto the stack (render-only shape, deterministic here)
+    f.sx = spray ? (this.rnd() - 0.5) * spray : 0; f.sy = spray ? (this.rnd() - 0.5) * spray : 0; f.arc = spray ? 50 + this.rnd() * 60 : 34;
     this.fly.push(f);
     return f;
   }
@@ -241,10 +278,9 @@ export class World {
     switch (f.kind) {
       case 'stack': r.incoming--; r.stack.push(f.type); break;
       case 'pile': r.pending--; r.add(f.tx, f.ty, this.rnd); break;
-      case 'counter': r.incoming--; r.stock++; r.bumpT = 1; break;
-      case 'cust': r.incoming--; r.got++; break;
+      case 'counter': r.incoming--; r.stock.push(f.type); r.bumpT = 1; break;
+      case 'cust': r.incoming--; r.bag.push(f.type); break;
       case 'procIn': r.inc--; r.buf++; break;
-      case 'procOut': r.outInc--; r.out++; break;
     }
   }
 
@@ -267,8 +303,14 @@ export class World {
     this.updateTileVis(silent);
   }
   applyEffect(e, t, silent) {
-    if (e.show) for (const id of e.show) { const o = this.objs[id]; if (o) { o.hidden = false; o.appearT = this.t; } }
-    if (e.show) { this.rebuildSolids(); if (!silent) this.emit('ground', {}); }
+    if (e.show) {
+      for (const id of e.show) {
+        const o = this.objs[id]; if (!o) continue;
+        o.hidden = false; o.appearT = this.t;
+        if (o.kind === 'field') { if (silent) { o.g.fill(1); o.ripe = o.n; } else o.sprout(this.rnd, this.t); }
+      }
+      this.rebuildSolids(); if (!silent) this.emit('ground', {});
+    }
     if (e.hens) {
       const c = this.objs[e.hens.coop];
       const before = c.n; c.n = Math.min(c.max, c.n + e.hens.n);
@@ -278,13 +320,12 @@ export class World {
     if (e.worker) {
       const w = makeCollector('worker', t.x, t.y);
       w.from = e.worker.from; w.to = e.worker.to; w.state = 'collect'; w.wait = 0; w.tgt = null; w.retarget = 0;
-      w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.cart = t.icon === 'cart'; w.appearT = this.t;
+      w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = t.icon === 'cart';
       this.workers.push(w); this.refreshStats();
     }
     if (e.vehicle) { this.player.vehicle = true; this.player.appearT = this.t; this.refreshStats(); }
     if (e.cashier) for (const id of e.cashier) { const c = this.objs[id]; c.cashier = true; if (c.cash > 0) { this.money += c.cash; c.cash = 0; } }
-    const procs = [].concat(e.proc || [], e.proc2 || []);
-    for (const pe of procs) { const p = this.objs[pe.id]; p.time *= pe.mul; }
+    if (e.proc) for (const pe of e.proc) { const p = this.objs[pe.id]; p.time *= pe.mul; }
   }
 
   // ---- goal ------------------------------------------------------------------
@@ -310,10 +351,15 @@ export class World {
     for (const w of this.workers) this.workerAI(w, dt);
     // fields regrow
     for (const f of this.fields) {
-      if (f.hidden) continue;
-      for (const p of f.plants) { if (p.g < 1) { p.g = Math.min(1, p.g + dt / f.grow); if (p.g >= 1) p.pop = 1; } if (p.pop > 0) p.pop = Math.max(0, p.pop - dt * 3); }
+      if (f.hidden || f.ripe >= f.n) continue;
+      const g = f.g, pop = f.pop, k = dt / f.grow;
+      for (let i = 0, n = f.n; i < n; i++) {
+        const v = g[i];
+        if (v < 1) { const nv = v + k; if (nv >= 1) { g[i] = 1; f.ripe++; pop[i] = 1; } else g[i] = nv; }
+      }
     }
-    // producers lay
+    if (!this.quiet) for (const f of this.fields) { const pop = f.pop; for (let i = 0, n = f.n; i < n; i++) if (pop[i] > 0) pop[i] = Math.max(0, pop[i] - dt * 3); }
+    // hens lay
     for (const c of this.coops) {
       if (c.hidden) continue;
       for (let i = 0; i < c.n; i++) {
@@ -327,10 +373,10 @@ export class World {
           for (let b = 0; b < c.burst; b++) {
             let tx, ty;
             if (h.side === 0) { tx = h.x + (this.rnd() - 0.5) * 120; ty = c.y + Math.pow(this.rnd(), 1.6) * c.h; }
-            else { tx = h.side < 0 ? c.x + Math.pow(this.rnd(), 1.5) * c.w : c.x + c.w - Math.pow(this.rnd(), 1.5) * c.w; ty = h.y + (this.rnd() - 0.5) * 120; }
+            else { tx = c.x + Math.pow(this.rnd(), 1.5) * c.w; ty = h.y + (this.rnd() - 0.5) * 120; }
             tx = Math.min(c.x + c.w - 2, Math.max(c.x + 2, tx)); ty = Math.min(c.y + c.h - 2, Math.max(c.y + 2, ty));
             c.pile.pending++;
-            this.launch(c.item, 'pile', h.x, h.y, h.side === 0 && c.producer === 'hen' ? 26 : 10, c.pile, tx, ty, 0, CFG.fly.lay);
+            this.launch(c.item, 'pile', h.x, h.y, 18, c.pile, tx, ty, 0, CFG.fly.lay);
           }
           this.emit('lay', { x: h.x, y: h.y, item: c.item });
         }
@@ -343,16 +389,17 @@ export class World {
     // counters & customers
     for (const c of this.counters) if (!c.hidden) this.updateCounter(c, dt);
     this.updateCustomers(dt);
-    // processors
+    // machines: output goes straight onto their counter
     for (const p of this.procs) {
       if (p.hidden) continue;
       p.work = Math.max(0, p.work - dt * 2);
-      if (p.buf >= p.ratio && p.out + p.outInc < CFG.proc.outCap) {
+      const out = p.outObj, room = !out || out.stock.length + out.incoming < CFG.counter.stockMax;
+      if (p.buf >= p.ratio && room) {
         p.timer += dt; p.work = 1;
         if (p.timer >= p.time) {
-          p.timer = 0; p.buf -= p.ratio; p.outInc++;
+          p.timer = 0; p.buf -= p.ratio;
           this.stats.produced[p.outItem] = (this.stats.produced[p.outItem] || 0) + 1;
-          this.launch(p.outItem, 'procOut', p.x, p.y, 30, p, p.outZone.cx, p.outZone.cy, 0, CFG.fly.produce);
+          if (out) { out.incoming++; this.launch(p.outItem, 'counter', p.x, p.y, 36, out, out.x, out.y, CFG.counter.deskH + 4, CFG.fly.produce); }
           this.emit('produce', { x: p.x, y: p.y, item: p.outItem });
         }
       } else p.timer = Math.min(p.timer, p.time);
@@ -363,16 +410,14 @@ export class World {
       if (f.t >= f.dur) { this.landFly(f); f.active = false; this.fly[i] = this.fly[this.fly.length - 1]; this.fly.pop(); this.flyFree.push(f); }
     }
     for (const pl of this.piles) { const b = pl.bump; for (let i = 0; i < b.length; i++) if (b[i] > 0) b[i] = Math.max(0, b[i] - dt * 5); }
-    // goal
     if (!this.won && this.progress().f >= 1) { this.won = true; this.winT = this.t; this.emit('win', {}); }
   }
 
   collide(c, nx, ny, r) {
     const W = this.W, H = this.H;
-    nx = Math.min(W - 20, Math.max(20, nx)); ny = Math.min(H - 20, Math.max(60, ny));
+    nx = Math.min(W - 18, Math.max(18, nx)); ny = Math.min(H - 18, Math.max(18, ny));
     for (const s of this.solids) {
       if (nx > s.x - r && nx < s.x + s.w + r && ny > s.y - r && ny < s.y + s.h + r) {
-        // push out along the smaller penetration
         const pl = nx - (s.x - r), pr = s.x + s.w + r - nx, pt = ny - (s.y - r), pb = s.y + s.h + r - ny;
         const m = Math.min(pl, pr, pt, pb);
         if (m === pl) nx = s.x - r; else if (m === pr) nx = s.x + s.w + r; else if (m === pt) ny = s.y - r; else ny = s.y + s.h + r;
@@ -381,7 +426,6 @@ export class World {
     c.x = nx; c.y = ny;
   }
 
-  // direction from c toward (tx,ty) that walks around solid rects (corner waypoints).
   segHits(ax, ay, bx, by, s, r) {
     const x0 = s.x - r, x1 = s.x + s.w + r, y0 = s.y - r, y1 = s.y + s.h + r;
     const dx = bx - ax, dy = by - ay; let t0 = 0, t1 = 1;
@@ -395,16 +439,26 @@ export class World {
     let best = null, bt = 2;
     for (const s of this.solids) {
       if (tx > s.x - r && tx < s.x + s.w + r && ty > s.y - r && ty < s.y + s.h + r) continue;
-      const t = this.segHits(c.x, c.y, tx, ty, s, r);
+      const inside = c.x > s.x - r && c.x < s.x + s.w + r && c.y > s.y - r && c.y < s.y + s.h + r;
+      const t = this.segHits(c.x, c.y, tx, ty, s, inside ? 2 : r);   // already touching: only care if we walk into it
       if (t >= 0 && t < bt) { bt = t; best = s; }
     }
     if (!best) return { x: tx, y: ty };
     const m = r + 6, s = best;
     const cs = [[s.x - m, s.y - m], [s.x + s.w + m, s.y - m], [s.x - m, s.y + s.h + m], [s.x + s.w + m, s.y + s.h + m]];
     let bc = null, bd = 1e18;
+    const blocked = (ax, ay, bx, by, rr) => {
+      for (const o of this.solids) {
+        if (ax > o.x - rr && ax < o.x + o.w + rr && ay > o.y - rr && ay < o.y + o.h + rr) continue;   // touching: ignore
+        if (this.segHits(ax, ay, bx, by, o, rr) >= 0) return true;
+      }
+      return false;
+    };
+    const insideAny = (x, y, rr) => this.solids.some((o) => x > o.x - rr && x < o.x + o.w + rr && y > o.y - rr && y < o.y + o.h + rr);
     for (const [x, y] of cs) {
-      if (this.segHits(c.x, c.y, x, y, s, r - 4) >= 0) continue;           // can't reach this corner directly
-      const dd = Math.hypot(x - c.x, y - c.y) + Math.hypot(tx - x, ty - y) + (this.segHits(x, y, tx, ty, s, r - 4) >= 0 ? 400 : 0);
+      if (x < 18 || y < 18 || x > this.W - 18 || y > this.H - 18) continue;
+      if (insideAny(x, y, r - 4) || blocked(c.x, c.y, x, y, r - 4)) continue;
+      const dd = Math.hypot(x - c.x, y - c.y) + Math.hypot(tx - x, ty - y) + (blocked(x, y, tx, ty, r - 4) ? 400 : 0);
       if (dd < bd) { bd = dd; bc = { x, y }; }
     }
     return bc || { x: tx, y: ty };
@@ -420,49 +474,63 @@ export class World {
   stepMove(c, dt, r) {
     const sp = Math.hypot(c.vx, c.vy);
     c.moving = sp > 8;
-    if (c.moving) { c.walk += dt * (6 + sp * 0.04); if (Math.abs(c.vx) > 4) c.face = c.vx > 0 ? 1 : -1; c.dirY = c.vy; }
+    // facing is in screen terms: screen-x velocity ∝ (vx - vy), screen-y ∝ (vx + vy)
+    const sx = c.vx - c.vy, sy = c.vx + c.vy;
+    if (c.moving) { c.walk += dt * (6 + sp * 0.04); if (Math.abs(sx) > 5) c.face = sx > 0 ? 1 : -1; c.dirY = sy; }
     this.collide(c, c.x + c.vx * dt, c.y + c.vy * dt, r);
-    c.sway += ((-c.vx * 0.0045) - c.sway) * Math.min(1, dt * 5);
+    c.sway += ((-sx * 0.0035) - c.sway) * Math.min(1, dt * 5);
   }
 
-  // ---- harvesting / picking / dropping (player, vehicle, workers share this) ----
+  // ---- harvesting / picking / dropping (player, mower, gardeners share this) ----
   interact(c, dt, isPlayer) {
     const space = () => c.cap - c.stack.length - c.incoming;
-    const srcs = c.sources;                      // workers: restricted source list
+    const srcs = c.sources;
     if (c.canPick) {
-      // crop fields: touch ripe plants
+      c.cutAcc = Math.min(c.cutAcc + c.cutRate * dt, Math.max(1, c.cutRate * 0.1));
       for (const f of this.fields) {
-        if (f.hidden || (srcs && !srcs.includes(f))) continue;
+        if (f.hidden || f.ripe <= 0 || (srcs && !srcs.includes(f)) || !this.hasSink(f.item)) continue;
         const hr = c.harvestR;
         if (c.x < f.x - hr || c.x > f.x + f.w + hr || c.y < f.y - hr || c.y > f.y + f.h + hr) continue;
-        let n = 0;
-        for (const p of f.plants) {
-          if (p.g < 1 || d2(p.x, p.y, c.x, c.y) > hr * hr) continue;
-          if (f.spill) {
-            if (f.pile.full()) break;
-            p.g = 0; n++;
-            for (let k = 0; k < f.spill; k++) {
-              const tx = p.x + (this.rnd() - 0.5) * 34, ty = p.y + (this.rnd() - 0.5) * 34;
-              f.pile.pending++;
-              this.launch(f.item, 'pile', p.x, p.y, 4, f.pile, tx, ty, 0, CFG.fly.harvest * 1.3);
+        const gp = f.gap, C = f.cols;
+        const c0 = Math.max(0, Math.floor((c.x - hr - f.x) / gp)), c1 = Math.min(C - 1, Math.floor((c.x + hr - f.x) / gp));
+        const r0 = Math.max(0, Math.floor((c.y - hr - f.y) / gp)), r1 = Math.min(f.rows - 1, Math.floor((c.y + hr - f.y) / gp));
+        const hr2 = hr * hr;
+        let stop = false, cut = 0, cx = 0, cy = 0;
+        for (let r = r0; r <= r1 && !stop; r++) {
+          const dy = f.y + (r + 0.5) * gp - c.y;
+          for (let col = c0; col <= c1; col++) {
+            const i = r * C + col;
+            if (f.g[i] < 1) continue;
+            const dx = f.x + (col + 0.5) * gp - c.x;
+            if (dx * dx + dy * dy > hr2) continue;
+            if (c.cutAcc < 1) { stop = true; break; }
+            const px = f.px(i), py = f.py(i);
+            if (f.spill) {
+              if (f.pile.full()) { stop = true; break; }
+              for (let k = 0; k < f.spill; k++) {
+                const tx = px + (this.rnd() - 0.5) * 34, ty = py + (this.rnd() - 0.5) * 34;
+                f.pile.pending++;
+                this.launch(f.item, 'pile', px, py, 4, f.pile, Math.min(f.x + f.w - 2, Math.max(f.x + 2, tx)), Math.min(f.y + f.h - 2, Math.max(f.y + 2, ty)), 0, CFG.fly.harvest);
+              }
+              c.cutAcc -= 3;
+            } else {
+              if (space() <= 0) { stop = true; break; }
+              c.incoming++;
+              this.launch(f.item, 'stack', px, py, 8, c, 0, 0, 0, CFG.fly.harvest, 70);
+              this.stats.collected[f.item] = (this.stats.collected[f.item] || 0) + 1;
+              c.cutAcc -= 1;
             }
-          } else {
-            if (space() < f.yieldN) break;
-            p.g = 0; n++;
-            for (let k = 0; k < f.yieldN; k++) { c.incoming++; this.launch(f.item, 'stack', p.x, p.y, 8, c, 0, 0, 0, CFG.fly.harvest); }
-            this.stats.collected[f.item] = (this.stats.collected[f.item] || 0) + f.yieldN;
+            f.g[i] = 0; f.ripe--; cut++; cx += px; cy += py;
           }
-          this.emit('harvest', { x: p.x, y: p.y, item: f.item, who: c.kind });
-          if (n >= 4) break;
         }
+        if (cut) { c.cutT = this.t; this.emit('harvest', { x: cx / cut, y: cy / cut, n: cut, item: f.item, who: c.kind }); }
       }
       // piles
       if (space() > 0) {
         c.pickAcc = Math.min(c.pickAcc + c.pickRate * dt, Math.max(1, c.pickRate * 0.1));
         let took = false;
         for (const pl of this.piles) {
-          if (pl.owner.hidden || (srcs && !srcs.includes(pl.owner))) continue;
-          if (c.only && pl.type !== c.only) continue;
+          if (pl.owner.hidden || (srcs && !srcs.includes(pl.owner)) || !this.hasSink(pl.type)) continue;
           while (c.pickAcc >= 1 && space() > 0) {
             const i = pl.take(c.x, c.y, c.pickR);
             if (i < 0) break;
@@ -470,16 +538,6 @@ export class World {
             this.launch(pl.type, 'stack', pl.cx(i), pl.cy(i), pl.hs[i] * CFG.pile.layer, c, 0, 0, 0, CFG.fly.pick);
             this.stats.collected[pl.type] = (this.stats.collected[pl.type] || 0) + 1;
             if (isPlayer) this.emit('pick', { item: pl.type });
-          }
-        }
-        // processor outputs
-        for (const p of this.procs) {
-          if (p.hidden || p.out <= 0 || (srcs && !srcs.includes(p))) continue;
-          if (!inRect(c.x, c.y, p.outZone)) continue;
-          while (c.pickAcc >= 1 && space() > 0 && p.out > 0) {
-            p.out--; c.pickAcc--; took = true; c.incoming++;
-            this.launch(p.outItem, 'stack', p.outZone.cx, p.outZone.cy, 6, c, 0, 0, 0, CFG.fly.pick);
-            if (isPlayer) this.emit('pick', { item: p.outItem });
           }
         }
         if (!took) c.pickAcc = Math.min(c.pickAcc, 1);
@@ -490,17 +548,19 @@ export class World {
     }
     // drop into sinks
     if (c.canDrop && c.stack.length > 0) {
-      let sink = null, item = null;
-      for (const k of this.counters) if (!k.hidden && inRect(c.x, c.y, k.zone) && c.stack.includes(k.item) && (!c.toObjs || c.toObjs.includes(k))) { sink = k; item = k.item; break; }
-      if (!sink) for (const p of this.procs) if (!p.hidden && inRect(c.x, c.y, p.inZone) && c.stack.includes(p.inItem) && (!c.toObjs || c.toObjs.includes(p))) { sink = p; item = p.inItem; break; }
+      let sink = null, accepts = null;
+      for (const k of this.counters) if (!k.hidden && inRect(c.x, c.y, k.zone) && (!c.toObjs || c.toObjs.includes(k)) && c.stack.some((t) => k.items.includes(t))) { sink = k; accepts = (t) => k.items.includes(t); break; }
+      if (!sink) for (const p of this.procs) if (!p.hidden && inRect(c.x, c.y, p.inZone) && (!c.toObjs || c.toObjs.includes(p)) && c.stack.includes(p.inItem)) { sink = p; accepts = (t) => t === p.inItem; break; }
       if (sink) {
         c.dropAcc = Math.min(c.dropAcc + c.dropRate * dt, Math.max(1, c.dropRate * 0.1));
         while (c.dropAcc >= 1) {
-          const idx = c.stack.lastIndexOf(item); if (idx < 0) break;
+          let idx = -1; for (let j = c.stack.length - 1; j >= 0; j--) if (accepts(c.stack[j])) { idx = j; break; }
+          if (idx < 0) break;
+          const item = c.stack[idx];
           c.stack.splice(idx, 1); c.dropAcc--;
           const z = 44 + idx * CFG.items[item].step;
-          if (sink.kind === 'counter') { sink.incoming++; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y - 4, 22, CFG.fly.drop); }
-          else { sink.inc++; this.launch(item, 'procIn', c.x, c.y, z, sink, sink.x - 20, sink.y, 34, CFG.fly.drop); }
+          if (sink.kind === 'counter') { sink.incoming++; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop); }
+          else { sink.inc++; this.launch(item, 'procIn', c.x, c.y, z, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop); }
           if (isPlayer) this.emit('drop', { item });
         }
       } else c.dropAcc = 0;
@@ -509,7 +569,6 @@ export class World {
 
   playerExtras(dt) {
     const p = this.player, R = CFG.player.cashR;
-    // vacuum cash piles
     for (const c of this.counters) {
       if (c.hidden || c.cash <= 0.01) continue;
       if (d2(p.x, p.y, c.cashPos.x, c.cashPos.y) > R * R) continue;
@@ -518,12 +577,11 @@ export class World {
       if (c.cash < 0.01) { this.money += c.cash; c.cash = 0; }
       this.emit('cash', { x: c.cashPos.x, y: c.cashPos.y, amount: take });
     }
-    // pay into unlock tiles
     const half = CFG.tile.size / 2;
     for (const t of this.tiles) if (t.cool > 0) t.cool -= dt;
     for (const t of this.tiles) {
       if (!t.visible) continue;
-      if (Math.abs(p.x - t.x) > half || Math.abs(p.y - t.y) > half) { continue; }
+      if (Math.abs(p.x - t.x) > half || Math.abs(p.y - t.y) > half) continue;
       if (t.cool > 0) break;
       if (this.money < 0.5) continue;
       const rate = Math.max(t.price / CFG.player.payTime, CFG.player.payMin);
@@ -541,28 +599,29 @@ export class World {
     c.spawnT -= dt;
     if (c.spawnT <= 0 && c.queue.length < C.queue) {
       c.spawnT = c.interval * (0.7 + this.rnd() * 0.6);
-      const cu = { x: c.spawn.x, y: c.spawn.y + (this.rnd() - 0.5) * 40, counter: c, state: 'in', want: C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)),
-                   got: 0, incoming: 0, wait: 0, hue: Math.floor(this.rnd() * 6), walk: this.rnd() * 6, face: -c.f, vx: 0, vy: 0, item: c.item };
+      const cu = { x: c.spawn.x + this.rnd() * 30, y: c.spawn.y + (this.rnd() - 0.5) * 20, counter: c, state: 'in',
+                   want: C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)),
+                   bag: [], incoming: 0, wait: 0, hue: Math.floor(this.rnd() * 8), walk: this.rnd() * 6, face: -1, vx: 0, vy: 0, leg: 0 };
       c.queue.push(cu); this.customers.push(cu);
     }
-    // front customer buys
     const front = c.queue[0];
     if (front && front.state === 'wait') {
       c.buyAcc = Math.min(c.buyAcc + c.serveRate * dt, 2);
-      while (c.buyAcc >= 1 && c.stock > 0 && front.got + front.incoming < front.want) {
-        c.buyAcc--; c.stock--; front.incoming++;
-        this.launch(c.item, 'cust', c.x, c.y - 4, 22, front, 0, 0, 0, CFG.fly.serve);
+      while (c.buyAcc >= 1 && c.stock.length > 0 && front.bag.length + front.incoming < front.want) {
+        c.buyAcc--; const it = c.stock.pop(); front.incoming++;
+        this.launch(it, 'cust', c.x, c.y, CFG.counter.deskH + 4, front, 0, 0, 0, CFG.fly.serve);
       }
-      if (c.stock <= 0) c.buyAcc = 0;
-      const done = front.got >= front.want || (front.incoming === 0 && front.got > 0 && c.stock <= 0 && (front.wait += dt) > C.patience);
+      if (c.stock.length <= 0) c.buyAcc = 0;
+      const got = front.bag.length;
+      const done = got >= front.want || (front.incoming === 0 && got > 0 && c.stock.length <= 0 && (front.wait += dt) > C.patience);
       if (done && front.incoming === 0) {
-        const amount = front.got * c.price;
-        this.stats.sold[c.item] = (this.stats.sold[c.item] || 0) + front.got;
+        let amount = 0;
+        for (const it of front.bag) { amount += itemPrice(it); this.stats.sold[it] = (this.stats.sold[it] || 0) + 1; }
         this.stats.earned += amount;
         if (c.cashier) { this.money += amount; this.emit('cashierPay', { x: c.x, y: c.y, amount }); }
         else { c.cash += amount; this.emit('pay', { x: front.x, y: front.y, tx: c.cashPos.x, ty: c.cashPos.y, amount }); }
         this.emit('sale', { x: c.x, y: c.y, amount });
-        front.state = 'out'; c.queue.shift();
+        front.state = 'out'; front.leg = 0; c.queue.shift();
       }
     }
   }
@@ -572,24 +631,23 @@ export class World {
     for (let i = this.customers.length - 1; i >= 0; i--) {
       const cu = this.customers[i], c = cu.counter;
       let tx, ty;
-      if (cu.state === 'out') { tx = c.exit.x; ty = c.exit.y; }
-      else { const qi = c.queue.indexOf(cu); tx = c.serve.x + qi * CFG.counter.queueGap * c.f; ty = c.serve.y; }
+      if (cu.state === 'out') { const wp = cu.leg === 0 ? c.exitA : c.exit; tx = wp.x; ty = wp.y; }
+      else { const qi = c.queue.indexOf(cu); tx = c.serve.x + qi * CFG.counter.queueGap; ty = c.serve.y; }
       const dx = tx - cu.x, dy = ty - cu.y, dd = Math.hypot(dx, dy);
       if (dd > 2) {
         const s = Math.min(dd, C.speed * dt);
         cu.vx = dx / dd * C.speed; cu.vy = dy / dd * C.speed;
         cu.x += dx / dd * s; cu.y += dy / dd * s; cu.walk += dt * 10; cu.moving = true;
-        if (Math.abs(dx) > 1) cu.face = dx > 0 ? 1 : -1;
+        const sx = dx - dy; if (Math.abs(sx) > 1) cu.face = sx > 0 ? 1 : -1;
       } else {
         cu.moving = false; cu.vx = cu.vy = 0;
-        if (cu.state === 'in' && c.queue[0] === cu) { cu.state = 'wait'; cu.face = -c.f; }
-        if (cu.state === 'out') { this.customers.splice(i, 1); }
+        if (cu.state === 'in' && c.queue[0] === cu) { cu.state = 'wait'; cu.face = -1; }
+        if (cu.state === 'out') { if (cu.leg === 0) cu.leg = 1; else this.customers.splice(i, 1); }
       }
-      if (cu.state === 'in' && c.queue[0] === cu && dd <= 2) cu.state = 'wait';
     }
   }
 
-  // ---- workers ---------------------------------------------------------------------
+  // ---- gardeners ---------------------------------------------------------------------
   workerAI(w, dt) {
     const T = this.t;
     const srcs = w.from.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
@@ -599,16 +657,11 @@ export class World {
     if (w.state === 'collect' && space <= 0) w.state = 'deliver';
     if (w.state === 'deliver' && w.stack.length === 0 && w.incoming === 0) { w.state = 'collect'; w.wait = 0; }
     w.canPick = w.state === 'collect';
-    // which sink objects the generic drop accepts
     let tx = w.x, ty = w.y;
     if (w.state === 'collect') {
-      // pick the richest source
       let best = null, bv = 0;
       for (const s of srcs) {
-        let v = 0;
-        if (s.kind === 'coop') v = s.pile.total;
-        else if (s.kind === 'field') v = (s.pile ? s.pile.total : 0) + s.plants.reduce((a, p) => a + (p.g >= 1 ? 1 : 0), 0);
-        else if (s.kind === 'proc') v = s.out * 3;
+        const v = s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + s.ripe;
         if (v > bv) { bv = v; best = s; }
       }
       if (!best) {
@@ -618,34 +671,30 @@ export class World {
         w.retarget -= dt;
         if (w.retarget <= 0 || !w.tgt) {
           w.retarget = 0.4;
-          if (best.kind === 'proc') w.tgt = { x: best.outZone.cx, y: best.outZone.cy };
-          else {
-            const pl = best.pile;
-            const i = pl && pl.total > 0 ? pl.hottest(w.x, w.y, T) : -1;
-            if (i >= 0) w.tgt = pl.safe(i);
-            else { // nearest ripe plant
-              let bp = null, bd = 1e18;
-              for (const p of best.plants) if (p.g >= 1) { const dd = d2(p.x, p.y, w.x, w.y); if (dd < bd) { bd = dd; bp = p; } }
-              if (bp) w.tgt = { x: bp.x, y: bp.y };
-            }
-          }
+          const pl = best.pile;
+          const i = pl && pl.total > 0 ? pl.hottest(w.x, w.y, T) : -1;
+          if (i >= 0) w.tgt = pl.safe(i);
+          else if (best.kind === 'field') { const j = best.nearestRipe(w.x, w.y); if (j >= 0) w.tgt = { x: best.px(j), y: best.py(j) }; }
         }
         if (w.tgt) { tx = w.tgt.x; ty = w.tgt.y; }
-        // partly-filled worker with an emptied source goes to deliver
         if (bv === 0 && w.stack.length > 0) w.state = 'deliver';
       }
     }
     if (w.state === 'deliver') {
       let bs = null, bd = 1e18;
-      for (const s of sinks) { const z = s.kind === 'counter' ? s.zone : s.inZone; const dd = d2(z.cx, z.cy, w.x, w.y); if (dd < bd) { bd = dd; bs = z; } }
-      if (bs) { tx = bs.cx; ty = bs.cy; }
+      for (const s of sinks) {
+        const ok = s.kind === 'counter' ? w.stack.some((t) => s.items.includes(t)) : w.stack.includes(s.inItem);
+        if (!ok) continue;
+        const z = s.kind === 'counter' ? s.zone : s.inZone; const dd = d2(z.cx, z.cy, w.x, w.y); if (dd < bd) { bd = dd; bs = z; }
+      }
+      if (bs) { tx = bs.cx + ((w.seed % 3) - 1) * 8; ty = bs.cy + ((w.seed % 2) ? 6 : -6); }
+      else if (w.stack.length) w.stack.length = 0;   // nothing takes these any more
     }
     const goal = Math.hypot(tx - w.x, ty - w.y);
     const wp = this.steer(w, tx, ty);
     const dx = wp.x - w.x, dy = wp.y - w.y, dd = Math.hypot(dx, dy);
     const sp = goal > 3 ? w.speed : 0;
     let vx = dd > 0 ? dx / dd * sp : 0, vy = dd > 0 ? dy / dd * sp : 0;
-    // unstick: if barely moving while far from target, slide sideways
     if (sp > 0) {
       w.stuck = Math.hypot(w.x - w.lastX, w.y - w.lastY) < w.speed * dt * 0.2 ? w.stuck + dt : Math.max(0, w.stuck - dt);
       if (w.stuck > 0.4) { const s = (Math.floor(T) % 2 ? 1 : -1); const ox = vx; vx = -vy * s; vy = ox * s; }
@@ -653,14 +702,21 @@ export class World {
     w.lastX = w.x; w.lastY = w.y;
     const k = Math.min(1, dt * 10);
     w.vx += (vx - w.vx) * k; w.vy += (vy - w.vy) * k;
-    this.stepMove(w, dt, 10);
+    this.stepMove(w, dt, 9);
   }
 
   // ---- guide: what should the player do next (arrow + sim bot) -----------------------
+  // machines first (they turn raw flowers into pricier goods), then counters
+  // produce nobody buys yet (no counter or machine takes it) is left in the field
+  hasSink(item) {
+    for (const p of this.procs) if (!p.hidden && p.inItem === item) return true;
+    for (const k of this.counters) if (!k.hidden && k.items.includes(item)) return true;
+    return false;
+  }
   sinksFor(item) {
     const out = [];
-    for (const k of this.counters) if (!k.hidden && k.item === item) out.push(k.zone);
-    for (const p of this.procs) if (!p.hidden && p.inItem === item) out.push(p.inZone);
+    for (const p of this.procs) if (!p.hidden && p.inItem === item) out.push({ z: p.inZone, w: 0.5 });
+    for (const k of this.counters) if (!k.hidden && k.items.includes(item)) out.push({ z: k.zone, w: 1 });
     return out;
   }
   guide() {
@@ -688,41 +744,36 @@ export class World {
   sinkTarget(p) {
     let best = null, bd = 1e18;
     const seen = new Set(p.stack);
-    for (const item of seen) for (const z of this.sinksFor(item)) { const dd = d2(z.cx, z.cy, p.x, p.y); if (dd < bd) { bd = dd; best = z; } }
+    for (const item of seen) for (const s of this.sinksFor(item)) { const dd = Math.sqrt(d2(s.z.cx, s.z.cy, p.x, p.y)) * s.w; if (dd < bd) { bd = dd; best = s.z; } }
     return best ? { x: best.cx, y: best.cy, kind: 'sink' } : null;
   }
   sourceTarget(p, free) {
     let best = null, bs = -1;
-    const has = (item) => this.sinksFor(item).length > 0;
-    for (const pr of this.procs) if (!pr.hidden && pr.out > 0 && has(pr.outItem)) {
-      const v = Math.min(free, pr.out) * CFG.items[pr.outItem].price * 1.5;
-      const s = v / (Math.sqrt(d2(pr.outZone.cx, pr.outZone.cy, p.x, p.y)) + 80);
-      if (s > bs) { bs = s; best = { x: pr.outZone.cx, y: pr.outZone.cy, kind: 'out' }; }
-    }
-    for (const pl of this.piles) if (!pl.owner.hidden && pl.total > 0 && has(pl.type)) {
+    const value = (item) => { let v = 0; for (const pr of this.procs) if (!pr.hidden && pr.inItem === item) v = Math.max(v, itemPrice(pr.outItem) / pr.ratio); for (const k of this.counters) if (!k.hidden && k.items.includes(item)) v = Math.max(v, itemPrice(item)); return v; };
+    for (const pl of this.piles) if (!pl.owner.hidden && pl.total > 0) {
+      const val = value(pl.type); if (!val) continue;
       const i = pl.hottest(p.x, p.y, this.t); if (i < 0) continue;
       const { x, y } = pl.safe(i);
-      const v = Math.min(free, pl.total) * CFG.items[pl.type].price;
-      const s = v / (Math.sqrt(d2(x, y, p.x, p.y)) + 80);
+      const s = Math.min(free, pl.total) * val / (Math.sqrt(d2(x, y, p.x, p.y)) + 80);
       if (s > bs) { bs = s; best = { x, y, kind: 'pile' }; }
     }
-    for (const f of this.fields) if (!f.hidden && has(f.item) && (!f.spill || f.pile.total < 20)) {
-      let bp = null, bd = 1e18, n = 0;
-      for (const pl of f.plants) if (pl.g >= 1) { n++; const dd = d2(pl.x, pl.y, p.x, p.y); if (dd < bd) { bd = dd; bp = pl; } }
-      if (!bp) continue;
-      const v = Math.min(free, n * (f.yieldN || f.spill)) * CFG.items[f.item].price;
-      const s = v / (Math.sqrt(bd) + 80);
-      if (s > bs) { bs = s; best = { x: bp.x, y: bp.y, kind: 'field' }; }
+    for (const f of this.fields) if (!f.hidden && f.ripe > 0 && (!f.spill || f.pile.total < 20)) {
+      const val = value(f.item); if (!val) continue;
+      const i = f.nearestRipe(p.x, p.y); if (i < 0) continue;
+      const x = f.px(i), y = f.py(i);
+      const s = Math.min(free, f.ripe * (f.spill || 1)) * val / (Math.sqrt(d2(x, y, p.x, p.y)) + 80);
+      if (s > bs) { bs = s; best = { x, y, kind: 'field' }; }
     }
     return best;
   }
 
-  // ---- save/restore of a level in progress (piles are rebuilt from prefill) ---------
+  // ---- save/restore of a level in progress ---------
   snapshot() {
-    return { li: this.li, t: this.t, money: this.money, stats: this.stats, upgDone: true,
+    return { li: this.li, t: this.t, money: this.money, stats: this.stats,
              tiles: this.tiles.map((t) => ({ id: t.id, paid: t.paid, bought: t.bought })),
              stack: this.player.stack.slice(0, 600),
-             cash: this.counters.map((c) => c.cash), stock: this.counters.map((c) => c.stock) };
+             cash: this.counters.map((c) => c.cash), stock: this.counters.map((c) => c.stock.slice(0, 300)),
+             buf: this.procs.map((p) => p.buf) };
   }
   restore(s) {
     for (const ts of s.tiles || []) {
@@ -734,7 +785,8 @@ export class World {
     if (s.stats) this.stats = { collected: {}, sold: {}, produced: {}, earned: 0, unlocks: 0, ...s.stats };
     if (Array.isArray(s.stack)) this.player.stack = s.stack.filter((x) => CFG.items[x]).slice(0, this.player.cap);
     (s.cash || []).forEach((v, i) => { if (this.counters[i]) this.counters[i].cash = v || 0; });
-    (s.stock || []).forEach((v, i) => { if (this.counters[i]) this.counters[i].stock = v || 0; });
+    (s.stock || []).forEach((v, i) => { if (this.counters[i] && Array.isArray(v)) this.counters[i].stock = v.filter((x) => CFG.items[x]); });
+    (s.buf || []).forEach((v, i) => { if (this.procs[i]) this.procs[i].buf = v || 0; });
     this.updateTileVis(true);
   }
 }
