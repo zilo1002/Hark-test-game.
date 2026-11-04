@@ -1,9 +1,9 @@
 // 半亩·丰收 — every tunable number lives here.
 // World units: the ground plane, x to the east (screen right-down), y to the south (screen left-down).
-// The camera is isometric (2:1); see render.js for the projection.
+// The camera looks down from the south-east (see render3d.js), so screen-right is +x −y.
 
 export const CFG = {
-  version: 2,
+  version: 3,
   saveKey: 'banmu-harvest-v2',
 
   view: {
@@ -115,7 +115,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[420, 330, 340, 100]], hedges: [[40, 600, 160, 22]], trees: [[60, 450, 'round'], [720, 40, 'round']], bushes: [[200, 470], [720, 620]], barn: [640, 120] } },
 
     // 4 — potatoes spill out of the ground; the ride-on mower arrives
-    { name: '土豆地', W: 780, H: 720, start: [440, 460], par: 180, bill: 10,
+    { name: '土豆地', W: 780, H: 720, start: [440, 460], par: 170, bill: 10,
       goal: { type: 'collect', item: 'potato', n: 3400 },
       objects: [
         { id: 'P1', type: 'field', crop: 'potato', x: 60, y: 60, w: 360, h: 300, gap: 30, prefill: 900 },
@@ -259,7 +259,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[470, 380, 430, 100], [540, 140, 80, 260]], hedges: [[820, 700, 70, 22]], trees: [[860, 60, 'round'], [860, 740, 'round']], bushes: [[600, 40], [440, 740]], barn: [680, 120] } },
 
     // 12 — roses into perfume
-    { name: '玫瑰香水', W: 840, H: 720, start: [470, 400], par: 130, bill: 20,
+    { name: '玫瑰香水', W: 840, H: 720, start: [470, 400], par: 140, bill: 20,
       goal: { type: 'produce', item: 'perfume', n: 220 },
       objects: [
         { id: 'R1', type: 'field', crop: 'rose', x: 40, y: 40, w: 330, h: 290, gap: 9 },
@@ -278,7 +278,7 @@ export const CFG = {
       deco: { theme: 'garden', paths: [[410, 360, 430, 100], [520, 200, 80, 170]], hedges: [[740, 580, 90, 22]], trees: [[800, 680, 'cone'], [800, 300, 'round']], bushes: [[420, 40], [780, 40]] } },
 
     // 13 — wheat and tomatoes, then a ketchup line
-    { name: '麦田番茄', W: 920, H: 780, start: [520, 440], par: 200, bill: 20,
+    { name: '麦田番茄', W: 920, H: 780, start: [520, 440], par: 220, bill: 20,
       goal: { type: 'earn', n: 3600 },
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 300, h: 300, gap: 9 },

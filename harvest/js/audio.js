@@ -42,12 +42,31 @@ export class Sound {
   }
 }
 
+// Vibration: in the Android app the WebView exposes AndroidHaptics.vibrate(ms, amplitude 1-255)
+// (VibrationEffect, real strength control); in a browser it falls back to navigator.vibrate.
 export class Haptics {
-  constructor() { this.on = true; this.last = 0; this.ok = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'; }
-  tick(ms = 12, gap = 70) {
+  constructor() {
+    this.on = true; this.last = 0;
+    this.native = typeof window !== 'undefined' && window.AndroidHaptics && typeof window.AndroidHaptics.vibrate === 'function';
+    this.ok = this.native || (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function');
+  }
+  buzz(ms, amp = 200) {
+    if (!this.on || !this.ok) return;
+    try { if (this.native) window.AndroidHaptics.vibrate(Math.round(ms), Math.max(1, Math.min(255, Math.round(amp)))); else navigator.vibrate(Math.round(ms)); }
+    catch (_) { this.ok = false; }
+  }
+  // throttled: at most one buzz per `gap` ms (used for the continuous cutting rumble)
+  tick(ms = 12, gap = 70, amp = 160) {
     if (!this.on || !this.ok) return;
     const now = performance.now(); if (now - this.last < gap) return; this.last = now;
-    try { navigator.vibrate(ms); } catch (_) { this.ok = false; }
+    this.buzz(ms, amp);
   }
-  pattern(p) { if (!this.on || !this.ok) return; try { navigator.vibrate(p); } catch (_) { this.ok = false; } }
+  // [on, off, on, …] in ms; amps optional per "on" segment
+  pattern(p, amps) {
+    if (!this.on || !this.ok) return;
+    if (!this.native) { try { navigator.vibrate(p); } catch (_) { this.ok = false; } return; }
+    let t = 0;
+    for (let i = 0; i < p.length; i += 2) { const ms = p[i], a = amps ? amps[i / 2] ?? 255 : 255; setTimeout(() => this.buzz(ms, a), t); t += p[i] + (p[i + 1] || 0); }
+    this.last = performance.now() + t;
+  }
 }

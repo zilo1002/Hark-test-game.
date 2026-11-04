@@ -2,12 +2,13 @@
 
 > 走进花田，一刀下去，花朵飞上背后的高塔。
 
-一个“走路—收割—叠高—出售—解锁”的农场小游戏，画面和手感参照 Gardenscapes / Homescapes 的花田模式试玩广告：等距视角的精致庄园、成千上万株可以一路割过去的花和庄稼、背上越堆越高的花塔、排队买花的顾客。纯静态网页，没有外部依赖和图片素材，所有画面都由 `<canvas>` 程序绘制。**横屏优先**，竖屏也能玩；电脑用鼠标拖动或 WASD / 方向键。
+一个“走路—收割—叠高—出售—解锁”的农场小游戏，画面和手感参照 Gardenscapes / Homescapes 的花田模式试玩广告。**v3 是 3D 版**：Three.js（`vendor/three.module.min.js`，本地文件，离线可用）渲染的低多边形庄园，圆滚滚的卡通小人（走路、挥镰刀、抱着高塔的动画），成千上万株可以一路割过去的花和庄稼，背上越堆越高的花塔，排队买花的顾客。没有图片素材，所有模型都由几何体拼出来。**横屏优先**，竖屏也能玩；电脑用鼠标拖动或 WASD / 方向键。另有离线安卓 APK（见 `android-harvest/`）。
 
 ## 玩法
 
 - **走路**：左下角的半透明摇杆——按住屏幕任意处拖动。
-- **收割**：走进成熟的麦田、郁金香、金盏花、玫瑰，周围一圈自动割下，花朵喷向空中、划着弧线落到背上的高塔里，田里留下一条整齐的割痕；割过的地方先是茬，再冒芽，过一会儿重新开花。
+- **收割**：走进成熟的麦田、郁金香、金盏花、玫瑰，周围一圈**同一帧全部割下**（半径内一株不留，只有背篓满了才停），花朵喷向空中、划着弧线落到怀里的高塔上，田里留下一条整齐、颜色明显更深的割痕；割过的地方先是一截截茬（约 4 秒），再冒芽，过一会儿重新开花。
+- **震动**：割的时候持续“嗡嗡”震（限频，不会糊成一片），卖出、解锁、过关更强。设置里可以关。安卓 APK 里用系统 VibrationEffect（可控强度），浏览器里用 navigator.vibrate（iPhone 的 Safari 不支持网页震动）。
 - **捡堆**：鸡蛋堆、土豆堆、番茄堆——走进去，周围的东西会被吸到背上。
 - **出售**：把东西背到蓝色「出售」台前的虚线框里卸货，顾客排队买走，钞票堆在旁边的深色格子上，走过去收钱。
 - **解锁**：站在青色虚线格子上付钱，满了“嘭”一下解锁：新花圃、雇园丁（会自己去割、自己送货）、雇小车、割草机（坐上去一次割一大片）、大花篮、跑鞋、大剪刀、买鸡、种番茄、出售台、收银员、加工机器、快机器。白色箭头一直指着下一步。
@@ -46,7 +47,20 @@ python3 -m http.server
 # 打开 http://localhost:8000/harvest/
 ```
 
-所有路径都是相对路径，放在任何子目录下都能运行。地址后加 `?debug` 会暴露 `window.__dbg`（自动截图/测试用）。
+所有路径都是相对路径，放在任何子目录下都能运行。地址后加 `?debug` 会暴露 `window.__dbg`（自动截图/测试用；`__dbg.quality(0|1|2)` 手动切画质）。
+
+## 画质自适应
+
+三档：高（像素比 2、2048 阴影、作物也投影）、中（像素比 1.5、1024 阴影）、低（像素比 1、无阴影）。开局用高档，连续 2 秒低于约 40 帧就降一档，持续流畅 12 秒会试着升回（最多降两次后不再升）。
+
+## 安卓 APK
+
+`android-harvest/` 是一个只有一个 Activity 的 WebView 外壳（`com.zilo.banmuharvest`）：横屏、沉浸式全屏、常亮；游戏文件打包在 APK 的 assets 里，通过 `https://appassets.androidplatform.net/harvest/` 本地提供（离线可玩、存档照常）；`window.AndroidHaptics.vibrate(ms, 振幅1-255)` 桥接系统震动；返回键 = 暂停菜单 / 关闭弹窗。
+
+```bash
+./android-harvest/build-apk.sh   # 直接用 Android SDK（aapt2 + javac + d8 + apksigner）出 debug APK
+# 或者用 Gradle（AGP 8.5.2，与 auto-clicker 同一套工具链）：cd android-harvest && gradle assembleDebug
+```
 
 ## 文件
 
@@ -57,22 +71,28 @@ harvest/js/config.js  所有数值：速度、容量、价格、作物、15 个�
 harvest/js/world.js   一关的全部游戏逻辑（不碰 DOM，浏览器和平衡模拟共用）
                       密集田地（Field：成千上万株，类型化数组）、沙堆高度场（Pile）、收割/捡拾/卸货、
                       出售台与顾客队列、加工机器、园丁 AI、绕障寻路、指引箭头
-harvest/js/render.js  等距（2:1）画布渲染：预渲染地面（草坪、石板路、花床、远侧围墙）、
-                      按 x+y 深度排序、田地按对角线逐行绘制 + 视野剔除（每帧最多约 4000 株，超出自动降级）、
-                      石栏杆/木栅栏/铁门/树篱/树/红谷仓、出售台、机器、背上的高塔、喷射飞行的花朵
-harvest/js/sprites.js 程序绘制的物品与植物贴图（含生长阶段：茬→芽→花苞→开花），按缩放缓存
+harvest/js/render3d.js Three.js 渲染：东南方向俯视的透视相机（屏幕右 = +x −y），草地/石板路/花床画在一张地面贴图上，
+                      围墙/树篱/树/谷仓合并成一个网格；每块田一个 InstancedMesh（按花色分组）+ 一层茬，
+                      每个物品堆一个 InstancedMesh，所有背着/飞着/摆在台上的物品按种类每帧重填 InstancedMesh；
+                      太阳光阴影跟着镜头走；上层 2D 画布画价格、数字、粒子、箭头和摇杆；三档画质自适应
+harvest/js/models.js  低多边形模型：作物、14 种物品、卡通小人（头大身圆，走路/挥镰/抱塔姿势）、割草机、小车、
+                      母鸡、番茄丛、围墙/木栅栏/铁门/树/树篱/谷仓、出售台、机器
+harvest/vendor/       three.module.min.js（r170，MIT）
+harvest/js/sprites.js 2D 物品图案（解锁格子和庄园界面的小图标用）
 harvest/js/chars.js   园丁主角、雇来的园丁、顾客、母鸡、番茄丛、割草机、小车
 harvest/js/icons.js   解锁格子与机器招牌上的小图标
 harvest/js/fx.js      对象池粒子（花瓣喷射）、飘字、飞钞票、彩带、震屏
 harvest/js/input.js   浮动虚拟摇杆（静止时停在左下角）+ 键盘
-harvest/js/audio.js   WebAudio 音效 + navigator.vibrate 震动
+harvest/js/audio.js   WebAudio 音效 + 震动（安卓 APK 走 AndroidHaptics，浏览器走 navigator.vibrate）
 harvest/js/save.js    存档（localStorage，失败时退回内存）
 harvest/js/home.js    关卡之间的庄园修复场景
 harvest/js/ui.js      DOM 界面
-harvest/js/main.js    启动、主循环、摇杆屏幕方向→等距世界方向、事件 → 特效
+harvest/js/main.js    启动、主循环、摇杆屏幕方向→世界方向、事件 → 特效与震动
+harvest/js/util.js    字体、弹性缓动、哈希
 harvest/sim/balance.mjs      无界面平衡模拟
 harvest/sim/set-par.mjs      按模拟结果重算每关三星时间
 harvest/sim/layout-check.mjs 检查关卡布局（格子、出售区、机器、田地互不重叠）
+harvest/sim/swath-check.mjs  割痕检查：直线穿过各关田地，半径内必须一株不剩（0 遗漏）、半径外不误割
 ```
 
 ## 平衡模拟
@@ -83,4 +103,8 @@ node harvest/sim/balance.mjs --verbose  # 列出每次解锁的时间与价格
 node harvest/sim/balance.mjs --level=5  # 只跑一关
 ```
 
-模拟直接运行 `js/world.js` 的真实逻辑，机器人跟着游戏里的指引箭头走（“熟练”= 满速摇杆、0.1 秒反应；“休闲”= 80% 摇杆、0.7 秒反应）。当前结果：第一次解锁 0:08，第一个园丁 0:45（休闲 0:51），每关熟练 1:57–3:42、休闲 2:05–4:05。
+模拟直接运行 `js/world.js` 的真实逻辑，机器人跟着游戏里的指引箭头走（“熟练”= 满速摇杆、0.1 秒反应；“休闲”= 80% 摇杆、0.7 秒反应）。当前结果（v3 一刀割净后整体快了约 10%，三星时间已按 `set-par` 重算）：第一次解锁 0:08，第一个园丁 0:46（休闲 0:53），每关熟练 1:57–3:41、休闲 2:01–4:12。
+
+```bash
+node harvest/sim/swath-check.mjs        # 27 条割痕全部 0 遗漏
+```

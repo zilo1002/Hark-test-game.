@@ -119,7 +119,7 @@ export class Field {
     this.w = this.cols * o.gap; this.h = this.rows * o.gap;
     const n = this.n = this.cols * this.rows;
     this.g = new Float32Array(n).fill(1);
-    this.jx = new Int8Array(n); this.jy = new Int8Array(n); this.v = new Uint8Array(n); this.pop = new Float32Array(n);
+    this.jx = new Int8Array(n); this.jy = new Int8Array(n); this.v = new Uint8Array(n); this.pop = new Float32Array(n); this.cutAt = new Float32Array(n).fill(-9);
     for (let i = 0; i < n; i++) { this.jx[i] = Math.round((rnd() - 0.5) * 60); this.jy[i] = Math.round((rnd() - 0.5) * 60); this.v[i] = (rnd() * 4) | 0; }
     this.ripe = n; this.grow = cr.grow; this.spill = cr.spill || 0; this.pile = null;
   }
@@ -486,42 +486,48 @@ export class World {
     const space = () => c.cap - c.stack.length - c.incoming;
     const srcs = c.sources;
     if (c.canPick) {
-      c.cutAcc = Math.min(c.cutAcc + c.cutRate * dt, Math.max(1, c.cutRate * 0.1));
+      // Clean, deterministic cut: every ripe plant whose (visual) position lies inside the
+      // harvest radius is cut this frame. Only a full stack / full pile limits it, and then the
+      // nearest plants go first so the swath edge stays round instead of patchy.
+      const cand = this._cand || (this._cand = []), cd = this._cd || (this._cd = []);
       for (const f of this.fields) {
         if (f.hidden || f.ripe <= 0 || (srcs && !srcs.includes(f)) || !this.hasSink(f.item)) continue;
         const hr = c.harvestR;
         if (c.x < f.x - hr || c.x > f.x + f.w + hr || c.y < f.y - hr || c.y > f.y + f.h + hr) continue;
         const gp = f.gap, C = f.cols;
-        const c0 = Math.max(0, Math.floor((c.x - hr - f.x) / gp)), c1 = Math.min(C - 1, Math.floor((c.x + hr - f.x) / gp));
-        const r0 = Math.max(0, Math.floor((c.y - hr - f.y) / gp)), r1 = Math.min(f.rows - 1, Math.floor((c.y + hr - f.y) / gp));
+        const c0 = Math.max(0, Math.floor((c.x - hr - f.x) / gp) - 1), c1 = Math.min(C - 1, Math.floor((c.x + hr - f.x) / gp) + 1);
+        const r0 = Math.max(0, Math.floor((c.y - hr - f.y) / gp) - 1), r1 = Math.min(f.rows - 1, Math.floor((c.y + hr - f.y) / gp) + 1);
         const hr2 = hr * hr;
-        let stop = false, cut = 0, cx = 0, cy = 0;
-        for (let r = r0; r <= r1 && !stop; r++) {
-          const dy = f.y + (r + 0.5) * gp - c.y;
-          for (let col = c0; col <= c1; col++) {
-            const i = r * C + col;
-            if (f.g[i] < 1) continue;
-            const dx = f.x + (col + 0.5) * gp - c.x;
-            if (dx * dx + dy * dy > hr2) continue;
-            if (c.cutAcc < 1) { stop = true; break; }
-            const px = f.px(i), py = f.py(i);
-            if (f.spill) {
-              if (f.pile.full()) { stop = true; break; }
-              for (let k = 0; k < f.spill; k++) {
-                const tx = px + (this.rnd() - 0.5) * 34, ty = py + (this.rnd() - 0.5) * 34;
-                f.pile.pending++;
-                this.launch(f.item, 'pile', px, py, 4, f.pile, Math.min(f.x + f.w - 2, Math.max(f.x + 2, tx)), Math.min(f.y + f.h - 2, Math.max(f.y + 2, ty)), 0, CFG.fly.harvest);
-              }
-              c.cutAcc -= 3;
-            } else {
-              if (space() <= 0) { stop = true; break; }
-              c.incoming++;
-              this.launch(f.item, 'stack', px, py, 8, c, 0, 0, 0, CFG.fly.harvest, 70);
-              this.stats.collected[f.item] = (this.stats.collected[f.item] || 0) + 1;
-              c.cutAcc -= 1;
+        cand.length = 0; cd.length = 0;
+        for (let r = r0; r <= r1; r++) for (let col = c0; col <= c1; col++) {
+          const i = r * C + col;
+          if (f.g[i] < 1) continue;
+          const dx = f.px(i) - c.x, dy = f.py(i) - c.y, dd = dx * dx + dy * dy;
+          if (dd <= hr2) { cand.push(i); cd.push(dd); }
+        }
+        if (!cand.length) continue;
+        let allow = f.spill ? Math.floor((f.pile.cap - f.pile.total - f.pile.pending) / f.spill) : space();
+        let list = cand;
+        if (allow < cand.length) {
+          if (allow <= 0) continue;
+          const ord = cand.map((i, k) => k).sort((a, b) => cd[a] - cd[b] || cand[a] - cand[b]);
+          list = ord.slice(0, allow).map((k) => cand[k]);
+        }
+        let cut = 0, cx = 0, cy = 0;
+        for (const i of list) {
+          const px = f.px(i), py = f.py(i);
+          if (f.spill) {
+            for (let k = 0; k < f.spill; k++) {
+              const tx = px + (this.rnd() - 0.5) * 34, ty = py + (this.rnd() - 0.5) * 34;
+              f.pile.pending++;
+              this.launch(f.item, 'pile', px, py, 4, f.pile, Math.min(f.x + f.w - 2, Math.max(f.x + 2, tx)), Math.min(f.y + f.h - 2, Math.max(f.y + 2, ty)), 0, CFG.fly.harvest);
             }
-            f.g[i] = 0; f.ripe--; cut++; cx += px; cy += py;
+          } else {
+            c.incoming++;
+            this.launch(f.item, 'stack', px, py, 8, c, 0, 0, 0, CFG.fly.harvest, 70);
+            this.stats.collected[f.item] = (this.stats.collected[f.item] || 0) + 1;
           }
+          f.g[i] = 0; f.ripe--; f.cutAt[i] = this.t; cut++; cx += px; cy += py;
         }
         if (cut) { c.cutT = this.t; this.emit('harvest', { x: cx / cut, y: cy / cut, n: cut, item: f.item, who: c.kind }); }
       }

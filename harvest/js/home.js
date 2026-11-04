@@ -3,7 +3,7 @@
 import { CFG } from './config.js';
 import { COL } from './sprites.js';
 import { person, HERO } from './chars.js';
-import { elastic, FONT } from './render.js';
+import { elastic, FONT } from './util.js';
 
 const TAU = Math.PI * 2;
 export const SPOTS = {

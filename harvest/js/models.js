@@ -1,0 +1,448 @@
+// Low-poly models built from Three.js primitives: crops, stack items, chunky cartoon people,
+// animals, machines and the environment. Every static model is merged into one geometry with
+// vertex colours, so a whole field or every item of a kind is a single InstancedMesh draw.
+import * as THREE from '../vendor/three.module.min.js';
+
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
+
+// one primitive with a colour and a transform: P(geo, '#hex', [x,y,z], [rx,ry,rz], [sx,sy,sz])
+export function P(geo, color, pos = [0, 0, 0], rot = [0, 0, 0], scl = [1, 1, 1]) { return { geo, color, pos, rot, scl }; }
+
+export function merge(parts) {
+  const geos = [];
+  let n = 0;
+  for (const pt of parts) {
+    let g = pt.geo.index ? pt.geo.toNonIndexed() : pt.geo.clone();
+    g.deleteAttribute('uv');
+    _e.set(pt.rot[0], pt.rot[1], pt.rot[2]); _q.setFromEuler(_e);
+    _m.compose(_p.set(pt.pos[0], pt.pos[1], pt.pos[2]), _q, _s.set(pt.scl[0], pt.scl[1], pt.scl[2]));
+    g.applyMatrix4(_m);
+    _c.set(pt.color);
+    const cnt = g.attributes.position.count, col = new Float32Array(cnt * 3);
+    for (let i = 0; i < cnt; i++) { col[i * 3] = _c.r; col[i * 3 + 1] = _c.g; col[i * 3 + 2] = _c.b; }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geos.push(g); n += cnt;
+  }
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  let o = 0;
+  for (const g of geos) {
+    pos.set(g.attributes.position.array, o); nor.set(g.attributes.normal.array, o); col.set(g.attributes.color.array, o);
+    o += g.attributes.position.count * 3; g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  out.computeBoundingSphere();
+  return out;
+}
+
+// shared primitive cache (unit-ish sizes, scaled per part)
+const G = {};
+export const box = (w, h, d) => G[`b${w},${h},${d}`] || (G[`b${w},${h},${d}`] = new THREE.BoxGeometry(w, h, d));
+export const cyl = (rt, rb, h, s = 8) => G[`c${rt},${rb},${h},${s}`] || (G[`c${rt},${rb},${h},${s}`] = new THREE.CylinderGeometry(rt, rb, h, s));
+export const cylO = (rt, rb, h, s = 3) => G[`o${rt},${rb},${h},${s}`] || (G[`o${rt},${rb},${h},${s}`] = new THREE.CylinderGeometry(rt, rb, h, s, 1, true));
+export const sph = (r, w = 8, h = 6) => G[`s${r},${w},${h}`] || (G[`s${r},${w},${h}`] = new THREE.SphereGeometry(r, w, h));
+export const ico = (r, d = 0) => G[`i${r},${d}`] || (G[`i${r},${d}`] = new THREE.IcosahedronGeometry(r, d));
+export const cone = (r, h, s = 8) => G[`k${r},${h},${s}`] || (G[`k${r},${h},${s}`] = new THREE.ConeGeometry(r, h, s));
+export const cap = (r, l, cs = 3, rs = 8) => G[`p${r},${l}`] || (G[`p${r},${l}`] = new THREE.CapsuleGeometry(r, l, cs, rs));
+export const tor = (r, t, rs = 4, ts = 10, arc = Math.PI * 2) => G[`t${r},${t},${arc}`] || (G[`t${r},${t},${arc}`] = new THREE.TorusGeometry(r, t, rs, ts, arc));
+
+const H = Math.PI / 2;
+
+// ------------------------------------------------------------------ materials
+const MATS = {};
+export function vcMat(key = 'vc', opts = {}) {
+  return MATS[key] || (MATS[key] = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, ...opts }));
+}
+export function colMat(hex) {
+  return MATS[hex] || (MATS[hex] = new THREE.MeshLambertMaterial({ color: hex, flatShading: true }));
+}
+
+// ------------------------------------------------------------------ stack / pile items
+// Each item sits centred on its origin, about CFG.items[type].step tall, ~12-14 units wide.
+const ITEM_PARTS = {
+  wheat: () => [
+    P(cyl(2.5, 2.5, 11, 7), '#E9B83A', [0, 0, 0], [0, 0, H], [1, 1, 1.25]),
+    P(ico(3.2, 0), '#FFE07A', [6.4, 0.3, 0], [0, 0, 0], [1.2, 0.85, 1.3]),
+    P(ico(3.0, 0), '#FFD65A', [-6.2, 0.2, 0], [0, 0.5, 0], [1.1, 0.85, 1.3]),
+    P(cyl(2.75, 2.75, 1.6, 7), '#A8741E', [0, 0, 0], [0, 0, H], [1, 1, 1.25]),
+  ],
+  tulip: () => {
+    // a wrapped bunch seen side-on: big pink cups up front, short stems, one leaf
+    const out = [];
+    for (const [z, y, c, x] of [[-2.6, 0, '#F2486E', 3.0], [0, 0.5, '#FF6F92', 4.2], [2.6, 0, '#E8365E', 3.0]]) {
+      out.push(P(cyl(0.6, 0.6, 7, 5), '#4FAE32', [-2.4, y - 0.6, z], [0, 0, H]));
+      out.push(P(cyl(2.5, 1.5, 4.4, 6), c, [x, y, z], [0, 0, -H]));
+      out.push(P(cone(1.0, 1.6, 4), c, [x + 2.8, y + 1.0, z], [0, 0, -H]));
+    }
+    out.push(P(box(3, 2.6, 6.8), '#FFF3E0', [-3.2, -0.4, 0]));
+    out.push(P(cone(1.6, 6, 4), '#3E9B2A', [-3, -1.6, 2.6], [0, 0, H], [1, 1, 0.4]));
+    return out;
+  },
+  gold: () => [
+    P(cyl(5.6, 5.4, 2.2, 10), '#FFB80F', [0, -0.3, 0]),
+    P(cyl(5.0, 5.0, 2.4, 10), '#FFD84A', [0, 0.1, 0], [0, Math.PI / 10, 0]),
+    P(cyl(2.3, 2.6, 1.4, 8), '#E07A0A', [0, 1.4, 0]),
+  ],
+  rose: () => {
+    const out = [];
+    for (const [z, c, x] of [[-2.6, '#E0283C', 3.2], [0, '#F03A50', 4.4], [2.6, '#C8102E', 3.2]]) {
+      out.push(P(cyl(0.55, 0.55, 6.5, 5), '#3E8F25', [-2.6, -0.6, z], [0, 0, H]));
+      out.push(P(ico(2.6, 0), c, [x, 0.3, z], [0.4, 0.3, 0]));
+      out.push(P(ico(1.6, 0), '#FF5A78', [x + 0.8, 1.2, z]));
+      out.push(P(cone(1.8, 1.6, 5), '#2F7A1E', [x - 2.4, 0, z], [0, 0, H]));
+    }
+    out.push(P(box(3, 2.4, 7.2), '#FFFFFF', [-3.4, -0.5, 0]));
+    return out;
+  },
+  egg: () => [P(sph(1, 7, 5), '#FFF8EA', [0, 0, 0], [0, 0, 0], [5.6, 4.5, 4.6])],
+  potato: () => [P(ico(1, 0), '#C98A4B', [0, 0, 0], [0.3, 0.7, 0.2], [6.4, 4.8, 5.2]), P(ico(0.9, 0), '#B07840', [2.0, 2.2, 1.4])],
+  tomato: () => [
+    P(sph(3.4, 7, 5), '#EE4630', [0, 0, 0], [0, 0, 0], [1, 0.82, 1]),
+    P(cone(2.1, 0.8, 5), '#3E9B2A', [0, 2.9, 0]),
+    P(cyl(0.4, 0.4, 1.4, 4), '#2F7A1E', [0, 3.6, 0]),
+  ],
+  crate: () => {
+    const out = [P(box(14, 6.5, 10), '#C8874A'), P(box(14.4, 1.4, 10.4), '#8E5627', [0, -1.6, 0]), P(box(14.4, 1.2, 10.4), '#E3A866', [0, 2.6, 0])];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) out.push(P(sph(1.8, 6, 5), '#FFF1D2', [-4.6 + i * 4.6, 3.9, -2.4 + j * 4.8], [0, 0, 0], [1, 0.8, 1]));
+    return out;
+  },
+  ketchup: () => [
+    P(cyl(3.0, 3.3, 6.4, 8), '#E2261C', [0, -1.2, 0]),
+    P(cyl(3.35, 3.35, 2.6, 8), '#FFFFFF', [0, -1.0, 0]),
+    P(cyl(1.4, 2.6, 1.8, 8), '#E2261C', [0, 2.8, 0]),
+    P(cyl(1.5, 1.5, 1.4, 8), '#FFFFFF', [0, 4.1, 0]),
+  ],
+  bouquet: () => [
+    P(cone(3.6, 11, 7), '#FFB3C8', [-1.2, 0, 0], [0, 0, H]),
+    P(cyl(1.0, 1.0, 1.4, 6), '#E86AA6', [-3.6, 0, 0], [0, 0, H]),
+    P(ico(2.2, 0), '#FFC21A', [5.0, 1.2, -1.6]),
+    P(ico(2.1, 0), '#F2486E', [5.2, 1.0, 1.8]),
+    P(ico(2.0, 0), '#FFFFFF', [5.8, -1.6, 0]),
+    P(ico(1.6, 0), '#5DBB3A', [3.6, -2.2, 1.4]),
+  ],
+  basket: () => [
+    P(cyl(6.0, 4.6, 4.8, 9), '#C98A4B', [0, -1.6, 0]),
+    P(cyl(6.2, 6.2, 1.1, 9), '#9C6331', [0, 0.8, 0]),
+    P(tor(5, 0.6, 3, 9, Math.PI), '#9C6331', [0, 1, 0]),
+    P(ico(2.2, 0), '#F2486E', [-2.4, 2.0, -1.4]),
+    P(ico(2.1, 0), '#FFC21A', [2.2, 2.0, 1.2]),
+    P(ico(1.9, 0), '#FF8FB0', [0.4, 2.2, -2.6]),
+    P(ico(1.8, 0), '#FFFFFF', [-0.6, 2.0, 2.6]),
+  ],
+  perfume: () => [
+    P(box(7, 5.8, 5), '#FF8FB0', [0, -1.2, 0]),
+    P(box(5.4, 4.4, 5.2), '#FFC2DA', [0, -1.0, 0]),
+    P(cyl(1.0, 1.2, 1.6, 6), '#FFFFFF', [0, 2.4, 0]),
+    P(sph(1.8, 7, 5), '#F2B529', [0, 4.0, 0]),
+  ],
+  bill: () => [P(box(11, 0.9, 6), '#57C35A'), P(box(3, 1.1, 3), '#E9FFE0', [0, 0.05, 0])],
+  cash: () => [P(box(12, 2.6, 7), '#57C35A'), P(box(12.3, 2.8, 2), '#2F8F3A'), P(box(2.6, 2.9, 2.2), '#E9FFE0')],
+};
+const ITEM_GEO = {};
+export function itemGeo(type) { return ITEM_GEO[type] || (ITEM_GEO[type] = merge((ITEM_PARTS[type] || ITEM_PARTS.egg)())); }
+export const ITEM_TYPES = Object.keys(ITEM_PARTS);
+// half height of each item, so stacks and piles rest items on their bottom face
+export const ITEM_HALF = { wheat: 2.6, tulip: 2.2, gold: 1.7, rose: 2.2, egg: 2.2, potato: 2.4, tomato: 2.8, crate: 3.3, ketchup: 4.4, bouquet: 3.4, basket: 3.4, perfume: 4.0, bill: 0.45, cash: 1.4 };
+
+// ------------------------------------------------------------------ crops (field plants)
+// Plants stand on y=0 and are ~11-14 units tall; scaled by growth. Stubble is what stays after a cut.
+const CROP_PARTS = {
+  wheat: () => [
+    P(cyl(0.6, 0.7, 7, 4), '#C99A35', [0, 3.5, 0]),
+    P(cyl(2.0, 1.3, 6.2, 6), '#F6C640', [0, 9.6, 0]),
+    P(cone(1.2, 2.2, 5), '#FFE07A', [0, 13.8, 0]),
+    P(cyl(0.55, 0.65, 6, 4), '#C99A35', [2.2, 3, 1.2], [0.15, 0, -0.25]),
+    P(cyl(1.7, 1.1, 5.2, 6), '#FFD95E', [3.6, 7.8, 2.0], [0.15, 0, -0.25]),
+    P(cyl(0.55, 0.65, 6, 4), '#C99A35', [-2, 3, -1.4], [-0.2, 0, 0.25]),
+    P(cyl(1.7, 1.1, 5.2, 6), '#EDB52E', [-3.3, 7.6, -2.4], [-0.2, 0, 0.25]),
+    P(cyl(1.6, 1.0, 5.0, 6), '#F8CC48', [-1.2, 8.0, 3.0], [0.3, 0, 0.1]),
+    P(cone(3.4, 4, 6), '#D9AE48', [0, 2, 0]),
+  ],
+  tulip: () => [
+    P(cyl(0.45, 0.5, 8, 4), '#4FAE32', [0, 4, 0]),
+    P(cone(1.4, 6, 4), '#3E9B2A', [1.6, 3, 0], [0, 0, -0.35], [1, 1, 0.45]),
+    P(cone(1.4, 5.5, 4), '#5DBB3A', [-1.5, 2.8, 0.4], [0, 0.6, 0.35], [1, 1, 0.45]),
+    P(cyl(2.4, 1.4, 3.8, 6), '#FFFFFF', [0, 9.8, 0]),
+    P(cone(0.9, 1.6, 4), '#FFFFFF', [1.4, 12.4, 0], [0, 0, -0.2]),
+    P(cone(0.9, 1.6, 4), '#FFFFFF', [-0.8, 12.4, 1.2], [0.2, 0, 0.1]),
+    P(cone(0.9, 1.6, 4), '#FFFFFF', [-0.6, 12.4, -1.2], [-0.2, 0, 0.1]),
+  ],
+  gold: () => [
+    P(ico(3.4, 0), '#4FA82A', [0, 2.6, 0], [0, 0, 0], [1, 0.7, 1]),
+    P(cyl(3.6, 3.2, 1.8, 7), '#FFFFFF', [0, 6.0, 0]),
+    P(cyl(3.2, 3.2, 2.0, 7), '#FFFFFF', [0, 6.2, 0], [0, Math.PI / 7, 0]),
+    P(cyl(1.4, 1.6, 1.0, 6), '#E07A0A', [0, 7.4, 0]),
+  ],
+  rose: () => [
+    P(ico(3.2, 0), '#3A8A26', [0, 3.2, 0], [0, 0, 0], [1, 1.1, 1]),
+    P(cyl(0.45, 0.5, 4, 4), '#2F7A1E', [0, 7, 0]),
+    P(ico(2.4, 0), '#FFFFFF', [0, 9.6, 0], [0.3, 0.4, 0]),
+    P(ico(1.5, 0), '#FFFFFF', [0.3, 10.9, 0.2]),
+    P(ico(1.1, 0), '#E0283C', [2.2, 6.2, 1.4]),
+  ],
+  potato: () => [
+    P(ico(6.5, 0), '#4FAE32', [0, 5, 0], [0, 0, 0], [1, 0.75, 1]),
+    P(ico(4.5, 0), '#6CCB3E', [3, 8, -2], [0.5, 0.3, 0], [1, 0.8, 1]),
+    P(ico(4, 0), '#5DBB3A', [-3.4, 7.4, 2.4], [0.2, 0.9, 0], [1, 0.8, 1]),
+    P(sph(1.6, 5, 4), '#FFFFFF', [2, 11.4, 1]),
+  ],
+};
+// tint colours for the white parts of each crop (applied with instance colour = whole plant tint is avoided)
+const CROP_TINT = { tulip: ['#F2486E', '#FF6F92', '#E8365E', '#FF4F7A'], gold: ['#FFC21A', '#FFB10A', '#FFD23F', '#FFC21A'], rose: ['#E0283C', '#C8102E', '#F03A50', '#D81E36'], potato: ['#FFFFFF'], wheat: ['#FFFFFF'] };
+const CROP_GEO = {};
+export function cropGeo(crop, variant = 0) {
+  const k = crop + variant;
+  if (CROP_GEO[k]) return CROP_GEO[k];
+  const tint = (CROP_TINT[crop] || ['#FFFFFF'])[variant % (CROP_TINT[crop] || ['#FFFFFF']).length];
+  const parts = CROP_PARTS[crop]().map((p) => (p.color === '#FFFFFF' ? { ...p, color: tint } : p));
+  return (CROP_GEO[k] = merge(parts));
+}
+export const cropVariants = (crop) => (CROP_TINT[crop] || ['#FFFFFF']).length;
+const STUB_GEO = {};
+export function stubbleGeo(crop) {
+  if (STUB_GEO[crop]) return STUB_GEO[crop];
+  const c = crop === 'wheat' ? '#C9A050' : crop === 'potato' ? '#7D4526' : '#7FBF45';
+  const c2 = crop === 'wheat' ? '#E2C27A' : crop === 'potato' ? '#9A5A32' : '#9AD45A';
+  // kept very cheap (~30 triangles): thousands of these sit under every field
+  return (STUB_GEO[crop] = merge(crop === 'potato'
+    ? [P(cone(4.5, 1.2, 6), c, [0, 0.6, 0]), P(cylO(0.5, 0.5, 2.5, 3), '#5DBB3A', [0, 1.6, 0])]
+    : [
+      P(cylO(0.6, 0.7, 2.8, 3), c, [0, 1.4, 0]), P(cylO(0.55, 0.65, 2.2, 3), c2, [1.8, 1.1, 0.8]), P(cylO(0.55, 0.65, 2.4, 3), c, [-1.5, 1.2, -1.0]),
+      P(cylO(0.5, 0.6, 2.0, 3), c2, [0.4, 1.0, -1.9]), P(cone(3.2, 0.6, 5), crop === 'wheat' ? '#7A5424' : '#2F5E1E', [0, 0.3, 0]),
+    ]));
+}
+
+// ------------------------------------------------------------------ people
+// Chunky cartoon figure: big head, round body, stubby limbs. Returns { root, parts } where
+// parts.* are pivot groups the animator rotates. Facing +Z. Total height ≈ 40 units.
+export function makePerson(o = {}) {
+  const skin = o.skin || '#FFCFA0';
+  const root = new THREE.Group(), body = new THREE.Group();
+  root.add(body);
+  const M = (c) => colMat(c);
+  const mesh = (geo, c, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new THREE.Mesh(geo, M(c)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; return m; };
+  // legs: pivot at the hip
+  const legs = [];
+  for (const s of [-1, 1]) {
+    const hip = new THREE.Group(); hip.position.set(s * 3.1, 12.5, 0);
+    hip.add(mesh(cap(2.5, 6, 2, 7), o.pants || '#3A4A78', 0, -5.2, 0));
+    hip.add(mesh(box(4.6, 2.6, 6.4), o.shoes || '#5A3414', 0, -10.6, 1.0));
+    body.add(hip); legs.push(hip);
+  }
+  // torso
+  const torso = new THREE.Group(); torso.position.set(0, 12, 0); body.add(torso);
+  if (o.dress) torso.add(mesh(cyl(5.2, 7.6, 12, 9), o.dress, 0, 5.5, 0));
+  else torso.add(mesh(cap(6.4, 5.4, 3, 9), o.shirt || '#FFFFFF', 0, 6.4, 0, 1, 1, 0.86));
+  if (o.vest) torso.add(mesh(cyl(6.2, 6.6, 7.5, 9, 1), o.vest, 0, 6.4, 0, 1.04, 1, 0.92));
+  if (o.overalls) { torso.add(mesh(cyl(6.3, 6.8, 6.5, 9), o.overalls, 0, 3.6, 0, 1.03, 1, 0.92)); torso.add(mesh(box(6.2, 5, 1.2), o.overalls, 0, 8.4, 5.5)); }
+  if (o.bowtie) torso.add(mesh(box(4.2, 1.8, 1.2), '#C8352A', 0, 11.2, 5.4));
+  // arms: pivot at the shoulder
+  const arms = [];
+  for (const s of [-1, 1]) {
+    const sh = new THREE.Group(); sh.position.set(s * 7.0, 10.6, 0);
+    sh.add(mesh(cap(2.1, 5.4, 2, 6), o.sleeve || o.dress || o.shirt || '#FFFFFF', 0, -3.8, 0));
+    sh.add(mesh(sph(2.2, 7, 5), skin, 0, -8.2, 0));
+    torso.add(sh); arms.push(sh);
+  }
+  // head
+  const head = new THREE.Group(); head.position.set(0, 27.5, 0); body.add(head);
+  head.add(mesh(sph(7.4, 12, 9), skin, 0, 0, 0, 1, 0.98, 1));
+  const hair = o.hair || '#6B3A1E';
+  const hm = new THREE.Mesh(HAIR_GEO, M(hair)); hm.position.set(0, 0.8, -0.4); hm.rotation.x = -0.42; hm.castShadow = true; head.add(hm);
+  head.add(mesh(sph(6.6, 10, 7), hair, 0, -0.4, -2.6, 1.05, 1, 0.8));
+  for (const s of [-1, 1]) {
+    const eye = new THREE.Mesh(sph(1.05, 6, 5), M('#2A1A10')); eye.position.set(s * 2.6, 0.2, 7.6); eye.scale.set(1, 1.3, 0.6); head.add(eye);
+    const cheek = new THREE.Mesh(sph(1.3, 6, 4), M('#FF9C8A')); cheek.position.set(s * 4.4, -2.4, 6.6); cheek.scale.set(1, 0.6, 0.4); head.add(cheek);
+  }
+  const nose = new THREE.Mesh(sph(1.1, 6, 4), M('#F2B486')); nose.position.set(0, -1.2, 8.1); head.add(nose);
+  if (o.hat === 'straw') {
+    head.add(mesh(cyl(11, 11, 0.9, 12), '#F2CF6B', 0, 5.2, 0));
+    head.add(mesh(cyl(6.2, 7.2, 4.6, 10), '#E8BE4E', 0, 7.6, 0));
+    head.add(mesh(cyl(7.25, 7.25, 1.2, 10), '#C8352A', 0, 6.0, 0));
+  } else if (o.hat === 'cap') {
+    head.add(mesh(sph(7.9, 10, 6, 0), o.capColor || '#3B7FE0', 0, 2.4, 0, 1, 0.75, 1));
+    head.add(mesh(box(8, 0.9, 6), o.capColor || '#3B7FE0', 0, 2.6, 7.4));
+  }
+  if (o.pigtails) for (const s of [-1, 1]) head.add(mesh(sph(2.6, 7, 5), hair, s * 7.6, -0.8, -2.2));
+  // tool in the right hand (sickle), hidden unless cutting
+  const tool = new THREE.Group();
+  tool.add(mesh(cyl(0.6, 0.6, 6, 5), '#8E5627', 0, 0, 0));
+  const blade = new THREE.Mesh(tor(3.6, 0.55, 3, 8, Math.PI * 1.2), M('#DDE3EA')); blade.position.set(0, 3.2, 3.2); blade.rotation.set(0, H, 0); blade.castShadow = true; tool.add(blade);
+  tool.position.set(0, -9, 1.4); tool.rotation.set(H, 0, 0); tool.visible = false;
+  arms[1].add(tool);
+  // contact shadow blob (cheap, always on)
+  const blob = new THREE.Mesh(BLOB_GEO, BLOB_MAT); blob.rotation.x = -H; blob.position.y = 0.3; blob.scale.set(10, 8, 1); root.add(blob);
+  return { root, body, legs, arms, torso, head, tool, blob, o };
+}
+export const HAIR_GEO = new THREE.SphereGeometry(7.9, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.5);
+export const BLOB_GEO = new THREE.CircleGeometry(1, 14);
+export const BLOB_MAT = new THREE.MeshBasicMaterial({ color: 0x1E4A10, transparent: true, opacity: 0.22, depthWrite: false });
+
+// pose a person: walk phase, moving, carrying, cutting (sickle sweep), time for idle breathing
+export function posePerson(pp, s) {
+  const { legs, arms, body, torso, head, tool } = pp;
+  const sw = s.moving ? Math.sin(s.walk) : 0;
+  const bob = s.moving ? Math.abs(Math.sin(s.walk)) * 1.6 : Math.sin(s.t * 3 + (s.seed || 0)) * 0.3;
+  body.position.y = bob;
+  legs[0].rotation.x = sw * 0.75; legs[1].rotation.x = -sw * 0.75;
+  torso.rotation.z = s.moving ? Math.sin(s.walk) * 0.05 : 0;
+  torso.rotation.x = s.carry ? -0.06 : (s.moving ? 0.08 : 0);
+  head.rotation.x = s.carry ? -0.1 : 0;
+  head.rotation.z = s.moving ? -Math.sin(s.walk) * 0.04 : Math.sin(s.t * 1.3 + (s.seed || 0)) * 0.04;
+  if (s.cutting) {
+    // fast horizontal sickle sweep with the right arm; the left keeps hold of the stack
+    const k = Math.sin(s.t * 22);
+    arms[1].rotation.set(-1.25, 0, -0.2 + k * 0.9);
+    arms[0].rotation.set(s.carry ? -1.45 : -sw * 0.8, 0, s.carry ? 0.25 : 0.1);
+    tool.visible = true;
+    torso.rotation.y = k * 0.18;
+  } else if (s.carry) {
+    // both arms forward and up, hugging the stack
+    arms[0].rotation.set(-1.5, 0, 0.32); arms[1].rotation.set(-1.5, 0, -0.32);
+    tool.visible = false; torso.rotation.y = 0;
+  } else {
+    arms[0].rotation.set(-sw * 0.85, 0, 0.12); arms[1].rotation.set(sw * 0.85, 0, -0.12);
+    tool.visible = !!s.showTool; torso.rotation.y = 0;
+  }
+  if (s.seated) { legs[0].rotation.x = -1.4; legs[1].rotation.x = -1.4; body.position.y = 0; }
+}
+
+// ------------------------------------------------------------------ vehicles & animals
+export function makeMower() {
+  const g = new THREE.Group();
+  const parts = [
+    P(box(26, 7, 34), '#E8452C', [0, 8, 0]), P(box(24, 3, 18), '#FF6A4D', [0, 12.5, 6]),
+    P(box(20, 6, 4), '#2F3440', [0, 4, -18]), P(box(14, 2, 10), '#3A3A44', [0, 13, -6]),
+    P(box(12, 8, 2.4), '#3A3A44', [0, 17, -11]), P(cyl(1, 1, 12, 6), '#3A3A44', [0, 18, 8], [0.5, 0, 0]),
+    P(tor(3.2, 0.7, 4, 10), '#2F3440', [0, 23, 11], [H + 0.5, 0, 0]),
+    P(box(26.4, 1.4, 34.4), '#FFFFFF', [0, 10.8, 0]),
+  ];
+  g.add(new THREE.Mesh(merge(parts), vcMat()));
+  g.children[0].castShadow = true;
+  const wheels = [];
+  for (const [x, z, r] of [[-14, 10, 5], [14, 10, 5], [-14, -11, 4], [14, -11, 4]]) {
+    const w = new THREE.Mesh(merge([P(cyl(r, r, 3.6, 10), '#2A2A30', [0, 0, 0], [0, 0, H]), P(cyl(r * 0.5, r * 0.5, 3.8, 8), '#CFCFD8', [0, 0, 0], [0, 0, H])]), vcMat());
+    w.position.set(x, r, z); w.castShadow = true; g.add(w); wheels.push(w);
+  }
+  return { root: g, wheels };
+}
+export function makeCart() {
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(merge([
+    P(box(18, 6, 22), '#E8452C', [0, 9, 0]), P(box(18.6, 1.2, 22.6), '#FF8A6E', [0, 12.4, 0]),
+    P(box(1.2, 1.2, 14), '#8E5627', [0, 7, 17]), P(box(8, 1.2, 1.2), '#8E5627', [0, 7, 24]),
+  ]), vcMat());
+  m.castShadow = true; g.add(m);
+  const wheels = [];
+  for (const [x, z] of [[-10, 6], [10, 6], [-10, -6], [10, -6]]) {
+    const w = new THREE.Mesh(merge([P(cyl(3.4, 3.4, 2, 10), '#3A3A44', [0, 0, 0], [0, 0, H]), P(cyl(1.4, 1.4, 2.2, 6), '#FFD23F', [0, 0, 0], [0, 0, H])]), vcMat());
+    w.position.set(x, 3.4, z); g.add(w); wheels.push(w);
+  }
+  return { root: g, wheels };
+}
+export function henGeo() {
+  return merge([
+    P(sph(5.2, 9, 7), '#FFFFFF', [0, 5.4, 0], [0, 0, 0], [1, 0.85, 1.2]),
+    P(sph(3, 8, 6), '#FFFFFF', [0, 10, 4.2]),
+    P(box(1.4, 2.6, 3.4), '#E8452C', [0, 13, 4]),
+    P(cone(1.1, 2.4, 5), '#F29C0E', [0, 9.6, 7.6], [H, 0, 0]),
+    P(sph(1.2, 5, 4), '#E8452C', [0, 7.8, 6.6]),
+    P(sph(0.55, 4, 3), '#1A1A1A', [1.7, 10.6, 6.4]), P(sph(0.55, 4, 3), '#1A1A1A', [-1.7, 10.6, 6.4]),
+    P(box(6, 4, 2), '#F2F2F2', [0, 8, -6], [0.6, 0, 0]),
+    P(sph(2.6, 6, 4), '#EDEDED', [4.6, 5.4, 0], [0, 0, 0], [0.5, 0.8, 1.1]), P(sph(2.6, 6, 4), '#EDEDED', [-4.6, 5.4, 0], [0, 0, 0], [0.5, 0.8, 1.1]),
+  ]);
+}
+export function nestGeo() {
+  return merge([P(box(22, 8, 20), '#C8874A', [0, 4, 0]), P(box(22.6, 1.4, 20.6), '#8E5627', [0, 8.2, 0]), P(cyl(8, 7, 2, 9), '#F2CF6B', [0, 8.6, 0])]);
+}
+export function bushGeo() {
+  const parts = [P(ico(8, 1), '#3E9B2A', [0, 9, 0], [0, 0, 0], [1, 0.95, 1]), P(ico(6, 0), '#5DBB3A', [3, 13, 2]), P(cyl(1.4, 1.8, 4, 6), '#8E5627', [0, 2, 0])];
+  for (const [x, y, z] of [[5, 9, 5], [-6, 8, 3], [2, 14, -5], [-3, 12, 6], [6, 6, -3]]) parts.push(P(sph(1.9, 6, 5), '#EE4630', [x, y, z]));
+  return merge(parts);
+}
+
+// ------------------------------------------------------------------ environment pieces (merged into static meshes)
+export const Env = {
+  stoneWall(out, x0, y0, x1, y1, pa, pb) {
+    const L = Math.hypot(x1 - x0, y1 - y0), a = Math.atan2(x1 - x0, y1 - y0), mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+    out.push(P(box(10, 12, L), '#E9E0CC', [mx, 6, my], [0, a, 0]));
+    out.push(P(box(12, 2.6, L + 0.4), '#F6EEDC', [mx, 13.2, my], [0, a, 0]));
+    if (pa) { out.push(P(box(15, 18, 15), '#D9CFB8', [x0, 9, y0])); out.push(P(box(17, 2.6, 17), '#F6EEDC', [x0, 19.2, y0])); out.push(P(sph(3.4, 6, 4), '#F6EEDC', [x0, 22.4, y0])); }
+    if (pb) { out.push(P(box(15, 18, 15), '#D9CFB8', [x1, 9, y1])); out.push(P(box(17, 2.6, 17), '#F6EEDC', [x1, 19.2, y1])); }
+  },
+  woodFence(out, x0, y0, x1, y1) {
+    const L = Math.hypot(x1 - x0, y1 - y0), a = Math.atan2(x1 - x0, y1 - y0), mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+    out.push(P(box(2.2, 2.6, L), '#E3A866', [mx, 7, my], [0, a, 0]));
+    out.push(P(box(2.2, 2.6, L), '#E3A866', [mx, 13, my], [0, a, 0]));
+    const n = Math.max(1, Math.round(L / 20));
+    for (let i = 0; i <= n; i++) { const t = i / n; out.push(P(box(4, 17, 4), '#C8874A', [x0 + (x1 - x0) * t, 8.5, y0 + (y1 - y0) * t])); }
+  },
+  gate(out, x0, y0, x1, y1, open) {
+    const L = Math.hypot(x1 - x0, y1 - y0), a = Math.atan2(x1 - x0, y1 - y0);
+    out.push(P(box(13, 26, 13), '#D9CFB8', [x0, 13, y0])); out.push(P(box(13, 26, 13), '#D9CFB8', [x1, 13, y1]));
+    out.push(P(sph(4, 6, 4), '#F6EEDC', [x0, 28, y0])); out.push(P(sph(4, 6, 4), '#F6EEDC', [x1, 28, y1]));
+    if (!open) {
+      const n = Math.round(L / 5);
+      for (let i = 1; i < n; i++) { const t = i / n; out.push(P(box(1.2, 20, 1.2), '#4A4A55', [x0 + (x1 - x0) * t, 10, y0 + (y1 - y0) * t])); }
+      out.push(P(box(1.4, 1.4, L), '#4A4A55', [(x0 + x1) / 2, 18, (y0 + y1) / 2], [0, a, 0]));
+      out.push(P(box(1.4, 1.4, L), '#4A4A55', [(x0 + x1) / 2, 6, (y0 + y1) / 2], [0, a, 0]));
+    }
+  },
+  hedge(out, x, y, w, d, h = 18) {
+    out.push(P(box(w, h, d), '#4FA82A', [x + w / 2, h / 2, y + d / 2]));
+    out.push(P(box(w - 2, 3, d - 2), '#7FD24A', [x + w / 2, h + 1, y + d / 2]));
+  },
+  tree(out, x, y, kind, s = 1) {
+    out.push(P(cyl(2.4 * s, 3.2 * s, 16 * s, 6), '#8E5627', [x, 8 * s, y]));
+    if (kind === 'cone') {
+      out.push(P(cone(13 * s, 26 * s, 7), '#2F8A2A', [x, 26 * s, y]));
+      out.push(P(cone(10 * s, 20 * s, 7), '#3FA236', [x, 38 * s, y]));
+      out.push(P(cone(6 * s, 13 * s, 7), '#5DBB3A', [x, 48 * s, y]));
+    } else {
+      out.push(P(ico(15 * s, 1), '#3FA236', [x, 30 * s, y]));
+      out.push(P(ico(10 * s, 0), '#5DBB3A', [x + 6 * s, 38 * s, y + 4 * s]));
+      out.push(P(ico(9 * s, 0), '#2F8A2A', [x - 8 * s, 26 * s, y - 3 * s]));
+    }
+  },
+  shrub(out, x, y, flower) {
+    out.push(P(ico(9, 1), '#4FAE32', [x, 7, y], [0, 0, 0], [1, 0.8, 1]));
+    for (const [dx, dy, dz] of [[4, 11, 3], [-5, 10, 2], [1, 12, -5], [-2, 9, 6], [6, 8, -3]]) out.push(P(sph(1.6, 5, 4), flower, [x + dx, dy, y + dz]));
+  },
+  barn(out, X, Y) {
+    const w = 76, d = 56, h = 34, x = X - w / 2, y = Y - d / 2;
+    out.push(P(box(w, h, d), '#D9482E', [X, h / 2, Y]));
+    out.push(P(box(w + 1, 3, d + 1), '#FFFFFF', [X, 2, Y]));
+    // gable roof along x
+    const roof = new THREE.CylinderGeometry(1, 1, 1, 3, 1);
+    out.push(P(roof, '#8E3A26', [X, h + 10, Y], [0, 0, H], [24, w + 8, d * 0.62]));
+    out.push(P(box(28, 26, 1.4), '#8E2A18', [X, 13, y + d + 0.6]));
+    out.push(P(box(30, 2, 1.8), '#FFFFFF', [X, 26, y + d + 0.8]));
+    out.push(P(box(2, 26, 1.8), '#FFFFFF', [X - 14, 13, y + d + 0.8])); out.push(P(box(2, 26, 1.8), '#FFFFFF', [X + 14, 13, y + d + 0.8]));
+    out.push(P(box(36, 1.8, 1.8), '#FFFFFF', [X, 13, y + d + 0.8], [0, 0, 0.75])); out.push(P(box(36, 1.8, 1.8), '#FFFFFF', [X, 13, y + d + 0.8], [0, 0, -0.75]));
+    out.push(P(box(12, 10, 1.4), '#FFFFFF', [X, h + 5, y + d + 4]));
+    void x;
+  },
+  // checkout desk (long along y): blue body, light top, register
+  counter(out, c, K) {
+    const d = c.desk;
+    out.push(P(box(d.w, K.deskH - 3, d.h), '#3E6FCC', [d.x + d.w / 2, (K.deskH - 3) / 2, d.y + d.h / 2]));
+    out.push(P(box(d.w + 4, 3, d.h + 4), '#8DB6FF', [d.x + d.w / 2, K.deskH - 1.5, d.y + d.h / 2]));
+    out.push(P(box(d.w - 6, 4, d.h - 6), '#2C559E', [d.x + d.w / 2, 3, d.y + d.h / 2]));
+    out.push(P(box(14, 5, 12), '#E6EAF2', [d.x + 11, K.deskH + 2.5, d.y + 12]));
+    out.push(P(box(2, 9, 10), '#3BB8F0', [d.x + 6, K.deskH + 8, d.y + 12], [0, 0, 0.3]));
+  },
+  proc(out, p, P0, cols) {
+    const b = p.body, H0 = P0.bodyH, cx = b.x + b.w / 2, cz = b.y + b.h / 2;
+    out.push(P(box(b.w + 6, 5, b.h + 6), '#C9CED8', [cx, 2.5, cz]));
+    out.push(P(box(b.w, H0 - 5, b.h), cols[1], [cx, 5 + (H0 - 5) / 2, cz]));
+    out.push(P(box(b.w - 8, 3, b.h - 8), '#FFFFFF', [cx, H0 + 1.5, cz]));
+    out.push(P(box(b.w + 0.6, 4, b.h + 0.6), cols[0], [cx, H0 - 4, cz]));
+    out.push(P(cyl(13, 6, 12, 4), '#D8DCE6', [b.x + 8, H0 + 8, cz], [0, Math.PI / 4, 0]));
+    out.push(P(cyl(3.2, 3.6, 18, 8), '#767A86', [b.x + b.w - 11, H0 + 9, b.y + 10]));
+    out.push(P(cyl(4, 4, 2, 8), '#5A5E68', [b.x + b.w - 11, H0 + 18.5, b.y + 10]));
+    out.push(P(box(18, 12, 1), '#FFFFFF', [cx, H0 * 0.55, b.y + b.h + 0.6]));
+  },
+};
+export const PROC_COL = { bouquet: ['#FFE16B', '#E8B21E'], basket: ['#F2C08A', '#C98A4B'], perfume: ['#FFB8D8', '#E86AA6'], crate: ['#8DB6FF', '#5B8FE8'], ketchup: ['#FF8A6E', '#E8452C'] };
