@@ -15,6 +15,7 @@ let data = Save.load();
 snd.on = data.settings.sound; hap.on = data.settings.vib;
 
 let mode = 'home', world = null, guide = null, guideT = 0, saveT = 0, hudT = 0, time = 0, last = performance.now();
+let feverFxT = 0;
 let modalOpen = false, cashFxT = 0, winDone = false, harvestFxT = 0, saleHapT = 0;
 const restoredAt = {};            // session-only animation stamps for the home screen
 
@@ -111,7 +112,7 @@ function handleEvents() {
       case 'pick': snd.play('pick'); break;
       case 'harvest':   // blooms burst up in a spray of petals and leaves
         if (e.who === 'player' || time - harvestFxT > 0.05) { harvestFxT = time; fx.burst(e.x, e.y, 10, Math.min(14, 3 + e.n * 2), ITEM_BITS[e.item] || ['#fff'], 70, 120, 2.2, 'petal', 0.7); }
-        if (e.who === 'player') { snd.play('harvest'); hap.tick(16, 70, 235); }   // continuous strong rumble while cutting
+        if (e.who === 'player') { snd.play('harvest'); if (world.feverT > 0) hap.tick(18, 38, 255); else hap.tick(16, 70, 235); }   // continuous strong rumble while cutting (faster in fever)
         break;
       case 'drop': snd.play('drop'); break;
       case 'sale': fx.text(e.x, e.y, 50, `+${Math.round(e.amount)}`, '#B9FF7A'); snd.play('sale'); if (time - saleHapT > 0.18) { saleHapT = time; hap.buzz(34, 255); } break;
@@ -128,7 +129,27 @@ function handleEvents() {
         fx.text(e.x, e.y, 50, '解锁！', '#FFF27A', true);
         snd.play('unlock'); hap.pattern([50, 45, 90], [255, 255]); break;
       case 'tileAppear': snd.play('appear'); fx.ring(e.x, e.y, '#FFF27A', 36); break;
-      case 'full': fx.text(world.player.x, world.player.y, 70, '满了！', '#FF6A4D'); snd.play('full'); hap.tick(30, 0, 200); break;
+      case 'full':   // stack at max: cutting stops, one strong buzz, the arrow swings to the counter
+        fx.text(world.player.x, world.player.y, 80, '满了！去出售', '#FF6A4D', true); fx.ring(world.player.x, world.player.y, '#FF6A4D', 50);
+        snd.play('full'); hap.buzz(170, 255); guideT = 0; break;
+      case 'golden':   // 金色作物
+        fx.burst(e.x, e.y, 14, 26, ['#FFD23F', '#FFF27A', '#FFFFFF', '#F29C0E'], 110, 160, 3.2, 'star', 1.0);
+        fx.ring(e.x, e.y, '#FFE55A', 46);
+        if (e.who === 'player') { fx.text(e.x, e.y, 60, `+${Math.round(e.amount)}`, '#FFE55A', true); for (let i = 0; i < 4; i++) fx.bill(R.X(e.x, e.y), R.Y(e.x, e.y, 30), coin.x, coin.y, i * 0.05); setTimeout(() => ui.bumpCoin(), 450); snd.play('coin'); hap.pattern([60, 30, 110], [255, 255]); }
+        else fx.text(e.x, e.y, 50, `+${Math.round(e.amount)}`, '#FFE55A');
+        break;
+      case 'fever':
+        fx.text(e.x, e.y, 90, '丰收狂热！', '#FFE55A', true); fx.ring(e.x, e.y, '#FFD23F', 90); fx.flash = 0.6; fx.shake(6, 0.25);
+        snd.play('unlock'); hap.pattern([40, 30, 40, 30, 120], [255, 255, 255]); break;
+      case 'feverEnd': break;
+      case 'workerLevel': fx.text(e.x, e.y, 64, `升级! Lv${e.lv}`, '#9BFF6A', true); fx.burst(e.x, e.y, 40, 12, ['#9BFF6A', '#FFFFFF', '#FFD23F'], 50, 90, 2.6, 'star', 0.8); snd.play('appear'); break;
+      case 'loaderUp': fx.burst(e.x, e.y, 10, 30, ['#FFC21A', '#FFFFFF', '#3BA7FF'], 100, 140, 3, 'conf', 1.0); fx.text(e.x, e.y, 70, '铲车!', '#FFE55A', true); break;
+      case 'vipPay':   // VIP pays double: coin shower
+        fx.text(e.x, e.y, 70, `VIP ×2  +${Math.round(e.amount)}`, '#FFE55A', true);
+        fx.burst(e.x, e.y, 40, 22, ['#FFD23F', '#FFF27A', '#FFFFFF'], 90, 150, 3, 'star', 1.0);
+        if (e.cashier) { for (let i = 0; i < 10; i++) fx.bill(R.X(e.x, e.y), R.Y(e.x, e.y, 30), coin.x, coin.y, i * 0.05); setTimeout(() => ui.bumpCoin(), 500); }
+        else for (let i = 0; i < 10; i++) fx.wbill(e.x + 30, e.y, e.tx + (Math.random() - 0.5) * 24, e.ty + (Math.random() - 0.5) * 10, i * 0.05);
+        snd.play('coin'); hap.pattern([40, 30, 60], [230, 255]); break;
       case 'produce': fx.burst(e.x, e.y, 40, 4, ['#FFFFFF', '#FFE16B', '#FF8FB0'], 30, 60, 2.6, 'star', 0.7); break;
       case 'lay': break;
       case 'ground': R.groundDirty = true; break;
@@ -150,6 +171,10 @@ function frame(now) {
     let left = dt;
     if (!modalOpen) while (left > 1e-4) { const s = Math.min(left, 1 / 60); world.update(s, world.won ? 0 : ix, world.won ? 0 : iy); left -= s; }
     handleEvents();
+    if (world.feverT > 0 && (feverFxT -= dt) <= 0) {   // golden sparkle trail
+      feverFxT = 0.06; const p = world.player;
+      fx.burst(p.x, p.y, 6, 3, ['#FFD23F', '#FFF27A', '#FFFFFF'], 25, 50, 2.4, 'star', 0.7);
+    }
     fx.update(dt);
     R.follow(dt);
     guideT -= dt; if (guideT <= 0) { guide = world.guide(); guideT = 0.15; }

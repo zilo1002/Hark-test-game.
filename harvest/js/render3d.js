@@ -22,6 +22,8 @@ const QUALITY = [
 const HERO = { shirt: '#FFFFFF', vest: '#C8352A', bowtie: true, pants: '#2D3A5A', hair: '#7A3E1D', sleeve: '#FFFFFF' };
 const GARDENER = { shirt: '#F7F5EE', overalls: '#3567C8', pants: '#3567C8', hair: '#5A3414', hat: 'straw', sleeve: '#F7F5EE' };
 const CARTER = { shirt: '#FFD23F', pants: '#4A5A8A', hair: '#3A2210', hat: 'cap', capColor: '#E8452C', sleeve: '#FFD23F' };
+const VIP = { shirt: '#FFD23F', vest: '#E8B21E', pants: '#7A3E9D', hair: '#3A2210', sleeve: '#FFD23F', crown: true };
+const GOLD_MAT = new THREE.MeshLambertMaterial({ color: 0xFFE46A, emissive: 0xB07800 });
 const CASHIER = { shirt: '#4CD08A', vest: '#2E8A5A', hair: '#3A2210', pants: '#2D3A5A', sleeve: '#4CD08A' };
 const ITEM_CAP = 1800;
 
@@ -271,7 +273,10 @@ export class Renderer {
       }
       stub.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       grp.add(stub);
-      this.fieldObjs.push({ f, grp, meshes, stub, stubOn: new Uint8Array(f.n), slot, vi, ang, sz, last, scale: (f.gap / 9) * ({ wheat: 1.3, tulip: 1.15, gold: 1.2, rose: 1.15, potato: 0.42 }[f.item] || 1) });
+      const gold = new THREE.InstancedMesh(M.cropGeo(f.item, 0), GOLD_MAT, 96);
+      gold.count = 0; gold.frustumCulled = false; gold.castShadow = true; gold.instanceMatrix.setUsage(THREE.DynamicDrawUsage); grp.add(gold);
+      const spr = M.makeSprinkler(); spr.root.position.set(f.x + f.w / 2, 0, f.y + f.h / 2); spr.root.visible = false; this.levelRoot.add(spr.root);
+      this.fieldObjs.push({ f, grp, meshes, stub, gold, spr, goldPrev: new Uint8Array(f.n), stubOn: new Uint8Array(f.n), slot, vi, ang, sz, last, scale: (f.gap / 9) * ({ wheat: 1.3, tulip: 1.15, gold: 1.2, rose: 1.15, potato: 0.42 }[f.item] || 1) });
     }
   }
   updateFields() {
@@ -279,15 +284,20 @@ export class Renderer {
       const f = o.f; o.grp.visible = !f.hidden; if (f.hidden) continue;
       const g = f.g, pop = f.pop, last = o.last, dirty = this._dirtyV || (this._dirtyV = []);
       dirty.length = 0; let stubDirty = false;
-      const gs = o.scale;
+      const gs = o.scale, gold = f.gold, gp = o.goldPrev, garr = o.gold.instanceMatrix.array;
+      let gk = 0; const spots = this.goldSpots;
       for (let i = 0; i < f.n; i++) {
         const gv = g[i];
         let s;
         if (gv >= 1) s = 1 + (pop[i] > 0 ? Math.sin(pop[i] * Math.PI) * 0.3 : 0);
         else s = gv < 0.55 ? 0 : 0.25 + 0.67 * (gv - 0.55) / 0.45;   // cut plants stay stubble for ~4 s
+        if (gold[i]) {   // 金色作物: drawn in the gold mesh, sparkles on the overlay
+          if (s > 0 && gk < 96) { const gss = s * o.sz[i] * gs * 1.3; put(garr, gk++, f.px(i), 0, f.py(i), o.ang[i] + this.time * 1.5, gss, gss); if (gv >= 1 && spots.length < 60) spots.push(f.px(i), f.py(i), i); }
+        }
+        if (gold[i] !== gp[i]) { gp[i] = gold[i]; last[i] = -1; }
         if (Math.abs(s - last[i]) < 0.006) continue;
         last[i] = s;
-        const v = o.vi[i], ss = s * o.sz[i] * gs;
+        const v = o.vi[i], ss = (gold[i] ? 0 : s) * o.sz[i] * gs;
         put(o.meshes[v].instanceMatrix.array, o.slot[i], f.px(i), 0, f.py(i), o.ang[i], ss, ss);
         // stubble only where the plant is short (a full plant hides it anyway: skip drawing it)
         const st = s < 0.75 ? 0.9 + o.sz[i] * 0.25 : 0;
@@ -295,6 +305,12 @@ export class Renderer {
         dirty[v] = true;
       }
       for (let v = 0; v < o.meshes.length; v++) if (dirty[v]) o.meshes[v].instanceMatrix.needsUpdate = true;
+      o.gold.count = gk; if (gk) o.gold.instanceMatrix.needsUpdate = true;
+      if (f.sprinkler) {
+        const a = elastic((this.wt - f.sprinklerT) / 0.6); o.spr.root.visible = a > 0; o.spr.root.scale.setScalar(Math.max(0.001, a) * 1.2);
+        o.spr.head.rotation.y = this.time * 2.2;
+        this.sprinklers.push(o);
+      }
       if (stubDirty) o.stub.instanceMatrix.needsUpdate = true;
     }
   }
@@ -425,6 +441,12 @@ export class Renderer {
       const pp = M.makePerson(HERO), mow = M.makeMower();
       mow.root.add(pp.root); this.levelRoot.add(mow.root);
       o = { c, pp, mow, ang: 0.8, root: mow.root };
+    } else if (c.kind === 'worker' && c.loader) {
+      const pp = M.makePerson(GARDENER), ld = M.makeLoader();
+      pp.root.position.set(0, 13, -1.5); pp.blob.visible = false; ld.root.add(pp.root);
+      const root = new THREE.Group(); root.add(ld.root); this.levelRoot.add(root);
+      const blob = new THREE.Mesh(M.BLOB_GEO, M.BLOB_MAT); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.3; blob.scale.set(17, 21, 1); root.add(blob);
+      o = { c, pp, ld, loader: true, ang: 0.8, root };
     } else if (c.kind === 'worker') {
       const pp = M.makePerson(c.cart ? CARTER : GARDENER);
       const root = new THREE.Group(); root.add(pp.root);
@@ -450,6 +472,12 @@ export class Renderer {
       o.pp.blob.visible = !veh;
       M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving && !veh, carry: carry && !veh, cutting: cutting && !veh, seated: veh, seed: 1 });
       if (veh) { o.pp.arms[0].rotation.set(-1.2, 0, 0.3); o.pp.arms[1].rotation.set(-1.2, 0, -0.3); o.pp.tool.visible = false; }
+    } else if (o.loader) {
+      M.posePerson(o.pp, { t, walk: c.walk, moving: false, carry: false, cutting: false, seated: true, seed: c.seed + 2 });
+      o.pp.arms[0].rotation.set(-1.15, 0, 0.3); o.pp.arms[1].rotation.set(-1.15, 0, -0.3); o.pp.tool.visible = false;
+      for (const wl of o.ld.wheels) if (c.moving) wl.rotation.x += dt * sp * 0.2;
+      o.ld.body.position.y = c.moving ? Math.abs(Math.sin(c.walk * 1.5)) * 0.6 : 0;
+      o.ld.root.rotation.x = cutting ? Math.sin(t * 30) * 0.015 : 0;
     } else {
       M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving, carry: carry && !c.cart && !cutting, cutting: cutting && !c.cart, seed: c.seed + 2, showTool: !c.cart && !carry });
       if (o.cart) for (const wl of o.cart.wheels) if (c.moving) wl.rotation.x += dt * sp * 0.3;
@@ -459,9 +487,12 @@ export class Renderer {
     // where the stack sits: in the hands (walking), on the mower's rear deck, or on the cart bed
     const a = o ? o.ang : 0, fx = Math.sin(a), fz = Math.cos(a);
     if (c.kind === 'player' && c.vehicle) return { x: c.x - fx * 17, y: c.y - fz * 17, z: 16, cols: 3, spread: 7.5, fx, fz };
+    if (c.kind === 'worker' && c.loader) return { x: c.x - fx * 17.8 * 1.15, y: c.y - fz * 17.8 * 1.15, z: 21.5, cols: 3, deep: 3, spread: 6.6, fx, fz };
     if (c.kind === 'worker' && c.cart) return { x: c.x - fx * 23, y: c.y - fz * 23, z: 15, cols: 2, spread: 7.5, fx, fz };
     const bob = c.moving ? Math.abs(Math.sin(c.walk)) * 1.8 : 0;
-    return { x: c.x + fx * 12, y: c.y + fz * 12, z: 22 + bob, cols: 1, spread: 0, fx, fz };
+    // bigger loads hug a wider tower so a full 100+ stack stays a readable height
+    const cols = c.cap > 220 ? 3 : c.cap > 70 ? 2 : 1, deep = c.cap > 70 ? 2 : 1;
+    return { x: c.x + fx * (12 + (deep - 1) * 3), y: c.y + fz * (12 + (deep - 1) * 3), z: 22 + bob, cols, deep, spread: 6.5, fx, fz };
   }
 
   // ---------------------------------------------------------------- dynamic items
@@ -485,22 +516,26 @@ export class Renderer {
     }
   }
   drawStack(c, o, labels, isPlayer) {
-    const n = c.stack.length, b = this.stackFrame(c, o);
-    const hts = [0, 0, 0], t = this.time, sp = Math.hypot(c.vx, c.vy);
+    const n = c.stack.length, b = this.stackFrame(c, o), deep = b.deep || 1, per = b.cols * deep;
+    const hts = this._hts || (this._hts = new Float32Array(12)); hts.fill(0);
+    const t = this.time, sp = Math.hypot(c.vx, c.vy);
     const rx = b.fz, rz = -b.fx;          // right vector
     o.lean = (o.lean || 0) + ((c.moving ? -sp / 160 : 0) - (o.lean || 0)) * 0.12;
     let top = { x: b.x, y: b.y, z: b.z };
     for (let i = 0; i < n; i++) {
-      const col = i % b.cols, type = c.stack[i], step = CFG.items[type].step;
-      const h = hts[col]; hts[col] += step;
+      const cell = i % per, col = cell % b.cols, row = (cell / b.cols) | 0, type = c.stack[i], step = CFG.items[type].step;
+      const h = hts[cell]; hts[cell] += step;
       const bend = Math.pow(h, 1.35) * 0.018, wob = Math.sin(t * 2.4 + h * 0.02) * h * 0.01;
-      const off = (col - (b.cols - 1) / 2) * b.spread + wob;
-      const x = b.x + rx * off + b.fx * o.lean * bend * 2, y = b.y + rz * off + b.fz * o.lean * bend * 2, z = b.z + h + (M.ITEM_HALF[type] || 2);
+      const off = (col - (b.cols - 1) / 2) * b.spread + wob, dep = (row - (deep - 1) / 2) * b.spread;
+      const x = b.x + rx * off + b.fx * (o.lean * bend * 2 + dep), y = b.y + rz * off + b.fz * (o.lean * bend * 2 + dep), z = b.z + h + (M.ITEM_HALF[type] || 2);
       this.item(type, x, y, z, o.ang + Math.PI / 2 + (hash(i) - 0.5) * 0.25, b.cols > 1 ? 1.0 : 1.15);
-      if (i >= n - b.cols) top = { x, y, z: z + step };
+      if (i >= n - per) top = { x: b.x, y: b.y, z: Math.max(top.z, z + step) };
     }
     o.top = top;
-    if (n > 0 && (isPlayer || n >= 5)) labels.push({ k: 'stack', x: top.x, y: top.y, z: top.z + 6, n, full: c.stack.length + c.incoming >= c.cap, big: isPlayer });
+    const full = c.stack.length + c.incoming >= c.cap;
+    if (n > 0 && (isPlayer || n >= 5)) labels.push({ k: 'stack', x: top.x, y: top.y, z: top.z + 6, n, full, big: isPlayer });
+    if (isPlayer) this.comboAnchor = n > 0 ? { x: top.x, y: top.y, z: top.z + 6, stack: true } : { x: c.x, y: c.y, z: 54, stack: false };
+    else if (c.lv) labels.push({ k: 'lv', x: c.x, y: c.y, z: o.loader ? 50 : 50, lv: c.lv, pop: this.wt - c.lvT });
   }
   flyItem(f) {
     const p = Math.min(1, f.t / f.dur), e = p * p * (3 - 2 * p);
@@ -521,6 +556,7 @@ export class Renderer {
     [this.ox, this.oy] = fx ? fx.shakeOffset() : [0, 0];
     this.placeCamera();
     const labels = this.labels || (this.labels = []); labels.length = 0;
+    this.goldSpots = this.goldSpots || []; this.goldSpots.length = 0; this.sprinklers = this.sprinklers || []; this.sprinklers.length = 0;
     this.updateFields(); this.updatePiles();
     this.beginItems();
     // coops: hens bob when they lay, bushes shiver
@@ -576,16 +612,21 @@ export class Renderer {
       labels.push({ k: 'tile', t, a, afford });
     }
     // characters
-    for (const w of world.workers) { const o = this.chars.get(w) || this.makeChar(w); this.updateChar(o, dt); this.drawStack(w, o, labels, false); }
+    for (const w of world.workers) {
+      let o = this.chars.get(w) || this.makeChar(w);
+      if (!!o.loader !== !!w.loader) { this.levelRoot.remove(o.root); o = this.makeChar(w); }
+      this.updateChar(o, dt); this.drawStack(w, o, labels, false);
+    }
     this.updateChar(this.player, dt); this.drawStack(world.player, this.player, labels, true);
     // customers (pooled figures)
     const pool = this.custPool, used = this._used || (this._used = {});
     for (const k in used) used[k] = 0;
     for (const cu of world.customers) {
-      const list = pool[cu.hue] || (pool[cu.hue] = []), k = used[cu.hue] || 0; used[cu.hue] = k + 1;
+      const key = cu.vip ? 'vip' : cu.hue;
+      const list = pool[key] || (pool[key] = []), k = used[key] || 0; used[key] = k + 1;
       let o = list[k];
       if (!o) {
-        const st = customerStyle(cu.hue); const pp = M.makePerson({ ...st, sleeve: st.dress || st.shirt, pigtails: cu.hue % 3 === 2 });
+        const st = cu.vip ? VIP : customerStyle(cu.hue); const pp = M.makePerson({ ...st, sleeve: st.sleeve || st.dress || st.shirt, pigtails: !cu.vip && cu.hue % 3 === 2 });
         this.levelRoot.add(pp.root); o = list[k] = { pp, ang: -Math.PI / 2, cu: null };
       }
       if (o.cu !== cu) { o.cu = cu; o.ang = Math.atan2(cu.vx || -1, cu.vy || 0); }
@@ -594,6 +635,7 @@ export class Renderer {
       o.pp.root.position.set(cu.x, 0, cu.y); o.pp.root.rotation.y = o.ang;
       M.posePerson(o.pp, { t: time, walk: cu.walk, moving: cu.moving, carry: cu.bag.length > 0, seed: cu.hue });
       const fx2 = Math.sin(o.ang), fz2 = Math.cos(o.ang);
+      if (cu.vip && cu.state !== 'out') labels.push({ k: 'vip', x: cu.x, y: cu.y, z: 56, item: cu.wish });
       for (let j = 0; j < Math.min(cu.bag.length, 12); j++) { const it = cu.bag[j]; this.item(it, cu.x + fx2 * 10, cu.y + fz2 * 10, 21 + j * CFG.items[it].step * 0.85 + (M.ITEM_HALF[it] || 2), o.ang + Math.PI / 2, 0.85); }
     }
     for (const h in pool) for (let k = used[h] || 0; k < pool[h].length; k++) { pool[h][k].pp.root.visible = false; pool[h][k].cu = null; }
@@ -614,6 +656,7 @@ export class Renderer {
     // ---- overlay
     const g = this.g; g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); g.clearRect(0, 0, this.W, this.H);
     if (fx) this.fxWorld(fx);
+    this.drawExtras(world);
     this.drawLabels(labels, world);
     if (guide) this.arrow(guide);
     if (fx) this.fxScreen(fx);
@@ -647,16 +690,71 @@ export class Renderer {
         }
       } else if (L.k === 'stack') {
         const [sx, sy0] = this.proj(L.x, L.y, L.z); const sy = Math.max(L.big ? 96 : 70, sy0);
-        const txt = L.full ? 'MAX' : `${L.n}`, px = Math.max(L.big ? 13 : 10, (L.big ? 12 : 9) * z);
+        const pulse = L.full && L.big ? 1.7 + Math.sin(this.time * 9) * 0.12 : 1;   // big pulsing MAX on the player's stack
+        const txt = L.full ? 'MAX' : `${L.n}`, px = Math.max(L.big ? 13 : 10, (L.big ? 12 : 9) * z) * pulse;
         g.font = FONT(px); const tw = g.measureText(txt).width;
         g.fillStyle = L.full ? '#FF4D3A' : 'rgba(30,30,30,0.55)';
         g.beginPath(); g.roundRect(sx - tw / 2 - 7, sy - px * 0.72, tw + 14, px * 1.44, px * 0.72); g.fill();
         this.label(txt, sx, sy, px, '#FFFFFF', L.full ? '#9E1B10' : '#1A1A1A');
+      } else if (L.k === 'lv') {   // 园丁成长 badge
+        const [sx0, sy] = this.proj(L.x, L.y, L.z), sx = sx0 - 26 * Math.max(1, z * 0.8), pop = L.pop < 0.5 ? 1 + Math.sin(L.pop / 0.5 * Math.PI) * 0.6 : 1, px = Math.max(8, 7.5 * z) * pop;
+        const txt = `Lv${L.lv}`; g.font = FONT(px); const tw = g.measureText(txt).width;
+        g.fillStyle = L.lv >= 5 ? '#FF8A1E' : L.lv >= 3 ? '#FFC21A' : '#6FC3FF';
+        g.beginPath(); g.roundRect(sx - tw / 2 - 5, sy - px * 0.7, tw + 10, px * 1.4, px * 0.7); g.fill();
+        this.label(txt, sx, sy, px, '#FFFFFF', '#5A3A10');
+      } else if (L.k === 'vip') {   // VIP thought bubble: the item + ×2
+        const [sx, sy] = this.proj(L.x, L.y, L.z), s = Math.max(0.8, z * 0.8), bob = Math.sin(this.time * 3) * 2;
+        g.save(); g.translate(sx, sy - 16 * s + bob);
+        g.fillStyle = 'rgba(255,255,255,0.96)'; g.strokeStyle = '#E8B21E'; g.lineWidth = 2;
+        g.beginPath(); g.roundRect(-24 * s, -13 * s, 48 * s, 26 * s, 13 * s); g.fill(); g.stroke();
+        g.beginPath(); g.arc(-4 * s, 16 * s, 3 * s, 0, TAU); g.fill(); g.stroke(); g.beginPath(); g.arc(-1 * s, 22 * s, 1.8 * s, 0, TAU); g.fill();
+        g.save(); g.translate(-10 * s, 0); g.scale(s * 0.85, s * 0.85); drawIcon(g, L.item, 0); g.restore();
+        g.restore();
+        this.label('×2', sx + 10 * s, sy - 16 * s + bob, 11 * s, '#FFD23F', '#8A4A00');
       } else if (L.k === 'buf') {
         const [sx, sy] = this.proj(L.x, L.y, L.z), px = Math.max(10, 9 * z);
         g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); g.roundRect(sx - px * 1.5, sy - px * 0.8, px * 3, px * 1.6, px * 0.8); g.fill();
         this.label(`${L.n}`, sx, sy, px, '#5A3414', '#FFFFFF');
       }
+    }
+  }
+  // golden plant sparkles, sprinkler water arcs, 丰收狂热 meter
+  drawExtras(world) {
+    const g = this.g, z = this.z, t = this.time, sp = this.goldSpots;
+    for (let k = 0; k < sp.length; k += 3) {
+      const ph = t * 4 + sp[k + 2] * 1.7, a = 0.5 + 0.5 * Math.sin(ph);
+      const [sx, sy] = this.proj(sp[k], sp[k + 1], 16 + Math.sin(ph * 0.5) * 3);
+      if (sx < -20 || sy < -20 || sx > this.W + 20 || sy > this.H + 20) continue;
+      const r = (2.5 + a * 4) * z;
+      g.save(); g.translate(sx, sy); g.rotate(ph * 0.3); g.globalAlpha = 0.55 + a * 0.45; g.fillStyle = '#FFF6B0';
+      g.beginPath(); for (let i = 0; i < 8; i++) { const rr = (i % 2 ? 0.22 : 1) * r; g.lineTo(Math.cos(i * Math.PI / 4) * rr, Math.sin(i * Math.PI / 4) * rr); } g.closePath(); g.fill();
+      g.restore();
+    }
+    g.globalAlpha = 1;
+    for (const o of this.sprinklers) {
+      const f = o.f, hx = f.x + f.w / 2, hy = f.y + f.h / 2, R = Math.min(f.w, f.h) * 0.45, head = 24 * 1.2;
+      g.fillStyle = 'rgba(150,215,255,0.8)';
+      for (let j = 0; j < 3; j++) {
+        const ang = t * 2.2 + j * TAU / 3, cx = Math.cos(ang), cy = Math.sin(ang);
+        for (let i = 0; i < 12; i++) {
+          const u = ((i / 12) + t * 0.9) % 1, d = R * u, h = head + 46 * u * (1 - u) * 2 - head * u;
+          const [sx, sy] = this.proj(hx + cx * d, hy + cy * d, Math.max(0, h));
+          g.globalAlpha = 0.85 - u * 0.45; g.beginPath(); g.arc(sx, sy, (1.4 + u * 1.4) * z, 0, TAU); g.fill();
+        }
+      }
+      g.globalAlpha = 1;
+    }
+    // 丰收狂热 meter under the stack count (or over the head with empty hands)
+    const A = this.comboAnchor, fever = world.feverT > 0;
+    if (A && (world.combo > 0.01 || fever)) {
+      const [sx, sy0] = this.proj(A.x, A.y, A.z), sy = (A.stack ? Math.max(96, sy0) + 20 * Math.max(1, z * 0.9) : sy0 - 6);
+      const w = 64 * Math.max(1, z * 0.8), h = 8 * Math.max(1, z * 0.8), f = fever ? world.feverT / CFG.fever.dur : world.combo;
+      g.fillStyle = 'rgba(30,30,30,0.6)'; g.beginPath(); g.roundRect(sx - w / 2 - 2, sy - h / 2 - 2, w + 4, h + 4, h); g.fill();
+      const gr = g.createLinearGradient(sx - w / 2, 0, sx + w / 2, 0);
+      if (fever) { const p = (t * 2) % 1; gr.addColorStop(0, '#FFD23F'); gr.addColorStop(p, '#FFFFFF'); gr.addColorStop(1, '#FF8A1E'); }
+      else { gr.addColorStop(0, '#FF8A1E'); gr.addColorStop(1, '#FFD23F'); }
+      g.fillStyle = gr; g.beginPath(); g.roundRect(sx - w / 2, sy - h / 2, Math.max(h, w * f), h, h / 2); g.fill();
+      if (fever) this.label('丰收狂热!', sx, sy + h * 1.9, Math.max(11, 11 * z) * (1 + Math.sin(t * 10) * 0.06), '#FFE55A', '#8A3A00');
     }
   }
   fxWorld(fx) {

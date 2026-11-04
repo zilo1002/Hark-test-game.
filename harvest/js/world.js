@@ -121,7 +121,9 @@ export class Field {
     this.g = new Float32Array(n).fill(1);
     this.jx = new Int8Array(n); this.jy = new Int8Array(n); this.v = new Uint8Array(n); this.pop = new Float32Array(n); this.cutAt = new Float32Array(n).fill(-9);
     for (let i = 0; i < n; i++) { this.jx[i] = Math.round((rnd() - 0.5) * 60); this.jy[i] = Math.round((rnd() - 0.5) * 60); this.v[i] = (rnd() * 4) | 0; }
-    this.ripe = n; this.grow = cr.grow; this.spill = cr.spill || 0; this.pile = null;
+    // 金色作物: a few sparkling golden plants; a cut golden plant re-rolls when it regrows
+    this.gold = new Uint8Array(n); for (let i = 0; i < n; i++) this.gold[i] = rnd() < CFG.golden.chance ? 1 : 0;
+    this.ripe = n; this.grow = cr.grow; this.growMul = 1; this.sprinkler = false; this.spill = cr.spill || 0; this.pile = null;
   }
   px(i) { return this.x + ((i % this.cols) + 0.5 + this.jx[i] / 300) * this.gap; }
   py(i) { return this.y + (((i / this.cols) | 0) + 0.5 + this.jy[i] / 300) * this.gap; }
@@ -169,6 +171,7 @@ export class World {
     this.piles = []; this.tiles = []; this.workers = []; this.customers = []; this.solids = [];
     this.fly = []; this.flyFree = [];
     this.gmode = 'collect';
+    this.combo = 0; this.comboIdle = 0; this.feverT = 0; this.comboGain = 0; this.loaders = false;
     this.deco = this.L.deco || {};
     for (const o of this.L.objects) this.build(o);
     for (const p of this.procs) p.outObj = p.outTo ? this.objs[p.outTo] : null;
@@ -252,14 +255,18 @@ export class World {
       p.harvestR = V.harvestR + u.radius * 0.6; p.cutRate = V.cutRate; p.pickRate = V.pickRate; p.dropRate = V.dropRate;
     } else {
       const P = CFG.player;
-      p.speed = P.speed + u.speed; p.cap = P.cap + u.cap; p.pickR = P.pickR + u.radius;
+      p.speed = P.speed + u.speed; p.cap = P.cap + u.cap * P.capUp; p.pickR = P.pickR + u.radius;
       p.harvestR = P.harvestR + u.radius; p.cutRate = P.cutRate + u.radius * 6;
-      p.pickRate = P.pickRate + u.radius; p.dropRate = P.dropRate + u.cap * 0.25;
+      p.pickRate = P.pickRate + u.radius; p.dropRate = P.dropRate + u.cap * 0.5;
+    }
+    if (this.feverT > 0) {   // 丰收狂热: faster, wider swath (the stack cap is untouched)
+      const F = CFG.fever; p.speed *= F.speedMul; p.harvestR *= F.radiusMul; p.pickR *= 1 + (F.radiusMul - 1) * 0.5; p.pickRate *= 1.4;
     }
     for (const w of this.workers) {
-      const Wk = CFG.worker;
-      w.speed = Wk.speed + u.wspeed; w.cap = Wk.cap + u.wcap; w.pickR = Wk.pickR; w.harvestR = Wk.harvestR;
-      w.cutRate = Wk.cutRate; w.pickRate = Wk.pickRate; w.dropRate = Wk.dropRate;
+      const Wk = w.loader ? CFG.loader : CFG.worker, Lv = CFG.workerLv, k = (w.lv || 1) - 1;
+      w.speed = (Wk.speed + u.wspeed) * (1 + Lv.speed * k); w.cap = Math.round((Wk.cap + u.wcap) * (1 + Lv.cap * k));
+      w.pickR = Wk.pickR; w.harvestR = Wk.harvestR;
+      w.cutRate = Wk.cutRate || 0; w.pickRate = Wk.pickRate; w.dropRate = Wk.dropRate;
     }
   }
 
@@ -321,8 +328,15 @@ export class World {
       const w = makeCollector('worker', t.x, t.y);
       w.from = e.worker.from; w.to = e.worker.to; w.state = 'collect'; w.wait = 0; w.tgt = null; w.retarget = 0;
       w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = t.icon === 'cart';
+      w.lv = 1; w.trips = 0; w.lvT = -9; w.loader = this.loaders && !w.cart;
       this.workers.push(w); this.refreshStats();
     }
+    if (e.upgradeWorkers === 'loader') {
+      this.loaders = true;
+      for (const w of this.workers) if (!w.cart && !w.loader) { w.loader = true; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
+      this.refreshStats();
+    }
+    if (e.sprinkler) for (const id of e.sprinkler) { const f = this.objs[id]; if (f && f.kind === 'field') { f.growMul = CFG.sprinkler.growMul; f.sprinkler = true; f.sprinklerT = this.t; } }
     if (e.vehicle) { this.player.vehicle = true; this.player.appearT = this.t; this.refreshStats(); }
     if (e.cashier) for (const id of e.cashier) { const c = this.objs[id]; c.cashier = true; if (c.cash > 0) { this.money += c.cash; c.cash = 0; } }
     if (e.proc) for (const pe of e.proc) { const p = this.objs[pe.id]; p.time *= pe.mul; }
@@ -352,7 +366,7 @@ export class World {
     // fields regrow
     for (const f of this.fields) {
       if (f.hidden || f.ripe >= f.n) continue;
-      const g = f.g, pop = f.pop, k = dt / f.grow;
+      const g = f.g, pop = f.pop, k = dt * f.growMul / f.grow;
       for (let i = 0, n = f.n; i < n; i++) {
         const v = g[i];
         if (v < 1) { const nv = v + k; if (nv >= 1) { g[i] = 1; f.ripe++; pop[i] = 1; } else g[i] = nv; }
@@ -383,8 +397,10 @@ export class World {
       }
     }
     // collectors interact
+    this.comboGain = 0;
     this.interact(this.player, dt, true);
     for (const w of this.workers) this.interact(w, dt, false);
+    this.updateFever(dt);
     this.playerExtras(dt);
     // counters & customers
     for (const c of this.counters) if (!c.hidden) this.updateCounter(c, dt);
@@ -393,7 +409,10 @@ export class World {
     for (const p of this.procs) {
       if (p.hidden) continue;
       p.work = Math.max(0, p.work - dt * 2);
-      const out = p.outObj, room = !out || out.stock.length + out.incoming < CFG.counter.stockMax;
+      // room on the counter: raw produce dumped there never blocks the machine's own goods
+      const out = p.outObj;
+      let room = !out || out.stock.length + out.incoming < CFG.counter.stockMax;
+      if (!room) { let k = 0; for (const it of out.stock) if (it === p.outItem) k++; room = k + out.incoming < CFG.counter.stockMax * 0.5; }
       if (p.buf >= p.ratio && room) {
         p.timer += dt; p.work = 1;
         if (p.timer >= p.time) {
@@ -506,21 +525,26 @@ export class World {
           if (dd <= hr2) { cand.push(i); cd.push(dd); }
         }
         if (!cand.length) continue;
-        // Everything inside the radius is always cut (clean swath, like the ads). Only the nearest
-        // `allow` plants are carried; the rest burst away as cut blooms once the stack is full.
-        let allow = Math.max(0, f.spill ? Math.floor((f.pile.cap - f.pile.total - f.pile.pending) / f.spill) : space());
-        let keep = null;
+        // Everything inside the radius is cut while there is room. At max capacity cutting STOPS
+        // (plants stay standing); with only a little room left, the nearest plants go first so the
+        // swath edge stays round.
+        const allow = f.spill ? Math.floor((f.pile.cap - f.pile.total - f.pile.pending) / f.spill) : space();
+        if (allow <= 0) continue;
+        let list = cand;
         if (allow < cand.length) {
-          keep = new Set();
           const ord = cand.map((i, k) => k).sort((a, b) => cd[a] - cd[b] || cand[a] - cand[b]);
-          for (let k = 0; k < allow; k++) keep.add(cand[ord[k]]);
+          list = ord.slice(0, allow).map((k) => cand[k]);
         }
         let cut = 0, cx = 0, cy = 0;
-        for (const i of cand) {
+        for (const i of list) {
           const px = f.px(i), py = f.py(i);
-          if (keep && !keep.has(i)) {
-            // cut, not carried
-          } else if (f.spill) {
+          if (f.gold[i]) {   // 金色作物: pays straight into the wallet
+            const amount = itemPrice(f.item) * CFG.golden.mul;
+            this.money += amount; this.stats.earned += amount;
+            this.emit('golden', { x: px, y: py, amount, who: c.kind });
+          }
+          f.gold[i] = this.rnd() < CFG.golden.chance ? 1 : 0;
+          if (f.spill) {
             for (let k = 0; k < f.spill; k++) {
               const tx = px + (this.rnd() - 0.5) * 34, ty = py + (this.rnd() - 0.5) * 34;
               f.pile.pending++;
@@ -533,6 +557,7 @@ export class World {
           }
           f.g[i] = 0; f.ripe--; f.cutAt[i] = this.t; cut++; cx += px; cy += py;
         }
+        if (isPlayer) this.comboGain += cut;
         if (cut) { c.cutT = this.t; this.emit('harvest', { x: cx / cut, y: cy / cut, n: cut, item: f.item, who: c.kind }); }
       }
       // piles
@@ -547,7 +572,7 @@ export class World {
             c.pickAcc--; took = true; c.incoming++;
             this.launch(pl.type, 'stack', pl.cx(i), pl.cy(i), pl.hs[i] * CFG.pile.layer, c, 0, 0, 0, CFG.fly.pick);
             this.stats.collected[pl.type] = (this.stats.collected[pl.type] || 0) + 1;
-            if (isPlayer) this.emit('pick', { item: pl.type });
+            if (isPlayer) { this.emit('pick', { item: pl.type }); this.comboGain++; }
           }
         }
         if (!took) c.pickAcc = Math.min(c.pickAcc, 1);
@@ -555,12 +580,13 @@ export class World {
       const full = space() <= 0 && c.stack.length > 0;
       if (full && !c.fullFlag && isPlayer) this.emit('full', {});
       c.fullFlag = full;
-    }
+    } else c.fullFlag = space() <= 0 && c.stack.length > 0;
     // drop into sinks
     if (c.canDrop && c.stack.length > 0) {
       let sink = null, accepts = null;
       for (const k of this.counters) if (!k.hidden && inRect(c.x, c.y, k.zone) && (!c.toObjs || c.toObjs.includes(k)) && c.stack.some((t) => k.items.includes(t))) { sink = k; accepts = (t) => k.items.includes(t); break; }
       if (!sink) for (const p of this.procs) if (!p.hidden && inRect(c.x, c.y, p.inZone) && (!c.toObjs || c.toObjs.includes(p)) && c.stack.includes(p.inItem)) { sink = p; accepts = (t) => t === p.inItem; break; }
+      c.dropping = !!sink;
       if (sink) {
         c.dropAcc = Math.min(c.dropAcc + c.dropRate * dt, Math.max(1, c.dropRate * 0.1));
         while (c.dropAcc >= 1) {
@@ -574,7 +600,21 @@ export class World {
           if (isPlayer) this.emit('drop', { item });
         }
       } else c.dropAcc = 0;
+    } else c.dropping = false;
+  }
+
+  // 丰收狂热 meter (player only)
+  updateFever(dt) {
+    const F = CFG.fever, p = this.player;
+    if (this.feverT > 0) {
+      this.feverT -= dt;
+      if (this.feverT <= 0) { this.feverT = 0; this.combo = 0; this.refreshStats(); this.emit('feverEnd', {}); }
+      return;
     }
+    if (this.comboGain > 0) { this.combo = Math.min(1, this.combo + this.comboGain * F.perItem); this.comboIdle = 0; }
+    else if (p.stack.length + p.incoming > 0 || p.dropping) this.comboIdle = 0;          // carrying a load: frozen
+    else if ((this.comboIdle += dt) > F.grace) this.combo = Math.max(0, this.combo - F.drain * dt);
+    if (this.combo >= 1) { this.feverT = F.dur; this.combo = 1; this.refreshStats(); this.emit('fever', { x: p.x, y: p.y }); }
   }
 
   playerExtras(dt) {
@@ -612,6 +652,7 @@ export class World {
       const cu = { x: c.spawn.x + this.rnd() * 30, y: c.spawn.y + (this.rnd() - 0.5) * 20, counter: c, state: 'in',
                    want: C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)),
                    bag: [], incoming: 0, wait: 0, hue: Math.floor(this.rnd() * 8), walk: this.rnd() * 6, face: -1, vx: 0, vy: 0, leg: 0 };
+      if (this.rnd() < CFG.vip.chance) { cu.vip = true; cu.wish = c.items.reduce((a, b) => (itemPrice(b) > itemPrice(a) ? b : a), c.items[0]); }
       c.queue.push(cu); this.customers.push(cu);
     }
     const front = c.queue[0];
@@ -627,6 +668,7 @@ export class World {
       if (done && front.incoming === 0) {
         let amount = 0;
         for (const it of front.bag) { amount += itemPrice(it); this.stats.sold[it] = (this.stats.sold[it] || 0) + 1; }
+        if (front.vip) { amount *= CFG.vip.mul; this.emit('vipPay', { x: c.x, y: c.y, tx: c.cashPos.x, ty: c.cashPos.y, amount, cashier: c.cashier }); }
         this.stats.earned += amount;
         if (c.cashier) { this.money += amount; this.emit('cashierPay', { x: c.x, y: c.y, amount }); }
         else { c.cash += amount; this.emit('pay', { x: front.x, y: front.y, tx: c.cashPos.x, ty: c.cashPos.y, amount }); }
@@ -665,7 +707,13 @@ export class World {
     w.sources = srcs; w.toObjs = sinks;
     const space = w.cap - w.stack.length - w.incoming;
     if (w.state === 'collect' && space <= 0) w.state = 'deliver';
-    if (w.state === 'deliver' && w.stack.length === 0 && w.incoming === 0) { w.state = 'collect'; w.wait = 0; }
+    if (w.state === 'deliver' && w.stack.length === 0 && w.incoming === 0) {
+      w.state = 'collect'; w.wait = 0;
+      // 园丁成长: level up every few delivery trips
+      w.trips++;
+      const Lv = CFG.workerLv, nl = Math.min(Lv.max, 1 + Math.floor(w.trips / Lv.per));
+      if (nl > w.lv) { w.lv = nl; w.lvT = T; this.refreshStats(); this.emit('workerLevel', { x: w.x, y: w.y, lv: nl }); }
+    }
     w.canPick = w.state === 'collect';
     let tx = w.x, ty = w.y;
     if (w.state === 'collect') {
@@ -712,7 +760,7 @@ export class World {
     w.lastX = w.x; w.lastY = w.y;
     const k = Math.min(1, dt * 10);
     w.vx += (vx - w.vx) * k; w.vy += (vy - w.vy) * k;
-    this.stepMove(w, dt, 9);
+    this.stepMove(w, dt, w.loader ? CFG.loader.body : 9);
   }
 
   // ---- guide: what should the player do next (arrow + sim bot) -----------------------
@@ -737,6 +785,8 @@ export class World {
     for (const c of this.counters) if (!c.hidden && c.cash > 0.5) {
       cash += c.cash; const dd = d2(c.cashPos.x, c.cashPos.y, p.x, p.y); if (dd < cd) { cd = dd; cashPos = c.cashPos; }
     }
+    // at max capacity the arrow always points at the counter / machine that takes the load
+    if (free <= 0 && p.stack.length > 0) { this.gmode = 'deliver'; const s = this.sinkTarget(p); if (s) return { ...s, full: true }; }
     let tile = null;
     for (const t of this.tiles) if (t.visible && t.price - t.paid <= this.money + 0.01) { tile = t; break; }
     if (tile) return { x: tile.x, y: tile.y, kind: 'tile', obj: tile };

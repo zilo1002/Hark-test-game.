@@ -50,6 +50,26 @@ export function drawIcon(g, kind, t = 0) {
     case 'mower': g.translate(6, 7); g.scale(0.45, 0.45); mower(g, t, false, 0); break;
     case 'cart': g.translate(2, 6); g.scale(0.7, 0.7); cart(g, t, false, 0); break;
     case 'worker': g.translate(0, 12); g.scale(0.62, 0.62); person(g, t, 0, false, BOY); break;
+    case 'loader': {   // 园丁换铲车: yellow loader with a front bucket, side view
+      const O = COL.outline;
+      g.lineJoin = 'round'; g.strokeStyle = O; g.lineWidth = 1.1;
+      g.fillStyle = '#FFC21A'; g.beginPath(); g.roundRect(-9, -6, 13, 8, 2); g.fill(); g.stroke();          // body
+      g.fillStyle = '#F29C0E'; g.beginPath(); g.roundRect(-11, -10, 7, 5, 1.5); g.fill(); g.stroke();       // load bed
+      g.fillStyle = '#3A3A44'; g.fillRect(-3, -12, 2, 6);                                                   // seat back
+      g.strokeStyle = '#E8A20E'; g.lineWidth = 2.2; g.beginPath(); g.moveTo(2, -3); g.lineTo(9, 1); g.stroke(); // arm
+      g.fillStyle = '#AEB6C2'; g.strokeStyle = O; g.lineWidth = 1.1; g.beginPath(); g.moveTo(8, -2); g.lineTo(14, -2); g.lineTo(13, 5); g.lineTo(7, 5); g.closePath(); g.fill(); g.stroke();   // bucket
+      for (const [x, r] of [[-6, 4.4], [4, 3.2]]) { g.fillStyle = '#24242A'; g.beginPath(); g.arc(x, 4, r, 0, 6.3); g.fill(); g.fillStyle = '#FFD23F'; g.beginPath(); g.arc(x, 4, r * 0.45, 0, 6.3); g.fill(); }
+      g.fillStyle = '#F2CF6B'; g.beginPath(); g.ellipse(-1, -14, 4.5, 1.4, 0, 0, 6.3); g.fill(); g.fillStyle = '#E8BE4E'; g.fillRect(-3.4, -17, 4.8, 3.2);   // straw hat
+      break;
+    }
+    case 'sprinkler': {   // 洒水器: post + spraying arcs
+      g.strokeStyle = '#8C94A0'; g.lineWidth = 2.4; g.beginPath(); g.moveTo(0, 9); g.lineTo(0, -3); g.stroke();
+      g.fillStyle = '#3BA7FF'; g.strokeStyle = COL.outline; g.lineWidth = 1; g.beginPath(); g.roundRect(-3, -6, 6, 4, 1.5); g.fill(); g.stroke();
+      g.fillStyle = '#7FD0FF';
+      for (const s of [-1, 1]) for (let i = 1; i <= 4; i++) { const u = i / 4; g.beginPath(); g.arc(s * u * 12, -6 - 10 * u * (1 - u) * 2.2 + u * 12, 1.2 + u * 0.8, 0, 6.3); g.fill(); }
+      g.fillStyle = '#5DBB3A'; g.beginPath(); g.ellipse(0, 9.5, 9, 2.2, 0, 0, 6.3); g.fill();
+      break;
+    }
     case 'counter':
       g.fillStyle = '#4C82DE'; g.strokeStyle = '#21468E'; g.lineWidth = 1.2; g.beginPath(); g.roundRect(-11, -1, 22, 9, 2); g.fill(); g.stroke();
       g.fillStyle = '#7FB0FF'; g.beginPath(); g.roundRect(-12, -4, 24, 4, 1.5); g.fill(); g.stroke();

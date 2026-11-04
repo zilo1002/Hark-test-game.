@@ -266,6 +266,11 @@ export function makePerson(o = {}) {
     head.add(mesh(box(8, 0.9, 6), o.capColor || '#3B7FE0', 0, 2.6, 7.4));
   }
   if (o.pigtails) for (const s of [-1, 1]) head.add(mesh(sph(2.6, 7, 5), hair, s * 7.6, -0.8, -2.2));
+  if (o.crown) {   // VIP: chunky gold crown with a red gem
+    head.add(mesh(cyl(5.6, 5.2, 3.2, 10), '#FFC21A', 0, 8.6, -0.4));
+    for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; head.add(mesh(cone(1.5, 3.4, 5), '#FFD23F', Math.sin(a) * 4.6, 11.6, -0.4 + Math.cos(a) * 4.6)); }
+    head.add(mesh(sph(1.3, 6, 5), '#E8283C', 0, 8.8, 5.0));
+  }
   // tool in the right hand (sickle), hidden unless cutting
   const tool = new THREE.Group();
   tool.add(mesh(cyl(0.6, 0.6, 6, 5), '#8E5627', 0, 0, 0));
@@ -327,6 +332,46 @@ export function makeMower() {
     w.position.set(x, r, z); w.castShadow = true; g.add(w); wheels.push(w);
   }
   return { root: g, wheels };
+}
+// 园丁换铲车: a small chunky ride-on loader (same toy palette as the mower). Faces +Z: front bucket,
+// driver seat in the middle, a railed load bed at the back where the harvest stacks up.
+export function makeLoader() {
+  const g = new THREE.Group();
+  const Y = '#FFC21A', Y2 = '#F29C0E', D = '#3A3A44', S = '#AEB6C2';
+  const parts = [
+    P(box(22, 5, 32), D, [0, 6.5, -1]),                                   // chassis
+    P(box(22, 7, 18), Y, [0, 12, -4]), P(box(22.4, 1.4, 18.4), '#FFE07A', [0, 15.8, -4]),   // body + trim
+    P(box(18, 7, 11), Y, [0, 11.5, 10]), P(box(16, 1.6, 9), Y2, [0, 15.6, 10]),           // hood
+    P(box(3.4, 2.4, 1), '#FFF6C0', [-5.5, 12.5, 15.8]), P(box(3.4, 2.4, 1), '#FFF6C0', [5.5, 12.5, 15.8]),   // headlights
+    P(box(5, 0.8, 0.6), D, [0, 10, 15.8]), P(box(5, 0.8, 0.6), D, [0, 12, 15.8]),            // grille
+    P(box(10, 2.6, 8), D, [0, 17.4, -1]), P(box(10, 7, 2.2), D, [0, 20.5, -5]),            // seat + backrest
+    P(cyl(0.9, 0.9, 9, 6), D, [0, 19.5, 6], [0.55, 0, 0]), P(tor(3.2, 0.75, 4, 10), '#2F3440', [0, 23.5, 8.4], [H + 0.55, 0, 0]),
+    P(cyl(1.1, 1.1, 9, 6), '#2F3440', [7, 19, 8]), P(cyl(1.5, 1.5, 1.6, 6), '#E8452C', [7, 24, 8]),   // exhaust
+    // load bed (rear) with rails
+    P(box(24, 2.4, 13), Y2, [0, 17.2, -15.5]),
+    P(box(1.6, 4, 13), Y, [-11.4, 20.2, -15.5]), P(box(1.6, 4, 13), Y, [11.4, 20.2, -15.5]), P(box(24, 4, 1.6), Y, [0, 20.2, -21.6]),
+    // loader arms + front bucket with teeth
+    P(box(2.6, 2.6, 17), Y, [-12, 11, 18], [0.32, 0, 0]), P(box(2.6, 2.6, 17), Y, [12, 11, 18], [0.32, 0, 0]),
+    P(box(26, 2, 8), S, [0, 3, 27]), P(box(26, 8, 2), S, [0, 6.5, 23.4]), P(box(2, 7, 8), S, [-12, 6, 27]), P(box(2, 7, 8), S, [12, 6, 27]),
+    P(box(27, 1.6, 1.6), '#8C94A0', [0, 9.8, 23.6]),
+  ];
+  for (let k = -2; k <= 2; k++) parts.push(P(box(2.2, 1.4, 3), '#D8DEE6', [k * 5.4, 2.6, 32]));
+  const body = new THREE.Mesh(merge(parts), vcMat()); body.castShadow = true; g.add(body);
+  const wheels = [];
+  for (const [x, z, r, w] of [[-14, -9, 6.6, 5], [14, -9, 6.6, 5], [-13, 11, 4.8, 4], [13, 11, 4.8, 4]]) {
+    const wl = new THREE.Mesh(merge([P(cyl(r, r, w, 12), '#24242A', [0, 0, 0], [0, 0, H]), P(cyl(r * 0.55, r * 0.55, w + 0.2, 8), Y, [0, 0, 0], [0, 0, H]), P(cyl(r * 0.2, r * 0.2, w + 0.4, 6), D, [0, 0, 0], [0, 0, H])]), vcMat());
+    wl.position.set(x, r, z); wl.castShadow = true; g.add(wl); wheels.push(wl);
+  }
+  return { root: g, body, wheels };
+}
+// 洒水器: a post with a spinning blue head (water arcs are drawn on the overlay)
+export function makeSprinkler() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(merge([P(cyl(4, 5, 2, 8), '#8C94A0', [0, 1, 0]), P(cyl(1.3, 1.3, 22, 6), '#AEB6C2', [0, 12, 0])]), vcMat());
+  base.castShadow = true; g.add(base);
+  const head = new THREE.Mesh(merge([P(cyl(2.6, 2.6, 3, 8), '#3BA7FF', [0, 0, 0]), P(box(1.4, 1.4, 6), '#2B7FD0', [0, 1, 3], [-0.5, 0, 0]), P(sph(1.6, 6, 4), '#FFD23F', [0, 2.4, 0])]), vcMat());
+  head.position.y = 24; g.add(head);
+  return { root: g, head };
 }
 export function makeCart() {
   const g = new THREE.Group();
