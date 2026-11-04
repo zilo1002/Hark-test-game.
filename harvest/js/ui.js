@@ -10,7 +10,9 @@ export class UI {
     this.el = { hud: $('hud'), money: $('money'), coin: $('coin'), lv: $('lvBadge'), goal: $('goalText'), bar: $('goalBar'), num: $('goalNum'),
                 tip: $('tip'), banner: $('banner'), home: $('home'), stars: $('starCount'), list: $('restoreList'), hint: $('restoreHint'),
                 play: $('btnPlay'), levels: $('levels'), grid: $('levelGrid'), settings: $('settings'), win: $('win'), pause: $('pause') };
-    this.lastMoney = -1; this.lastGoal = ''; this.stack = [];
+    this.lastMoney = -1; this.lastGoal = ''; this.stack = []; this.page = 0;
+    // 花园庄园 (stars from levels 1–15) / 林场牧场 (levels 16–30): one star pool, two estates
+    for (const b of $('homeTabs').children) b.onclick = () => { this.page = +b.dataset.p; this.renderHome(h.data()); };
     $('btnPause').onclick = () => this.openPause();
     $('btnResume').onclick = () => this.closeModal(this.el.pause);
     $('btnHome').onclick = () => { this.closeAll(); h.home(); };
@@ -29,7 +31,7 @@ export class UI {
     reset.onclick = () => {
       if (!reset.dataset.armed) { reset.dataset.armed = '1'; reset.textContent = '再点一次：确定清空所有进度'; setTimeout(() => { delete reset.dataset.armed; reset.textContent = '重置全部进度'; }, 3000); return; }
       delete reset.dataset.armed; reset.textContent = '重置全部进度';
-      this.closeAll(); h.reset();
+      this.closeAll(); this.page = 0; this._auto2 = false; h.reset();
     };
   }
   // modals stack: settings opened from pause returns to pause
@@ -88,10 +90,19 @@ export class UI {
     this.el.play.textContent = data.cur ? `继续 第 ${next + 1} 关` : allDone ? `全部通关！再玩第 ${L} 关` : `开始 第 ${next + 1} 关 · ${CFG.levels[next].name}`;
     this.el.play.dataset.li = next;
     const restored = new Set(data.restored);
-    const cheapest = CFG.meta.filter((m) => !restored.has(m.id)).reduce((a, m) => Math.min(a, m.cost), 99);
-    this.el.hint.textContent = restored.size === CFG.meta.length ? '· 庄园修好啦！' : left >= cheapest ? '· 点一下就能修' : '· 过关拿星星';
+    if (!this.page) this.page = 1;
+    if (data.unlocked >= 15 && !this._auto2) { this._auto2 = true; this.page = 2; }   // once past level 15, open on the new farm
+    const page = this.page, metas = CFG.meta.filter((m) => (m.page || 1) === page);
+    for (const b of $('homeTabs').children) {
+      const p = +b.dataset.p, todo = CFG.meta.filter((m) => (m.page || 1) === p && !restored.has(m.id)).length;
+      b.classList.toggle('on', p === page);
+      b.innerHTML = `${p === 1 ? '花园庄园' : '林场牧场'}${todo ? '' : '<em>✓</em>'}`;
+    }
+    $('restoreHead').textContent = page === 1 ? '用星星修复庄园' : '用星星建林场牧场';
+    const cheapest = metas.filter((m) => !restored.has(m.id)).reduce((a, m) => Math.min(a, m.cost), 99);
+    this.el.hint.textContent = metas.every((m) => restored.has(m.id)) ? (page === 1 ? '· 庄园修好啦！' : '· 牧场建好啦！') : left >= cheapest ? '· 点一下就能修' : page === 2 && data.unlocked < 15 ? '· 第 16 关起拿星星' : '· 过关拿星星';
     this.el.list.innerHTML = '';
-    for (const m of CFG.meta) {
+    for (const m of metas) {
       const b = document.createElement('button');
       const done = restored.has(m.id), can = !done && left >= m.cost;
       b.className = 'rbtn' + (done ? ' done' : can ? ' can' : ' poor');
@@ -113,6 +124,9 @@ export class UI {
       g.appendChild(b);
     });
     this.openModal(this.el.levels);
+    // 30 levels: scroll the next level to play into view
+    const tgt = g.children[Math.min(CFG.levels.length - 1, d.cur ? d.cur.li : d.unlocked)];
+    if (tgt && tgt.scrollIntoView) tgt.scrollIntoView({ block: 'center', inline: 'nearest' });
   }
   openSettings() {
     const d = this.h.data();

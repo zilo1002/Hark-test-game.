@@ -123,7 +123,7 @@ export class Field {
     for (let i = 0; i < n; i++) { this.jx[i] = Math.round((rnd() - 0.5) * 60); this.jy[i] = Math.round((rnd() - 0.5) * 60); this.v[i] = (rnd() * 4) | 0; }
     // 金色作物: a few sparkling golden plants; a cut golden plant re-rolls when it regrows
     this.gold = new Uint8Array(n); for (let i = 0; i < n; i++) this.gold[i] = rnd() < CFG.golden.chance ? 1 : 0;
-    this.ripe = n; this.grow = cr.grow; this.growMul = 1; this.sprinkler = false; this.spill = cr.spill || 0; this.pile = null;
+    this.ripe = n; this.grow = cr.grow; this.yield = cr.yield || 1; this.growMul = 1; this.sprinkler = false; this.spill = cr.spill || 0; this.pile = null;
   }
   px(i) { return this.x + ((i % this.cols) + 0.5 + this.jx[i] / 300) * this.gap; }
   py(i) { return this.y + (((i / this.cols) | 0) + 0.5 + this.jy[i] / 300) * this.gap; }
@@ -200,9 +200,11 @@ export class World {
       const pr = CFG.producers[o.producer];
       const c = { ...base, kind: 'coop', period: pr.period, burst: pr.burst, slots: [], pile: new Pile(o.item, o.x, o.y, o.w, o.h, o.cap) };
       // nest boxes along the north fence (side 0) and the west fence (side -1)
-      const topN = Math.floor((o.w - 20) / 34) + 1, sp = (o.w - 20) / Math.max(1, topN - 1);
+      // cows, sheep, hives and apple trees are bigger than hens: wider slot spacing (pr.gap)
+      const gp = pr.gap || 34;
+      const topN = Math.floor((o.w - 20) / gp) + 1, sp = (o.w - 20) / Math.max(1, topN - 1);
       for (let i = 0; i < topN; i++) c.slots.push({ x: o.x + 10 + i * sp, y: o.y - 16, side: 0 });
-      for (let i = 0; ; i++) { const y = o.y + 30 + i * 34; if (y > o.y + o.h - 16) break; c.slots.push({ x: o.x - 16, y, side: -1 }); }
+      for (let i = 0; ; i++) { const y = o.y + 30 + i * gp; if (y > o.y + o.h - 16) break; c.slots.push({ x: o.x - 16, y, side: -1 }); }
       c.max = Math.min(o.max, c.slots.length);
       c.n = Math.min(o.n, c.max);
       c.hens = c.slots.map((s) => ({ ...s, t: this.rnd() * pr.period, lay: 0, appearT: -9 }));
@@ -327,7 +329,8 @@ export class World {
     if (e.worker) {
       const w = makeCollector('worker', t.x, t.y);
       w.from = e.worker.from; w.to = e.worker.to; w.state = 'collect'; w.wait = 0; w.tgt = null; w.retarget = 0;
-      w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = t.icon === 'cart';
+      w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = t.icon === 'cart' || t.icon === 'milker';
+      w.lumber = w.from.some((id) => this.objs[id] && this.objs[id].item === 'log');
       w.lv = 1; w.trips = 0; w.lvT = -9; w.loader = this.loaders && !w.cart;
       this.workers.push(w); this.refreshStats();
     }
@@ -410,15 +413,17 @@ export class World {
       if (p.hidden) continue;
       p.work = Math.max(0, p.work - dt * 2);
       // room on the counter: raw produce dumped there never blocks the machine's own goods
-      const out = p.outObj;
-      let room = !out || out.stock.length + out.incoming < CFG.counter.stockMax;
-      if (!room) { let k = 0; for (const it of out.stock) if (it === p.outItem) k++; room = k + out.incoming < CFG.counter.stockMax * 0.5; }
+      const out = p.outObj, chain = out && out.kind === 'proc';
+      // a machine can feed another machine (logs → planks → chairs)
+      let room = !out || (chain ? out.buf + out.inc < CFG.proc.chainMax : out.stock.length + out.incoming < CFG.counter.stockMax);
+      if (!room && !chain) { let k = 0; for (const it of out.stock) if (it === p.outItem) k++; room = k + out.incoming < CFG.counter.stockMax * 0.5; }
       if (p.buf >= p.ratio && room) {
         p.timer += dt; p.work = 1;
         if (p.timer >= p.time) {
           p.timer = 0; p.buf -= p.ratio;
           this.stats.produced[p.outItem] = (this.stats.produced[p.outItem] || 0) + 1;
-          if (out) { out.incoming++; this.launch(p.outItem, 'counter', p.x, p.y, 36, out, out.x, out.y, CFG.counter.deskH + 4, CFG.fly.produce); }
+          if (chain) { out.inc++; this.launch(p.outItem, 'procIn', p.x, p.y, 36, out, out.x - 14, out.y, CFG.proc.bodyH + 10, CFG.fly.produce * 1.6, 40); }
+          else if (out) { out.incoming++; this.launch(p.outItem, 'counter', p.x, p.y, 36, out, out.x, out.y, CFG.counter.deskH + 4, CFG.fly.produce); }
           this.emit('produce', { x: p.x, y: p.y, item: p.outItem });
         }
       } else p.timer = Math.min(p.timer, p.time);
@@ -528,7 +533,7 @@ export class World {
         // Everything inside the radius is cut while there is room. At max capacity cutting STOPS
         // (plants stay standing); with only a little room left, the nearest plants go first so the
         // swath edge stays round.
-        const allow = f.spill ? Math.floor((f.pile.cap - f.pile.total - f.pile.pending) / f.spill) : space();
+        const allow = f.spill ? Math.floor((f.pile.cap - f.pile.total - f.pile.pending) / f.spill) : Math.ceil(space() / f.yield);
         if (allow <= 0) continue;
         let list = cand;
         if (allow < cand.length) {
@@ -551,14 +556,19 @@ export class World {
               this.launch(f.item, 'pile', px, py, 4, f.pile, Math.min(f.x + f.w - 2, Math.max(f.x + 2, tx)), Math.min(f.y + f.h - 2, Math.max(f.y + 2, ty)), 0, CFG.fly.harvest);
             }
           } else {
-            c.incoming++;
-            this.launch(f.item, 'stack', px, py, 8, c, 0, 0, 0, CFG.fly.harvest, 70);
-            this.stats.collected[f.item] = (this.stats.collected[f.item] || 0) + 1;
+            // a chopped tree drops several logs (yield), every other plant one item
+            // (the last tree that tops the stack off only drops what still fits)
+            const n = Math.max(1, Math.min(f.yield, space()));
+            for (let k = 0; k < n; k++) {
+              c.incoming++;
+              this.launch(f.item, 'stack', px, py, 8 + k * 10, c, 0, 0, 0, CFG.fly.harvest + k * 0.06, 70);
+            }
+            this.stats.collected[f.item] = (this.stats.collected[f.item] || 0) + n;
           }
           f.g[i] = 0; f.ripe--; f.cutAt[i] = this.t; cut++; cx += px; cy += py;
         }
         if (isPlayer) this.comboGain += cut;
-        if (cut) { c.cutT = this.t; this.emit('harvest', { x: cx / cut, y: cy / cut, n: cut, item: f.item, who: c.kind }); }
+        if (cut) { c.cutT = this.t; c.cutItem = f.item; this.emit('harvest', { x: cx / cut, y: cy / cut, n: cut, item: f.item, who: c.kind }); }
       }
       // piles
       if (space() > 0) {
@@ -821,7 +831,7 @@ export class World {
       const val = value(f.item); if (!val) continue;
       const i = f.nearestRipe(p.x, p.y); if (i < 0) continue;
       const x = f.px(i), y = f.py(i);
-      const s = Math.min(free, f.ripe * (f.spill || 1)) * val / (Math.sqrt(d2(x, y, p.x, p.y)) + 80);
+      const s = Math.min(free, f.ripe * (f.spill || f.yield)) * val / (Math.sqrt(d2(x, y, p.x, p.y)) + 80);
       if (s > bs) { bs = s; best = { x, y, kind: 'field' }; }
     }
     return best;

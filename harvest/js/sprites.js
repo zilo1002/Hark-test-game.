@@ -148,9 +148,112 @@ function cash(g) {
   g.strokeStyle = 'rgba(255,255,255,0.4)'; g.beginPath(); g.moveTo(-8, 0.5); g.lineTo(0, 4.5); g.lineTo(8, 0.5); g.stroke();
 }
 
-export const ITEM_DRAW = { egg, potato, tomato, wheat, crate, ketchup, bill, cash, tulip, rose, gold, bouquet, basket, perfume };
+// ---- v3.3 item icons (zone markers, VIP bubbles, tile icons) ----
+function ol(g, fill, stroke, lw = 0.7) { g.fillStyle = fill; g.strokeStyle = stroke; g.lineWidth = lw; }
+function log(g) {
+  ol(g, '#9A5A2E', '#5E3414'); g.beginPath(); g.roundRect(-7, -3, 12, 6, 2); g.fill(); g.stroke();
+  g.strokeStyle = 'rgba(60,30,10,0.5)'; g.beginPath(); g.moveTo(-5, -1); g.lineTo(2, -1); g.moveTo(-4, 1.4); g.lineTo(3, 1.4); g.stroke();
+  ol(g, '#F2CF8A', '#8E5627'); E(g, 5, 0, 2.6, 3); g.fill(); g.stroke();
+  g.strokeStyle = '#C99A5E'; g.lineWidth = 0.5; E(g, 5, 0, 1.4, 1.7); g.stroke();
+  g.fillStyle = '#5DBB3A'; E(g, -3, -3.6, 1.6, 0.9, -0.4); g.fill();
+}
+function plank(g) {
+  ol(g, '#E9B672', '#8E5627'); g.beginPath(); g.moveTo(-8, -1); g.lineTo(2, -5); g.lineTo(8, -2); g.lineTo(-2, 2); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#C98A4B'; g.beginPath(); g.moveTo(-8, -1); g.lineTo(-2, 2); g.lineTo(-2, 4); g.lineTo(-8, 1); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#B9783C'; g.beginPath(); g.moveTo(-2, 2); g.lineTo(8, -2); g.lineTo(8, 0); g.lineTo(-2, 4); g.closePath(); g.fill(); g.stroke();
+  g.strokeStyle = 'rgba(140,80,30,0.5)'; g.beginPath(); g.moveTo(-4, -0.6); g.lineTo(4, -3.6); g.stroke();
+}
+function chair(g) {
+  ol(g, '#C8874A', '#6B3A1E', 0.8);
+  g.beginPath(); g.roundRect(-5, -9, 10, 8, 1.5); g.fill(); g.stroke();
+  g.fillStyle = '#E8452C'; g.beginPath(); g.roundRect(-6, -1, 12, 3, 1); g.fill(); g.stroke();
+  g.fillStyle = '#8E5627'; for (const x of [-5, 3.6]) { g.fillRect(x, 2, 1.6, 6); }
+  g.strokeStyle = '#E9B672'; g.lineWidth = 1; g.beginPath(); g.moveTo(-3, -6); g.lineTo(3, -6); g.moveTo(-3, -3.5); g.lineTo(3, -3.5); g.stroke();
+}
+function milk(g) {
+  ol(g, '#FFFFFF', '#7A8AA8', 0.8);
+  g.beginPath(); g.moveTo(-3.6, 7); g.lineTo(-3.6, -1); g.quadraticCurveTo(-3.6, -3, -1.6, -4); g.lineTo(-1.6, -6); g.lineTo(1.6, -6); g.lineTo(1.6, -4); g.quadraticCurveTo(3.6, -3, 3.6, -1); g.lineTo(3.6, 7); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#3B7FE0'; g.fillRect(-3.6, 0.5, 7.2, 3.4);
+  g.fillStyle = '#E8452C'; g.beginPath(); g.roundRect(-2, -8, 4, 2.4, 0.8); g.fill();
+  g.fillStyle = 'rgba(180,200,230,0.6)'; g.fillRect(-2.6, -1.6, 1, 7);
+}
+function cheese(g) {
+  ol(g, '#FFD23F', '#B5860A', 0.8);
+  g.beginPath(); g.moveTo(-7, 4); g.lineTo(7, 4); g.lineTo(7, -1); g.lineTo(-7, -4); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#FFE58A'; g.beginPath(); g.moveTo(-7, -4); g.lineTo(7, -1); g.lineTo(4, -3.2); g.closePath(); g.fill();
+  g.fillStyle = '#E8A20E'; for (const [x, y, r] of [[-3, 1, 1.2], [2, 2, 0.9], [4.6, 0.2, 0.7], [-0.4, -0.6, 0.6]]) { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+}
+function icecream(g) {
+  ol(g, '#E3A866', '#9C6331'); g.beginPath(); g.moveTo(-3.6, -1); g.lineTo(3.6, -1); g.lineTo(0, 8); g.closePath(); g.fill(); g.stroke();
+  g.strokeStyle = 'rgba(140,90,40,0.6)'; g.lineWidth = 0.5; g.beginPath(); g.moveTo(-2.4, 1); g.lineTo(1.8, 4.4); g.moveTo(2.4, 1); g.lineTo(-1.8, 4.4); g.stroke();
+  ol(g, '#FFB3C8', '#D9709A'); E(g, 0, -2.6, 4.2, 3.2); g.fill(); g.stroke();
+  ol(g, '#FFF3E0', '#D8C0A8'); E(g, 0, -5.8, 3, 2.4); g.fill(); g.stroke();
+  g.fillStyle = '#E0283C'; g.beginPath(); g.arc(0.4, -8.4, 1.2, 0, TAU); g.fill();
+}
+function corn(g) {
+  ol(g, '#6CCB3E', '#3E8F25'); g.beginPath(); g.moveTo(-8, 1); g.quadraticCurveTo(-3, -4, 2, -4); g.lineTo(-2, 1); g.closePath(); g.fill(); g.stroke();
+  ol(g, '#FFD23F', '#C9962A'); E(g, 1, -0.6, 6.4, 2.8, -0.2); g.fill(); g.stroke();
+  g.fillStyle = '#F2B529'; for (let i = -4; i <= 5; i += 2) for (const yy of [-1.6, 0.4]) { g.beginPath(); g.arc(i + 1, yy - i * 0.2, 0.7, 0, TAU); g.fill(); }
+  ol(g, '#4FAE32', '#3E8F25'); g.beginPath(); g.moveTo(-8, 1); g.quadraticCurveTo(-2, 4, 3, 2.6); g.lineTo(-2, 0); g.closePath(); g.fill(); g.stroke();
+}
+function popcorn(g) {
+  for (const [x, y] of [[-3, -5], [0, -6.4], [3, -5], [-1.6, -3.6], [1.8, -3.6]]) { ol(g, '#FFF6D0', '#D9C48E', 0.5); g.beginPath(); g.arc(x, y, 2.2, 0, TAU); g.fill(); g.stroke(); }
+  ol(g, '#FFFFFF', '#8E1E12', 0.8); g.beginPath(); g.moveTo(-5, -3); g.lineTo(5, -3); g.lineTo(3.8, 7); g.lineTo(-3.8, 7); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#E8452C'; for (const x of [-3.2, 0.2]) { g.beginPath(); g.moveTo(x, -3); g.lineTo(x + 1.8, -3); g.lineTo(x + 1.6, 7); g.lineTo(x + 0.2, 7); g.closePath(); g.fill(); }
+}
+function pumpkin(g) {
+  ol(g, '#F2871E', '#B5560A', 0.8);
+  for (const [x, rx] of [[-3.4, 3.4], [3.4, 3.4], [0, 3.6]]) { E(g, x, 1, rx, 4.6); g.fill(); g.stroke(); }
+  g.fillStyle = '#FFAE58'; E(g, -1, -0.6, 1, 2.6); g.fill();
+  g.fillStyle = '#6B8E23'; g.fillRect(-0.8, -6, 1.6, 2.6);
+  g.fillStyle = '#5DBB3A'; E(g, 2.6, -4.6, 2, 0.9, -0.4); g.fill();
+}
+function pie(g) {
+  ol(g, '#E3A866', '#9C6331', 0.8); E(g, 0, 1.6, 7.4, 3.6); g.fill(); g.stroke();
+  g.fillRect(-7.4, -0.4, 14.8, 2); ol(g, '#E8871E', '#B5560A'); E(g, 0, -0.6, 6.4, 2.8); g.fill(); g.stroke();
+  g.strokeStyle = '#F2C08A'; g.lineWidth = 1.2; E(g, 0, -0.6, 6.6, 3); g.stroke();
+  g.fillStyle = '#FFFFFF'; E(g, 0, -1, 1.8, 0.9); g.fill();
+}
+function berry(g) {
+  ol(g, '#E8243C', '#8E0E1E', 0.8); g.beginPath(); g.moveTo(-4.6, -2); g.quadraticCurveTo(-5, 3, 0, 6.6); g.quadraticCurveTo(5, 3, 4.6, -2); g.quadraticCurveTo(0, -4, -4.6, -2); g.fill(); g.stroke();
+  g.fillStyle = '#FFE58A'; for (const [x, y] of [[-2, 0], [1, -0.6], [2.6, 1.6], [-0.6, 2.4], [1, 4], [-2.6, 2.6]]) { E(g, x, y, 0.4, 0.6); g.fill(); }
+  ol(g, '#4FAE32', '#2E7D1E', 0.5); g.beginPath(); for (let i = 0; i < 5; i++) { const a = Math.PI + i * Math.PI / 4; g.lineTo(Math.cos(a) * 3.6, -2.6 + Math.sin(a) * 2); g.lineTo(Math.cos(a + 0.4) * 1, -2.6); } g.closePath(); g.fill(); g.stroke();
+}
+function jarBody(g, glass, lid, label, labelText) {
+  ol(g, glass, '#7A1010', 0.8); g.beginPath(); g.roundRect(-4.6, -3, 9.2, 10, 2.4); g.fill(); g.stroke();
+  ol(g, lid, '#8E5627', 0.7); g.beginPath(); g.roundRect(-5, -6, 10, 3.4, 1); g.fill(); g.stroke();
+  g.fillStyle = label; g.beginPath(); g.roundRect(-3.4, 0, 6.8, 4, 0.8); g.fill();
+  g.fillStyle = labelText; g.beginPath(); g.arc(0, 2, 1.1, 0, TAU); g.fill();
+  g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillRect(-3.6, -2, 1, 7);
+}
+function jam(g) { jarBody(g, '#C8102E', '#FFFFFF', '#FFF3E0', '#E8243C'); g.fillStyle = '#E8452C'; for (let x = -4.6; x < 5; x += 2.3) { g.beginPath(); g.arc(x + 1.1, -5.9, 1.1, Math.PI, 0); g.fill(); } }
+function honey(g) { jarBody(g, '#FFB80F', '#E8E0D0', '#5A3414', '#FFD23F'); }
+function wool(g) {
+  for (const [x, y, r] of [[-3, 1, 3.6], [3, 1, 3.6], [0, -2.4, 4], [0, 2.4, 3.6]]) { ol(g, '#FFFFFF', '#B8B0A8', 0.6); g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); g.stroke(); }
+  g.fillStyle = 'rgba(200,190,180,0.5)'; g.beginPath(); g.arc(1.4, 0.6, 1.4, 0, TAU); g.fill();
+}
+function yarn(g) {
+  ol(g, '#FF6FA8', '#B23A78', 0.8); g.beginPath(); g.arc(0, 0, 5.6, 0, TAU); g.fill(); g.stroke();
+  g.strokeStyle = '#E8457E'; g.lineWidth = 0.7; for (const a of [-0.6, 0, 0.6]) { g.beginPath(); g.ellipse(0, 0, 5.4, 2.2, a, 0, TAU); g.stroke(); }
+  g.strokeStyle = '#FFB3D8'; g.lineWidth = 0.9; g.beginPath(); g.moveTo(4, 3.6); g.quadraticCurveTo(8, 6, 6, 8); g.stroke();
+}
+function apple(g) {
+  ol(g, '#E8283C', '#8E0E1E', 0.8); g.beginPath(); g.moveTo(0, -3); g.bezierCurveTo(-3, -5.6, -6.4, -2, -5.2, 2); g.bezierCurveTo(-4.2, 5.6, -1.4, 6.4, 0, 5.4); g.bezierCurveTo(1.4, 6.4, 4.2, 5.6, 5.2, 2); g.bezierCurveTo(6.4, -2, 3, -5.6, 0, -3); g.fill(); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,0.7)'; E(g, -2.4, -0.8, 1, 1.6, -0.4); g.fill();
+  g.strokeStyle = '#6B3A1E'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, -3); g.lineTo(0.6, -6); g.stroke();
+  g.fillStyle = '#5DBB3A'; E(g, 2.4, -5.4, 2, 0.9, -0.4); g.fill();
+}
+function juice(g) {
+  ol(g, '#FFF3E0', '#7A8A5A', 0.8); g.beginPath(); g.moveTo(-4, 8); g.lineTo(-4, -3); g.lineTo(0, -7); g.lineTo(4, -3); g.lineTo(4, 8); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#5DBB3A'; g.fillRect(-4, 0, 8, 5);
+  g.fillStyle = '#E8283C'; g.beginPath(); g.arc(0, 2.5, 1.7, 0, TAU); g.fill();
+  g.fillStyle = '#E8452C'; g.beginPath(); g.arc(1.6, -5, 1, 0, TAU); g.fill();
+}
+export const ITEM_DRAW = { egg, potato, tomato, wheat, crate, ketchup, bill, cash, tulip, rose, gold, bouquet, basket, perfume,
+  log, plank, chair, milk, cheese, icecream, corn, popcorn, pumpkin, pie, berry, jam, wool, yarn, honey, apple, juice };
 const ITEM_SIZE = { egg: [12, 13], potato: [14, 12], tomato: [13, 13], wheat: [18, 12], crate: [18, 15], ketchup: [11, 20], bill: [16, 10], cash: [18, 13],
-                    tulip: [18, 12], rose: [18, 12], gold: [14, 10], bouquet: [16, 15], basket: [15, 16], perfume: [12, 16] };
+                    tulip: [18, 12], rose: [18, 12], gold: [14, 10], bouquet: [16, 15], basket: [15, 16], perfume: [12, 16],
+                    log: [18, 12], plank: [18, 12], chair: [14, 18], milk: [10, 18], cheese: [16, 12], icecream: [11, 19], corn: [18, 12], popcorn: [13, 17], pumpkin: [16, 14], pie: [17, 11], berry: [12, 14], jam: [12, 16], wool: [16, 15], yarn: [15, 15], honey: [12, 16], apple: [13, 14], juice: [10, 18] };
 
 // ---- field plants: (0,0) is the ground point, -y up. stage 0 stubble … 4 in bloom ----------------
 const TULIP_C = [['#F2486E', '#B5183E'], ['#FF6F9C', '#C9356A'], ['#E8243C', '#9E0E22'], ['#FF8FB0', '#D0507A']];

@@ -6,7 +6,7 @@ function arrowUp(g, x, y, s, c) {
   g.fillStyle = c; g.strokeStyle = '#FFFFFF'; g.lineWidth = 1.4;
   g.beginPath(); g.moveTo(x, y - 6 * s); g.lineTo(x + 5 * s, y); g.lineTo(x + 2 * s, y); g.lineTo(x + 2 * s, y + 5 * s); g.lineTo(x - 2 * s, y + 5 * s); g.lineTo(x - 2 * s, y); g.lineTo(x - 5 * s, y); g.closePath(); g.fill(); g.stroke();
 }
-const ITEMS = new Set(['egg', 'potato', 'tomato', 'wheat', 'crate', 'ketchup', 'bill', 'cash', 'tulip', 'rose', 'gold', 'bouquet', 'basket', 'perfume']);
+const ITEMS = new Set(Object.keys(ITEM_DRAW));
 
 export function drawIcon(g, kind, t = 0) {
   g.save();
@@ -70,6 +70,64 @@ export function drawIcon(g, kind, t = 0) {
       g.fillStyle = '#5DBB3A'; g.beginPath(); g.ellipse(0, 9.5, 9, 2.2, 0, 0, 6.3); g.fill();
       break;
     }
+    // ---- v3.3 tile icons ----
+    case 'cow': {
+      const O = COL.outline; g.lineJoin = 'round'; g.strokeStyle = O; g.lineWidth = 1;
+      g.fillStyle = '#FFFFFF'; g.beginPath(); g.roundRect(-11, -6, 17, 10, 4); g.fill(); g.stroke();
+      g.fillStyle = '#2A2A30'; g.beginPath(); g.ellipse(-5, -2, 3.4, 2.4, 0.3, 0, 6.3); g.fill(); g.beginPath(); g.ellipse(1, 1, 2.4, 2, 0, 0, 6.3); g.fill();
+      for (const x of [-9, -5, 0, 4]) { g.fillStyle = '#FFFFFF'; g.fillRect(x, 3, 2.4, 6); g.strokeRect(x, 3, 2.4, 6); }
+      g.fillStyle = '#FFFFFF'; g.beginPath(); g.ellipse(8, -6, 5, 4.4, 0, 0, 6.3); g.fill(); g.stroke();
+      g.fillStyle = '#FFB3B8'; g.beginPath(); g.ellipse(10, -3.6, 3.4, 2.4, 0, 0, 6.3); g.fill(); g.stroke();
+      g.fillStyle = '#2A2A30'; g.beginPath(); g.arc(7.4, -7.4, 0.9, 0, 6.3); g.fill();
+      g.fillStyle = '#FFF3D6'; g.beginPath(); g.moveTo(5, -9.6); g.lineTo(4, -13); g.lineTo(6.6, -10); g.fill(); g.beginPath(); g.moveTo(10, -9.6); g.lineTo(11.6, -13); g.lineTo(11.4, -9.4); g.fill();
+      g.fillStyle = '#FFC21A'; g.beginPath(); g.arc(5.6, 0.6, 1.6, 0, 6.3); g.fill(); g.stroke();
+      break;
+    }
+    case 'sheep': {
+      g.strokeStyle = '#B8B0A8'; g.lineWidth = 0.7;
+      g.fillStyle = '#3A3036'; for (const x of [-7, -3, 2, 6]) g.fillRect(x, 3, 2, 6);
+      for (const [x, y, r] of [[-6, -2, 4.6], [-1, -4, 5], [4, -2, 4.6], [-3, 1, 4.4], [2, 1, 4.4]]) { g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(x, y, r, 0, 6.3); g.fill(); g.stroke(); }
+      g.fillStyle = '#3A3036'; g.beginPath(); g.ellipse(9, -3, 3.6, 4.4, 0.2, 0, 6.3); g.fill();
+      g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(8, -7, 2.4, 0, 6.3); g.fill(); g.beginPath(); g.arc(10, -3.4, 0.7, 0, 6.3); g.fill();
+      break;
+    }
+    case 'hive': {
+      const O = COL.outline; g.strokeStyle = O; g.lineWidth = 1;
+      g.fillStyle = '#C8874A'; g.fillRect(-10, 6, 20, 3); g.strokeRect(-10, 6, 20, 3);
+      for (const y of [-1, -8]) { g.fillStyle = '#FFF6E0'; g.fillRect(-8, y, 16, 7); g.strokeRect(-8, y, 16, 7); }
+      g.fillStyle = '#FFC21A'; g.beginPath(); g.moveTo(-10, -8); g.lineTo(0, -13); g.lineTo(10, -8); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#3A2A10'; g.fillRect(-3, 3, 6, 1.6);
+      g.fillStyle = '#FFD23F'; g.beginPath(); g.ellipse(9, -12, 2.4, 1.8, 0, 0, 6.3); g.fill(); g.stroke(); g.fillStyle = '#2A2A30'; g.fillRect(8.4, -13.6, 1.2, 3.4);
+      g.fillStyle = 'rgba(255,255,255,0.85)'; g.beginPath(); g.ellipse(8, -15, 1.8, 1, -0.5, 0, 6.3); g.fill();
+      break;
+    }
+    case 'appletree': {
+      g.fillStyle = '#8E5627'; g.fillRect(-2, 0, 4, 10);
+      for (const [x, y, r, c] of [[0, -6, 9, '#3FA236'], [-5, -3, 6, '#2F8A2A'], [5, -8, 6, '#5DBB3A']]) { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, 6.3); g.fill(); }
+      for (const [x, y] of [[-4, -6], [3, -3], [5, -9], [-1, -11], [-6, -1]]) { g.fillStyle = '#E8283C'; g.beginPath(); g.arc(x, y, 1.8, 0, 6.3); g.fill(); }
+      break;
+    }
+    case 'lumber': g.save(); g.translate(-2, 12); g.scale(0.62, 0.62); person(g, t, 0, false, { ...BOY, shirt: '#D9382A', overalls: null, pants: '#4A5A8A', sickle: false }); g.restore(); g.translate(8, -1); g.scale(0.6, 0.6); drawIcon(g, 'axe', t); break;
+    case 'axe':
+      g.rotate(-0.5); g.fillStyle = '#A8741E'; g.strokeStyle = COL.outline; g.lineWidth = 1; g.beginPath(); g.roundRect(-1.4, -10, 2.8, 20, 1); g.fill(); g.stroke();
+      g.fillStyle = '#C9D2DC'; g.beginPath(); g.moveTo(1, -9); g.lineTo(9, -11); g.quadraticCurveTo(11, -5, 9, 0); g.lineTo(1, -3); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#E8452C'; g.fillRect(-1.6, -9, 3.2, 4);
+      break;
+    case 'saw':
+      g.rotate(t * 3); g.fillStyle = '#D8DEE6'; g.strokeStyle = COL.outline; g.lineWidth = 1;
+      g.beginPath(); for (let i = 0; i < 24; i++) { const a = i * Math.PI / 12, r = i % 2 ? 8 : 10.5; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#E8452C'; g.beginPath(); g.arc(0, 0, 3, 0, 6.3); g.fill(); g.stroke();
+      break;
+    case 'truck': {   // 运木车: green log truck carrying logs
+      const O = COL.outline; g.strokeStyle = O; g.lineWidth = 1;
+      g.fillStyle = '#4CB24E'; g.beginPath(); g.roundRect(4, -8, 9, 11, 2); g.fill(); g.stroke();
+      g.fillStyle = '#A8DCFF'; g.fillRect(6, -6, 5, 4);
+      g.fillStyle = '#2F8F3A'; g.beginPath(); g.roundRect(-13, -1, 18, 4, 1); g.fill(); g.stroke();
+      for (const [y, x] of [[-4, -10], [-4, -4], [-8, -7]]) { g.fillStyle = '#9A5A2E'; g.beginPath(); g.roundRect(x - 3, y - 2, 11, 4, 2); g.fill(); g.stroke(); g.fillStyle = '#F2CF8A'; g.beginPath(); g.arc(x + 8, y, 1.8, 0, 6.3); g.fill(); }
+      for (const x of [-8, 1, 9]) { g.fillStyle = '#24242A'; g.beginPath(); g.arc(x, 5, 3, 0, 6.3); g.fill(); g.fillStyle = '#FFD23F'; g.beginPath(); g.arc(x, 5, 1.2, 0, 6.3); g.fill(); }
+      break;
+    }
+    case 'milker': g.save(); g.translate(2, 6); g.scale(0.7, 0.7); cart(g, t, false, 0); g.restore(); g.translate(-2, -5); g.scale(1.1, 1.1); ITEM_DRAW.milk(g); break;
     case 'counter':
       g.fillStyle = '#4C82DE'; g.strokeStyle = '#21468E'; g.lineWidth = 1.2; g.beginPath(); g.roundRect(-11, -1, 22, 9, 2); g.fill(); g.stroke();
       g.fillStyle = '#7FB0FF'; g.beginPath(); g.roundRect(-12, -4, 24, 4, 1.5); g.fill(); g.stroke();

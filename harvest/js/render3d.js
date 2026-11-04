@@ -24,6 +24,8 @@ const GARDENER = { shirt: '#F7F5EE', overalls: '#3567C8', pants: '#3567C8', hair
 const CARTER = { shirt: '#FFD23F', pants: '#4A5A8A', hair: '#3A2210', hat: 'cap', capColor: '#E8452C', sleeve: '#FFD23F' };
 const VIP = { shirt: '#FFD23F', vest: '#E8B21E', pants: '#7A3E9D', hair: '#3A2210', sleeve: '#FFD23F', crown: true };
 const GOLD_MAT = new THREE.MeshLambertMaterial({ color: 0xFFE46A, emissive: 0xB07800 });
+const LUMBERJACK = { shirt: '#D9382A', vest: '#2D3A5A', pants: '#4A5A8A', hair: '#6B3A1E', hat: 'beanie', capColor: '#F29C0E', beard: '#7A3E1D', sleeve: '#D9382A' };
+const MILKER = { shirt: '#FFFFFF', overalls: '#3BA7FF', pants: '#3BA7FF', hair: '#3A2210', hat: 'cap', capColor: '#FFFFFF', sleeve: '#FFFFFF' };
 const CASHIER = { shirt: '#4CD08A', vest: '#2E8A5A', hair: '#3A2210', pants: '#2D3A5A', sleeve: '#4CD08A' };
 const ITEM_CAP = 1800;
 
@@ -197,17 +199,26 @@ export class Renderer {
     for (const c of w.counters) pave(c.cashPos.x - 28, c.y - 40, w.W - c.cashPos.x + 28 + pad, 132);
     for (const p of w.procs) pave(p.inZone.x - 8, p.y - 34, p.body.x + p.body.w - p.inZone.x + 18, 68);
     for (const f of w.fields) {
-      const bed = f.hidden ? COL.soil : { tulip: '#3F8A2C', rose: '#3A7A28', gold: '#4F9A26', wheat: '#8E6A34', potato: COL.soil }[f.item];
-      const edge = f.hidden ? COL.soil2 : { tulip: '#2E6A1E', rose: '#2A5E1C', gold: '#3E8420', wheat: '#6E5026', potato: COL.soil2 }[f.item];
+      const bed = f.hidden ? COL.soil : { tulip: '#3F8A2C', rose: '#3A7A28', gold: '#4F9A26', wheat: '#8E6A34', potato: COL.soil, log: '#4F8A26', corn: '#9A7438', pumpkin: '#8A5A30', berry: '#3F8A2C' }[f.item];
+      const edge = f.hidden ? COL.soil2 : { tulip: '#2E6A1E', rose: '#2A5E1C', gold: '#3E8420', wheat: '#6E5026', potato: COL.soil2, log: '#3A6E1C', corn: '#76562A', pumpkin: '#6A4422', berry: '#2E6A1E' }[f.item];
       g.fillStyle = edge; g.fillRect(f.x - 6, f.y - 6, f.w + 12, f.h + 12);
       g.fillStyle = bed; g.fillRect(f.x - 3, f.y - 3, f.w + 6, f.h + 6);
+      if (f.item === 'log' && !f.hidden) {   // forest floor: leaf litter + moss dots instead of furrows
+        for (let i = 0; i < f.w * f.h / 180; i++) { g.fillStyle = i % 3 ? 'rgba(30,70,15,0.25)' : 'rgba(200,150,60,0.3)'; g.beginPath(); g.ellipse(f.x + R(i + 7000) * f.w, f.y + R(i + 7300) * f.h, 2 + R(i) * 3, 1.2 + R(i + 1) * 2, R(i + 2) * 3, 0, TAU); g.fill(); }
+        continue;
+      }
       g.strokeStyle = 'rgba(70,35,15,0.25)'; g.lineWidth = 2;
       for (let yy = f.y + f.gap / 2; yy < f.y + f.h; yy += Math.max(12, f.gap * 2)) { g.beginPath(); g.moveTo(f.x, yy); g.lineTo(f.x + f.w, yy); g.stroke(); }
     }
     for (const c of w.coops) {
-      g.fillStyle = c.producer === 'hen' ? '#E9D08A' : '#B98A55'; g.fillRect(c.x - 26, c.y - 26, c.w + 26, c.h + 26);
-      g.fillStyle = c.producer === 'hen' ? '#F4E2A8' : COL.soil; g.fillRect(c.x, c.y, c.w, c.h);
-      for (let i = 0; i < 120; i++) { g.fillStyle = c.producer === 'hen' ? 'rgba(200,150,60,0.25)' : 'rgba(80,40,15,0.25)'; g.fillRect(c.x + R(i + 5000) * c.w, c.y + R(i + 5100) * c.h, 4, 1.4); }
+      // hens: straw yard; bushes: soil; cows/sheep/apple trees: lush pasture; hives: a flower meadow
+      const pal = { hen: ['#E9D08A', '#F4E2A8', 'rgba(200,150,60,0.25)'], bush: ['#B98A55', COL.soil, 'rgba(80,40,15,0.25)'],
+                    cow: ['#5DA53A', '#8ED65A', 'rgba(40,110,20,0.3)'], sheep: ['#5DA53A', '#9BDB6A', 'rgba(40,110,20,0.3)'],
+                    appletree: ['#4F9A26', '#7CCB3E', 'rgba(40,100,20,0.3)'], hive: ['#6CBF45', '#A8E070', 'rgba(255,255,255,0.55)'] }[c.producer] || ['#B98A55', COL.soil, 'rgba(80,40,15,0.25)'];
+      g.fillStyle = pal[0]; g.fillRect(c.x - 26, c.y - 26, c.w + 26, c.h + 26);
+      g.fillStyle = pal[1]; g.fillRect(c.x, c.y, c.w, c.h);
+      for (let i = 0; i < 120; i++) { g.fillStyle = pal[2]; g.fillRect(c.x + R(i + 5000) * c.w, c.y + R(i + 5100) * c.h, 4, 1.4); }
+      if (c.producer === 'hive') for (let i = 0; i < 90; i++) { g.fillStyle = ['#FFD23F', '#FF8FB0', '#FFFFFF', '#B07ACC'][i % 4]; g.beginPath(); g.arc(c.x + R(i + 5400) * c.w, c.y + R(i + 5500) * c.h, 2.2, 0, TAU); g.fill(); }
     }
     // shade along the far walls
     let gr = g.createLinearGradient(0, 0, 0, 40); gr.addColorStop(0, 'rgba(20,60,10,0.25)'); gr.addColorStop(1, 'rgba(20,60,10,0)'); g.fillStyle = gr; g.fillRect(0, 0, w.W, 40);
@@ -246,7 +257,7 @@ export class Renderer {
     if (dc.barn) M.Env.barn(out, dc.barn[0], dc.barn[1]);
     // low wooden rims round the field beds
     for (const f of w.fields) {
-      const c = f.item === 'wheat' || f.item === 'potato' ? '#8E5627' : '#2E6A1E';
+      const c = f.item === 'wheat' || f.item === 'potato' || f.item === 'corn' || f.item === 'pumpkin' ? '#8E5627' : f.item === 'log' ? '#6B4A22' : '#2E6A1E';
       out.push(M.P(M.box(f.w + 14, 3, 4), c, [f.x + f.w / 2, 1.5, f.y - 5])); out.push(M.P(M.box(f.w + 14, 3, 4), c, [f.x + f.w / 2, 1.5, f.y + f.h + 5]));
       out.push(M.P(M.box(4, 3, f.h + 6), c, [f.x - 5, 1.5, f.y + f.h / 2])); out.push(M.P(M.box(4, 3, f.h + 6), c, [f.x + f.w + 5, 1.5, f.y + f.h / 2]));
     }
@@ -276,7 +287,7 @@ export class Renderer {
       const gold = new THREE.InstancedMesh(M.cropGeo(f.item, 0), GOLD_MAT, 96);
       gold.count = 0; gold.frustumCulled = false; gold.castShadow = true; gold.instanceMatrix.setUsage(THREE.DynamicDrawUsage); grp.add(gold);
       const spr = M.makeSprinkler(); spr.root.position.set(f.x + f.w / 2, 0, f.y + f.h / 2); spr.root.visible = false; this.levelRoot.add(spr.root);
-      this.fieldObjs.push({ f, grp, meshes, stub, gold, spr, goldPrev: new Uint8Array(f.n), stubOn: new Uint8Array(f.n), slot, vi, ang, sz, last, scale: (f.gap / 9) * ({ wheat: 1.3, tulip: 1.15, gold: 1.2, rose: 1.15, potato: 0.42 }[f.item] || 1) });
+      this.fieldObjs.push({ f, grp, meshes, stub, gold, spr, goldPrev: new Uint8Array(f.n), stubOn: new Uint8Array(f.n), slot, vi, ang, sz, last, scale: (f.gap / 9) * ({ wheat: 1.3, tulip: 1.15, gold: 1.2, rose: 1.15, potato: 0.42, log: 0.95, corn: 1.3, pumpkin: 0.8, berry: 1.35 }[f.item] || 1) });
     }
   }
   updateFields() {
@@ -359,6 +370,12 @@ export class Renderer {
           const nest = new THREE.Mesh(M.nestGeo(), M.vcMat()); nest.castShadow = true; nest.receiveShadow = true; g.add(nest);
           const hen = new THREE.Mesh(M.henGeo(), M.vcMat()); hen.position.y = 8.6; hen.castShadow = true; g.add(hen);
           g.userData.anim = hen;
+        } else if (c.producer !== 'bush') {   // cow / sheep / hive / apple tree
+          const geo = { cow: M.cowGeo, sheep: M.sheepGeo, hive: M.hiveGeo, appletree: M.appleTreeGeo }[c.producer];
+          const m = new THREE.Mesh(this._prodGeo(c.producer, geo), M.vcMat()); m.castShadow = true; g.add(m);
+          const k = { cow: 1.15, sheep: 1.15, hive: 1.15, appletree: 1.35 }[c.producer] || 1; m.scale.setScalar(k); m.userData.k = k;
+          if (c.producer === 'cow' || c.producer === 'sheep') { const bucket = new THREE.Mesh(this._prodGeo('bucket', () => M.merge([M.P(M.cyl(3.4, 2.8, 5, 8), '#AEB6C2', [0, 2.5, 0]), M.P(M.cyl(3, 3, 0.4, 8), '#FFFFFF', [0, 4.9, 0])])), M.vcMat()); bucket.position.set(9, 0, 10); g.add(bucket); }
+          g.userData.anim = m;
         } else {
           const b = new THREE.Mesh(M.bushGeo(), M.vcMat()); b.castShadow = true; g.add(b); b.scale.setScalar(1.3); g.userData.anim = b;
         }
@@ -367,6 +384,7 @@ export class Renderer {
       return { c, grp, hens };
     });
   }
+  _prodGeo(k, fn) { this._pg = this._pg || {}; return this._pg[k] || (this._pg[k] = fn()); }
   buildCounters(w) {
     this.counterObjs = w.counters.map((c) => {
       const grp = new THREE.Group(); grp.position.set(c.x, 0, c.y); this.levelRoot.add(grp);
@@ -391,6 +409,11 @@ export class Renderer {
       const body = new THREE.Mesh(M.merge(out), M.vcMat()); body.castShadow = true; body.receiveShadow = true; body.userData.own = true; grp.add(body);
       const gear = new THREE.Mesh(M.merge([M.P(M.cyl(7, 7, 2, 10), '#FFD23F', [0, 0, 0], [0, 0, Math.PI / 2]), M.P(M.cyl(2.6, 2.6, 2.6, 8), '#7A5A10', [0, 0, 0], [0, 0, Math.PI / 2])]), M.vcMat());
       gear.position.set(p.body.w / 2 + 1.5, CFG.proc.bodyH * 0.5, 4); grp.add(gear);
+      if (p.outItem === 'plank' || p.outItem === 'chair') {   // 锯木厂: a big round saw blade on top
+        const blade = new THREE.Mesh(M.merge([M.P(M.cyl(11, 11, 1.2, 16), '#D8DEE6', [0, 0, 0], [Math.PI / 2, 0, 0]), M.P(M.cyl(3, 3, 1.6, 8), '#E8452C', [0, 0, 0], [Math.PI / 2, 0, 0]),
+          ...Array.from({ length: 12 }, (_, i) => { const a = i / 12 * Math.PI * 2; return M.P(M.cone(1.6, 3, 3), '#AEB6C2', [Math.cos(a) * 11.6, Math.sin(a) * 11.6, 0], [0, 0, a - Math.PI / 2]); })]), M.vcMat());
+        blade.position.set(-p.body.w / 2 + 16, CFG.proc.bodyH + 6, p.body.h / 2 - 6); blade.castShadow = true; grp.add(blade); grp.userData.blade = blade;
+      }
       const sign = new THREE.Mesh(M.itemGeo(p.outItem), M.vcMat()); sign.position.set(4, CFG.proc.bodyH + 10, 0); sign.scale.setScalar(1.3); sign.castShadow = true; grp.add(sign);
       const puffs = [0, 1, 2].map(() => { const s = new THREE.Mesh(M.sph(1, 7, 5), new THREE.MeshLambertMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.8, depthWrite: false })); s.userData.ownMat = true; grp.add(s); return s; });
       const zone = this.decal(p.inZone.w, p.inZone.h, (g, W, H) => this.paintZone(g, W, H, null, p.inItem));
@@ -442,13 +465,13 @@ export class Renderer {
       mow.root.add(pp.root); this.levelRoot.add(mow.root);
       o = { c, pp, mow, ang: 0.8, root: mow.root };
     } else if (c.kind === 'worker' && c.loader) {
-      const pp = M.makePerson(GARDENER), ld = M.makeLoader();
+      const pp = M.makePerson(c.lumber ? LUMBERJACK : GARDENER), ld = M.makeLoader(c.lumber ? 'log' : '');
       pp.root.position.set(0, 13, -1.5); pp.blob.visible = false; ld.root.add(pp.root);
       const root = new THREE.Group(); root.add(ld.root); this.levelRoot.add(root);
       const blob = new THREE.Mesh(M.BLOB_GEO, M.BLOB_MAT); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.3; blob.scale.set(17, 21, 1); root.add(blob);
       o = { c, pp, ld, loader: true, ang: 0.8, root };
     } else if (c.kind === 'worker') {
-      const pp = M.makePerson(c.cart ? CARTER : GARDENER);
+      const pp = M.makePerson(c.cart ? (c.from && this.world.objs[c.from[0]] && this.world.objs[c.from[0]].producer === 'cow' ? MILKER : CARTER) : c.lumber ? LUMBERJACK : GARDENER);
       const root = new THREE.Group(); root.add(pp.root);
       let cart = null; if (c.cart) { cart = M.makeCart(); cart.root.position.set(0, 0, -20); root.add(cart.root); }
       this.levelRoot.add(root);
@@ -470,7 +493,7 @@ export class Renderer {
       o.mow.root.children[0].visible = veh; for (const wl of o.mow.wheels) { wl.visible = veh; if (veh && c.moving) wl.rotation.x += dt * sp * 0.2; }
       o.pp.root.position.set(0, veh ? 9 : 0, veh ? -4 : 0);
       o.pp.blob.visible = !veh;
-      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving && !veh, carry: carry && !veh, cutting: cutting && !veh, seated: veh, seed: 1 });
+      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving && !veh, carry: carry && !veh, cutting: cutting && !veh, seated: veh, seed: 1, axe: c.cutItem === 'log' });
       if (veh) { o.pp.arms[0].rotation.set(-1.2, 0, 0.3); o.pp.arms[1].rotation.set(-1.2, 0, -0.3); o.pp.tool.visible = false; }
     } else if (o.loader) {
       M.posePerson(o.pp, { t, walk: c.walk, moving: false, carry: false, cutting: false, seated: true, seed: c.seed + 2 });
@@ -479,7 +502,7 @@ export class Renderer {
       o.ld.body.position.y = c.moving ? Math.abs(Math.sin(c.walk * 1.5)) * 0.6 : 0;
       o.ld.root.rotation.x = cutting ? Math.sin(t * 30) * 0.015 : 0;
     } else {
-      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving, carry: carry && !c.cart && !cutting, cutting: cutting && !c.cart, seed: c.seed + 2, showTool: !c.cart && !carry });
+      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving, carry: carry && !c.cart && !cutting, cutting: cutting && !c.cart, seed: c.seed + 2, showTool: !c.cart && !carry, axe: !!c.lumber });
       if (o.cart) for (const wl of o.cart.wheels) if (c.moving) wl.rotation.x += dt * sp * 0.3;
     }
   }
@@ -567,6 +590,10 @@ export class Renderer {
         g.visible = a > 0; if (!g.visible) return; g.scale.setScalar(a);
         const an = g.userData.anim;
         if (c.producer === 'hen') { an.position.y = 8.6 + h.lay * 3; an.scale.set(1 + h.lay * 0.12, 1 - h.lay * 0.1, 1); an.rotation.y = Math.sin(time * 1.7 + i) * 0.35; }
+        else if (c.producer === 'cow' || c.producer === 'sheep') {   // a happy hop and a head-turn when a bottle / wool ball pops out
+          const k = an.userData.k; an.position.y = h.lay * 2.4; an.scale.set(k * (1 + h.lay * 0.06), k * (1 - h.lay * 0.05), k); an.rotation.y = Math.sin(time * 0.9 + i * 1.7) * 0.25;
+        } else if (c.producer === 'hive') { const k = an.userData.k; an.scale.set(k * (1 + h.lay * 0.08), k * (1 - h.lay * 0.06), k * (1 + h.lay * 0.08)); an.rotation.z = Math.sin(time * 20 + i) * h.lay * 0.05; }
+        else if (c.producer === 'appletree') { const k = an.userData.k; an.rotation.z = Math.sin(time * 18 + i) * h.lay * 0.06; an.scale.setScalar(k); }
         else { an.scale.set(1.3 + h.lay * 0.1, 1.3 - h.lay * 0.08, 1.3 + h.lay * 0.1); }
       });
     }
@@ -594,6 +621,7 @@ export class Renderer {
       const sh = p.work ? Math.sin(time * 40) * 0.5 : 0;
       o.grp.scale.setScalar(a); o.body.position.x = sh; o.zone.scale.setScalar(a);
       if (p.work) o.gear.rotation.x += dt * 5;
+      if (o.grp.userData.blade) o.grp.userData.blade.rotation.z -= dt * (p.work ? 14 : 1.2);
       o.sign.rotation.y = time * 0.8; o.sign.position.y = CFG.proc.bodyH + 10 + Math.sin(time * 2) * 1.2;
       o.puffs.forEach((s, i) => {
         const u = (time * 0.8 + i / 3) % 1; s.visible = p.work > 0;

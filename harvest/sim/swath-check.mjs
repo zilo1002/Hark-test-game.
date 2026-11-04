@@ -14,7 +14,7 @@ const segDist2 = (px, py, ax, ay, bx, by) => {
 };
 CFG.fever.perItem = 0;   // fever would widen the swath mid-run
 let fails = 0, runs = 0;
-for (const li of [0, 1, 4, 7, 13]) {
+for (const li of [0, 1, 4, 7, 13, 15, 19, 20, 21]) {   // + v3.3: trees, corn, strawberries, pumpkins
   const L = CFG.levels[li];
   for (const f0 of L.objects.filter((o) => o.type === 'field' && !o.hidden && !CFG.crops[o.crop].spill)) {
     for (const [dir, label] of [[[1, 0], 'east'], [[0, 1], 'south'], [[0.7071, 0.7071], 'diagonal']]) {
@@ -41,7 +41,7 @@ for (const li of [0, 1, 4, 7, 13]) {
         else if (d2 > (hr + 4) ** 2 && cut) wrong++;
       }
       runs++;
-      const ok = left === 0 && wrong === 0 && inside > 20;
+      const ok = left === 0 && wrong === 0 && inside > (f.gap >= 20 ? 12 : 20);   // trees/pumpkins are sparse
       if (!ok) fails++;
       console.log(`${ok ? 'OK  ' : 'FAIL'} 第${li + 1}关 ${f0.id} ${f0.crop} ${label.padEnd(8)} swath plants ${inside}, left uncut ${left}, cut outside swath ${wrong}`);
     }
@@ -50,7 +50,7 @@ for (const li of [0, 1, 4, 7, 13]) {
 console.log(fails ? `\n${fails}/${runs} swaths left plants behind` : `\nall ${runs} swaths clean (zero leftovers)`);
 // ---- stop at max capacity
 let mfails = 0;
-for (const li of [0, 1, 7]) {
+for (const li of [0, 1, 7, 15]) {   // 第16关: trees drop 3 logs each, the last one only what still fits
   const L = CFG.levels[li], f0 = L.objects.find((o) => o.type === 'field' && !o.hidden);
   const w = new World(li, { quiet: true, seed: 5 }); w.solids = [];
   const f = w.objs[f0.id], p = w.player;
@@ -59,13 +59,13 @@ for (const li of [0, 1, 7]) {
   const ripe0 = f.ripe;
   for (let t = 0; t < 4; t += 1 / 60) { w.update(1 / 60, 1, 0); p.cap = room; }
   const cut = ripe0 - f.ripe - 0;   // regrowth within 4 s is impossible (grow ≥ 7 s)
-  const ok = cut === room && p.stack.length + p.incoming === room && p.fullFlag;
+  const ok = cut === Math.ceil(room / f.yield) && p.stack.length + p.incoming === room && p.fullFlag;
   if (!ok) mfails++;
   console.log(`${ok ? 'OK  ' : 'FAIL'} 第${li + 1}关 ${f0.id} at max: cap ${room}, cut ${cut}, carried ${p.stack.length + p.incoming}, plants left standing on the path ${f.ripe}`);
 }
 fails += mfails;
 // ---- gardeners / loaders never cut while full, and always go back to unload
-for (const li of [0, 7, 13]) {
+for (const li of [0, 7, 13, 15, 25, 29]) {
   const w = new World(li, { quiet: true, seed: 9 });
   for (const t of w.tiles) if (!t.done) w.completeTile(t, true);
   let over = 0, cutFull = 0, trips = 0;

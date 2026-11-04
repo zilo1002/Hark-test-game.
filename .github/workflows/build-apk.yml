@@ -1,0 +1,57 @@
+# Builds the 半亩·丰收 Android APK on every push to main and publishes it as a GitHub Release asset.
+# Same build as local: android-harvest/build-apk.sh (direct Android SDK build: aapt2 → javac → d8 → zipalign → apksigner),
+# with the game in harvest/ bundled into the APK's assets, signed with the checked-in android-harvest/debug.keystore
+# so every new release installs over the previous one.
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install SDK platform 34 + build-tools 34.0.0
+        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0" > /dev/null
+
+      - name: Build APK
+        working-directory: android-harvest
+        env:
+          SDK: ${{ env.ANDROID_HOME }}
+          OUT_DIR: ${{ github.workspace }}/dist
+        run: |
+          chmod +x build-apk.sh
+          ./build-apk.sh
+          cp "$OUT_DIR/banmu-harvest-debug.apk" "$OUT_DIR/banmu-harvest.apk"
+          echo "VERSION_NAME=$(grep -m1 '^VERSION_NAME=' build-apk.sh | cut -d= -f2)" >> "$GITHUB_ENV"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: harvest-v${{ env.VERSION_NAME }}
+          name: 半亩·丰收 v${{ env.VERSION_NAME }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            半亩·丰收 安卓安装包（离线可玩，下载 banmu-harvest.apk 直接安装；新版本会覆盖安装，进度保留）。
+            Built from ${{ github.sha }}.
+          files: dist/banmu-harvest.apk
+          fail_on_unmatched_files: true

@@ -137,6 +137,90 @@ const ITEM_PARTS = {
     P(cyl(1.0, 1.2, 1.6, 6), '#FFFFFF', [0, 2.4, 0]),
     P(sph(1.8, 7, 5), '#F2B529', [0, 4.0, 0]),
   ],
+  // ---- v3.3 items ----
+  log: () => [   // a chunky log lying along x: bark, pale end rings
+    P(cyl(2.8, 2.8, 13, 8), '#9A5A2E', [0, 0, 0], [0, 0, H]),
+    P(cyl(2.4, 2.4, 13.2, 8), '#F2CF8A', [0, 0, 0], [0, 0, H], [1, 1, 1]),
+    P(cyl(2.85, 2.85, 11.6, 8), '#8A4E26', [0, 0, 0], [0, 0, H]),
+    P(cyl(0.9, 0.9, 13.4, 6), '#C99A5E', [0, 0, 0], [0, 0, H]),
+    P(box(2.2, 1.6, 1.6), '#5E8F2A', [2.6, 2.4, 0.6]),
+  ],
+  plank: () => [P(box(15, 2.6, 7), '#E9B672'), P(box(15.2, 0.6, 7.2), '#C98A4B', [0, 1.1, 0]), P(box(13, 0.4, 0.6), '#B9783C', [0, 1.45, -1.6]), P(box(10, 0.4, 0.6), '#B9783C', [-1, 1.45, 1.8])],
+  chair: () => [
+    P(box(10, 1.8, 10), '#D99A5A', [0, 0, 0]),
+    P(box(10, 9, 1.8), '#C8874A', [0, 5.4, -4.1]), P(box(10.4, 1.6, 2.2), '#E9B672', [0, 9.8, -4.1]),
+    P(box(1.6, 5, 1.6), '#8E5627', [-4, -3.4, -4]), P(box(1.6, 5, 1.6), '#8E5627', [4, -3.4, -4]), P(box(1.6, 5, 1.6), '#8E5627', [-4, -3.4, 4]), P(box(1.6, 5, 1.6), '#8E5627', [4, -3.4, 4]),
+    P(box(8, 1.4, 6), '#E8452C', [0, 1.4, 0.6]),
+  ],
+  milk: () => [   // glass milk bottle with a red cap
+    P(cyl(2.9, 3.0, 7.2, 9), '#FFFFFF', [0, -1, 0]),
+    P(cyl(1.6, 2.9, 1.8, 9), '#FFFFFF', [0, 3.4, 0]),
+    P(cyl(1.7, 1.7, 1.2, 9), '#E8452C', [0, 4.8, 0]),
+    P(cyl(3.05, 3.05, 2.2, 9), '#3B7FE0', [0, -0.6, 0]),
+  ],
+  cheese: () => [   // a fat yellow wedge with holes
+    P(cyl(6, 6, 5.4, 3), '#FFD23F', [0, 0, 0], [0, 0.4, 0], [1, 1, 0.8]),
+    P(sph(1.1, 6, 4), '#E8A20E', [1.2, 2.7, 0.6]), P(sph(0.9, 6, 4), '#E8A20E', [-2, 2.7, -1.2]), P(sph(0.8, 6, 4), '#E8A20E', [3.6, 0.6, 2.6]),
+  ],
+  icecream: () => [
+    P(cone(3.2, 8, 8), '#E3A866', [0, -2, 0], [Math.PI, 0, 0]),
+    P(sph(3.4, 8, 6), '#FFB3C8', [0, 2.6, 0]), P(sph(2.6, 8, 6), '#FFF3E0', [0, 5.6, 0]),
+    P(sph(0.9, 5, 4), '#E0283C', [0, 8.2, 0]),
+  ],
+  corn: () => [
+    P(cap(2.2, 7, 2, 8), '#FFD23F', [0, 0, 0], [0, 0, H]),
+    P(cone(2.6, 7, 5), '#6CCB3E', [-3.4, -0.4, 1.4], [0, 0.3, H], [1, 1, 0.5]),
+    P(cone(2.6, 7, 5), '#4FAE32', [-3.4, -0.4, -1.4], [0, -0.3, H], [1, 1, 0.5]),
+  ],
+  popcorn: () => [
+    P(cyl(4.2, 3.2, 7.5, 10), '#FFFFFF', [0, -0.6, 0]),
+    P(cyl(4.25, 3.25, 7.5, 10, 1), '#E8452C', [0, -0.6, 0], [0, 0, 0], [1.01, 1, 0.5]),
+    P(ico(1.8, 0), '#FFF6D0', [-1.6, 3.8, 0.8]), P(ico(1.8, 0), '#FFFFFF', [1.6, 4, -0.6]), P(ico(1.6, 0), '#FFE58A', [0, 4.8, 1.6]), P(ico(1.5, 0), '#FFFFFF', [0.4, 4.4, -2]),
+  ],
+  pumpkin: () => [
+    P(sph(4.6, 10, 7), '#F2871E', [0, 0, 0], [0, 0, 0], [1.15, 0.8, 1.15]),
+    P(sph(3.6, 8, 6), '#FF9F38', [0, 0.2, 0], [0, 0.4, 0], [1.35, 0.85, 0.9]),
+    P(cyl(0.6, 0.9, 2.4, 5), '#6B8E23', [0, 3.6, 0]),
+    P(cone(1.6, 3, 4), '#4FAE32', [1.8, 3.2, 0], [0, 0, -1.2], [1, 1, 0.4]),
+  ],
+  pie: () => [
+    P(cyl(6.6, 5.6, 3, 12), '#E3A866', [0, -0.4, 0]),
+    P(cyl(6.0, 6.0, 1.2, 12), '#E8871E', [0, 1.1, 0]),
+    P(tor(6.1, 0.8, 4, 12), '#F2C08A', [0, 1.4, 0], [H, 0, 0]),
+    P(sph(1.4, 6, 4), '#FFFFFF', [0, 2, 0], [0, 0, 0], [1, 0.5, 1]),
+  ],
+  berry: () => [
+    P(cone(3.2, 5.6, 7), '#E8243C', [0, -0.6, 0], [Math.PI, 0, 0]),
+    P(sph(3.2, 7, 4, 0), '#F03A50', [0, 1.6, 0], [0, 0, 0], [1, 0.5, 1]),
+    P(cone(2.4, 1.4, 5), '#3E9B2A', [0, 2.6, 0]),
+  ],
+  jam: () => [
+    P(cyl(3.4, 3.4, 6, 10), '#C8102E', [0, -0.8, 0]),
+    P(cyl(3.6, 3.6, 1.8, 10), '#FFFFFF', [0, 2.8, 0]), P(cyl(3.8, 3.4, 0.9, 10), '#E8452C', [0, 3.5, 0]),
+    P(box(4.4, 2.6, 0.6), '#FFF3E0', [0, -0.8, 3.3]),
+  ],
+  wool: () => [P(ico(4, 1), '#FFFFFF', [0, 0, 0], [0, 0, 0], [1.1, 0.9, 1]), P(ico(2.6, 0), '#F4F0E8', [2.6, 1.6, 1]), P(ico(2.4, 0), '#F4F0E8', [-2.4, 1.4, -1.2])],
+  yarn: () => [
+    P(sph(4, 9, 7), '#FF6FA8', [0, 0, 0]),
+    P(tor(4.05, 0.45, 3, 12), '#E8457E', [0, 0, 0], [0.5, 0, 0.2]), P(tor(4.05, 0.45, 3, 12), '#E8457E', [-0.6, 0.6, 0]), P(tor(4.05, 0.45, 3, 12), '#FF9AC4', [H, 0.3, 0]),
+    P(cyl(0.6, 0.6, 3, 5), '#B9783C', [3.2, 2.6, 0], [0, 0, 0.8]),
+  ],
+  honey: () => [
+    P(cyl(3.6, 3.2, 6, 10), '#FFB80F', [0, -0.8, 0]),
+    P(cyl(3.0, 3.6, 1.2, 10), '#FFD23F', [0, 2.6, 0]),
+    P(cyl(3.9, 3.9, 1.4, 10), '#E8E0D0', [0, 3.6, 0]),
+    P(box(4.6, 2.4, 0.6), '#5A3414', [0, -0.6, 3.3]),
+  ],
+  apple: () => [
+    P(sph(3.5, 8, 6), '#E8283C', [0, 0, 0], [0, 0, 0], [1.05, 0.95, 1.05]),
+    P(cyl(0.35, 0.35, 2, 4), '#6B3A1E', [0, 3.6, 0]),
+    P(cone(1.2, 2.8, 4), '#4FAE32', [1.2, 3.6, 0], [0, 0, -1.1], [1, 1, 0.4]),
+  ],
+  juice: () => [
+    P(box(6, 9, 6), '#FFF3E0', [0, -0.4, 0]), P(box(6.2, 4.4, 6.2), '#5DBB3A', [0, -1.4, 0]),
+    P(sph(1.6, 7, 5), '#E8283C', [0, -1.4, 3.1], [0, 0, 0], [1, 1, 0.4]),
+    P(cyl(0, 3.2, 2.4, 4), '#FFF3E0', [0, 5.2, 0], [0, Math.PI / 4, 0]), P(cyl(0.9, 0.9, 1, 6), '#E8452C', [1.4, 5.4, 1.4]),
+  ],
   bill: () => [P(box(11, 0.9, 6), '#57C35A'), P(box(3, 1.1, 3), '#E9FFE0', [0, 0.05, 0])],
   cash: () => [P(box(12, 2.6, 7), '#57C35A'), P(box(12.3, 2.8, 2), '#2F8F3A'), P(box(2.6, 2.9, 2.2), '#E9FFE0')],
 };
@@ -144,7 +228,8 @@ const ITEM_GEO = {};
 export function itemGeo(type) { return ITEM_GEO[type] || (ITEM_GEO[type] = merge((ITEM_PARTS[type] || ITEM_PARTS.egg)())); }
 export const ITEM_TYPES = Object.keys(ITEM_PARTS);
 // half height of each item, so stacks and piles rest items on their bottom face
-export const ITEM_HALF = { wheat: 2.6, tulip: 2.2, gold: 1.7, rose: 2.2, egg: 2.2, potato: 2.4, tomato: 2.8, crate: 3.3, ketchup: 4.4, bouquet: 3.4, basket: 3.4, perfume: 4.0, bill: 0.45, cash: 1.4 };
+export const ITEM_HALF = { wheat: 2.6, tulip: 2.2, gold: 1.7, rose: 2.2, egg: 2.2, potato: 2.4, tomato: 2.8, crate: 3.3, ketchup: 4.4, bouquet: 3.4, basket: 3.4, perfume: 4.0, bill: 0.45, cash: 1.4,
+  log: 2.8, plank: 1.3, chair: 5.9, milk: 4.6, cheese: 2.7, icecream: 6, corn: 2.2, popcorn: 4.4, pumpkin: 3.7, pie: 1.9, berry: 3.4, jam: 3.8, wool: 3.6, yarn: 4, honey: 3.8, apple: 3.3, juice: 4.9 };
 
 // ------------------------------------------------------------------ crops (field plants)
 // Plants stand on y=0 and are ~11-14 units tall; scaled by growth. Stubble is what stays after a cut.
@@ -189,8 +274,34 @@ const CROP_PARTS = {
     P(sph(1.6, 5, 4), '#FFFFFF', [2, 11.4, 1]),
   ],
 };
+// v3.3 crops. 'log' is a whole tree (field gap ≈ 30, so it is drawn small and scaled up ~3×).
+Object.assign(CROP_PARTS, {
+  log: () => [
+    P(cyl(1.1, 1.5, 5.5, 7), '#8E5627', [0, 2.75, 0]),
+    P(cone(5.6, 6.5, 7), '#2F8A2A', [0, 7.6, 0]), P(cone(4.4, 5.6, 7), '#FFFFFF', [0, 10.4, 0]), P(cone(2.9, 4.4, 7), '#5DBB3A', [0, 13.2, 0]),
+  ],
+  corn: () => [
+    P(cyl(0.55, 0.7, 12, 5), '#5DA53A', [0, 6, 0]),
+    P(cone(1.2, 7, 4), '#4FAE32', [1.8, 5, 0], [0, 0, -0.6], [1, 1, 0.4]), P(cone(1.2, 7, 4), '#6CCB3E', [-1.8, 6.4, 0.6], [0, 0.4, 0.6], [1, 1, 0.4]),
+    P(cone(1.1, 6, 4), '#3E9B2A', [0.4, 9.6, -1.6], [-0.6, 0, 0], [1, 1, 0.4]),
+    P(cap(1.2, 3.2, 2, 6), '#FFFFFF', [1.2, 8.4, 0.6], [0, 0, -0.35]),
+    P(cone(1.3, 3.6, 4), '#7FC24A', [1.0, 7.4, 0.6], [0, 0, -0.35], [1, 1, 0.6]),
+    P(cone(0.6, 2.6, 4), '#E8C25A', [0, 13.2, 0]),
+  ],
+  pumpkin: () => [
+    P(cone(5, 1.2, 7), '#3E9B2A', [0, 0.6, 0]),
+    P(sph(4.4, 9, 7), '#FFFFFF', [0, 3.6, 0], [0, 0, 0], [1.15, 0.82, 1.15]),
+    P(cyl(0.6, 0.9, 2.4, 5), '#6B8E23', [0, 7.4, 0]),
+    P(cone(2.2, 4, 4), '#5DBB3A', [3.6, 2.2, 2.6], [0.4, 0, -1.2], [1, 1, 0.4]), P(cone(2.0, 3.6, 4), '#4FAE32', [-3.8, 2.0, -2.0], [-0.4, 0, 1.2], [1, 1, 0.4]),
+  ],
+  berry: () => [
+    P(ico(3.6, 0), '#3E9B2A', [0, 2.6, 0], [0, 0, 0], [1, 0.65, 1]), P(ico(2.6, 0), '#5DBB3A', [1.4, 4, -1], [0, 0.5, 0], [1, 0.6, 1]),
+    P(cone(1.3, 2.6, 6), '#FFFFFF', [1.8, 3.4, 2.2], [Math.PI, 0, 0]), P(cone(1.2, 2.4, 6), '#FFFFFF', [-2.4, 3.2, 1.0], [Math.PI, 0, 0]), P(cone(1.1, 2.2, 6), '#FFFFFF', [0.4, 5.6, 0.4], [Math.PI, 0, 0]),
+    P(sph(0.9, 5, 4), '#FFFFFF', [-1.2, 5.6, -1.6]),
+  ],
+});
 // tint colours for the white parts of each crop (applied with instance colour = whole plant tint is avoided)
-const CROP_TINT = { tulip: ['#F2486E', '#FF6F92', '#E8365E', '#FF4F7A'], gold: ['#FFC21A', '#FFB10A', '#FFD23F', '#FFC21A'], rose: ['#E0283C', '#C8102E', '#F03A50', '#D81E36'], potato: ['#FFFFFF'], wheat: ['#FFFFFF'] };
+const CROP_TINT = { log: ['#3FA236', '#4FB233', '#2F9A2E'], corn: ['#FFD23F', '#FFC21A'], pumpkin: ['#F2871E', '#FF9F38', '#E8771A'], berry: ['#E8243C', '#F03A50'], tulip: ['#F2486E', '#FF6F92', '#E8365E', '#FF4F7A'], gold: ['#FFC21A', '#FFB10A', '#FFD23F', '#FFC21A'], rose: ['#E0283C', '#C8102E', '#F03A50', '#D81E36'], potato: ['#FFFFFF'], wheat: ['#FFFFFF'] };
 const CROP_GEO = {};
 export function cropGeo(crop, variant = 0) {
   const k = crop + variant;
@@ -206,6 +317,11 @@ export function stubbleGeo(crop) {
   const c = crop === 'wheat' ? '#C9A050' : crop === 'potato' ? '#7D4526' : '#7FBF45';
   const c2 = crop === 'wheat' ? '#E2C27A' : crop === 'potato' ? '#9A5A32' : '#9AD45A';
   // kept very cheap (~30 triangles): thousands of these sit under every field
+  if (crop === 'log') {   // a sawn stump with pale rings and a few chips
+    return (STUB_GEO[crop] = merge([P(cyl(1.6, 1.9, 2.2, 7), '#8E5627', [0, 1.1, 0]), P(cyl(1.45, 1.45, 0.3, 7), '#F2CF8A', [0, 2.3, 0]), P(cyl(0.5, 0.5, 0.35, 5), '#C99A5E', [0, 2.4, 0]), P(box(1.2, 0.3, 0.6), '#F2CF8A', [2.4, 0.2, 1]), P(box(0.9, 0.3, 0.6), '#E3B270', [-2, 0.2, -1.4], [0, 0.8, 0])]));
+  }
+  if (crop === 'pumpkin') return (STUB_GEO[crop] = merge([P(cone(4.5, 1.0, 7), '#3E9B2A', [0, 0.5, 0]), P(cylO(0.5, 0.5, 2.0, 3), '#5DBB3A', [0, 1.2, 0])]));
+  if (crop === 'berry') return (STUB_GEO[crop] = merge([P(ico(2.6, 0), '#3E9B2A', [0, 1.4, 0], [0, 0, 0], [1, 0.55, 1])]));
   return (STUB_GEO[crop] = merge(crop === 'potato'
     ? [P(cone(4.5, 1.2, 6), c, [0, 0.6, 0]), P(cylO(0.5, 0.5, 2.5, 3), '#5DBB3A', [0, 1.6, 0])]
     : [
@@ -257,7 +373,12 @@ export function makePerson(o = {}) {
     const cheek = new THREE.Mesh(sph(1.3, 6, 4), M('#FF9C8A')); cheek.position.set(s * 4.4, -2.4, 6.6); cheek.scale.set(1, 0.6, 0.4); head.add(cheek);
   }
   const nose = new THREE.Mesh(sph(1.1, 6, 4), M('#F2B486')); nose.position.set(0, -1.2, 8.1); head.add(nose);
-  if (o.hat === 'straw') {
+  if (o.beard) head.add(mesh(sph(5, 8, 6), o.beard, 0, -4.4, 4.2, 1.1, 0.7, 0.6));
+  if (o.hat === 'beanie') {
+    head.add(mesh(sph(7.9, 10, 6, 0), o.capColor || '#E8452C', 0, 2.2, 0, 1, 0.85, 1));
+    head.add(mesh(cyl(8, 8, 2, 10), '#FFFFFF', 0, 2.4, 0));
+    head.add(mesh(sph(2.2, 6, 5), '#FFFFFF', 0, 9.6, 0));
+  } else if (o.hat === 'straw') {
     head.add(mesh(cyl(11, 11, 0.9, 12), '#F2CF6B', 0, 5.2, 0));
     head.add(mesh(cyl(6.2, 7.2, 4.6, 10), '#E8BE4E', 0, 7.6, 0));
     head.add(mesh(cyl(7.25, 7.25, 1.2, 10), '#C8352A', 0, 6.0, 0));
@@ -277,9 +398,15 @@ export function makePerson(o = {}) {
   const blade = new THREE.Mesh(tor(3.6, 0.55, 3, 8, Math.PI * 1.2), M('#DDE3EA')); blade.position.set(0, 3.2, 3.2); blade.rotation.set(0, H, 0); blade.castShadow = true; tool.add(blade);
   tool.position.set(0, -9, 1.4); tool.rotation.set(H, 0, 0); tool.visible = false;
   arms[1].add(tool);
+  // axe for chopping trees (swapped in for the sickle when cutting logs)
+  const axe = new THREE.Group();
+  axe.add(mesh(cyl(0.7, 0.7, 11, 5), '#A8741E', 0, 3, 0));
+  axe.add(mesh(box(1.4, 4.4, 5), '#C9D2DC', 0, 7.6, 2.2)); axe.add(mesh(box(1.6, 4.6, 1.2), '#E8452C', 0, 7.6, -0.2));
+  axe.position.set(0, -9, 1.4); axe.rotation.set(H, 0, 0); axe.visible = false;
+  arms[1].add(axe);
   // contact shadow blob (cheap, always on)
   const blob = new THREE.Mesh(BLOB_GEO, BLOB_MAT); blob.rotation.x = -H; blob.position.y = 0.3; blob.scale.set(10, 8, 1); root.add(blob);
-  return { root, body, legs, arms, torso, head, tool, blob, o };
+  return { root, body, legs, arms, torso, head, tool, axe, blob, o };
 }
 export const HAIR_GEO = new THREE.SphereGeometry(7.9, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.5);
 export const BLOB_GEO = new THREE.CircleGeometry(1, 14);
@@ -287,7 +414,9 @@ export const BLOB_MAT = new THREE.MeshBasicMaterial({ color: 0x1E4A10, transpare
 
 // pose a person: walk phase, moving, carrying, cutting (sickle sweep), time for idle breathing
 export function posePerson(pp, s) {
-  const { legs, arms, body, torso, head, tool } = pp;
+  const { legs, arms, body, torso, head, axe } = pp;
+  // tool = the sickle, or the axe when the last swing was at a tree
+  const tool = s.axe ? axe : pp.tool; (s.axe ? pp.tool : axe).visible = false;
   const sw = s.moving ? Math.sin(s.walk) : 0;
   const bob = s.moving ? Math.abs(Math.sin(s.walk)) * 1.6 : Math.sin(s.t * 3 + (s.seed || 0)) * 0.3;
   body.position.y = bob;
@@ -335,9 +464,10 @@ export function makeMower() {
 }
 // 园丁换铲车: a small chunky ride-on loader (same toy palette as the mower). Faces +Z: front bucket,
 // driver seat in the middle, a railed load bed at the back where the harvest stacks up.
-export function makeLoader() {
+export function makeLoader(kind) {
   const g = new THREE.Group();
-  const Y = '#FFC21A', Y2 = '#F29C0E', D = '#3A3A44', S = '#AEB6C2';
+  // kind 'log': the lumberjacks' green log truck (same chassis, timber-yard green)
+  const Y = kind === 'log' ? '#4CB24E' : '#FFC21A', Y2 = kind === 'log' ? '#2F8F3A' : '#F29C0E', D = '#3A3A44', S = '#AEB6C2';
   const parts = [
     P(box(22, 5, 32), D, [0, 6.5, -1]),                                   // chassis
     P(box(22, 7, 18), Y, [0, 12, -4]), P(box(22.4, 1.4, 18.4), '#FFE07A', [0, 15.8, -4]),   // body + trim
@@ -405,6 +535,53 @@ export function nestGeo() {
 export function bushGeo() {
   const parts = [P(ico(8, 1), '#3E9B2A', [0, 9, 0], [0, 0, 0], [1, 0.95, 1]), P(ico(6, 0), '#5DBB3A', [3, 13, 2]), P(cyl(1.4, 1.8, 4, 6), '#8E5627', [0, 2, 0])];
   for (const [x, y, z] of [[5, 9, 5], [-6, 8, 3], [2, 14, -5], [-3, 12, 6], [6, 6, -3]]) parts.push(P(sph(1.9, 6, 5), '#EE4630', [x, y, z]));
+  return merge(parts);
+}
+
+// v3.3 producers. Each stands at its stall on the fence line facing +Z, like the hens.
+export function cowGeo() {   // black-and-white dairy cow, pink muzzle, little horns, bell
+  const W = '#FFFFFF', K = '#2A2A30', PK = '#FFB3B8';
+  return merge([
+    P(cap(6.2, 10, 3, 10), W, [0, 13, 0], [H, 0, 0], [1, 1, 0.95]),
+    P(sph(3.6, 7, 5), K, [3.6, 15.6, -3], [0, 0, 0], [1, 0.7, 1.3]), P(sph(3, 7, 5), K, [-4, 12.4, 3.6], [0, 0, 0], [0.8, 1, 1.2]), P(sph(2.6, 7, 5), K, [-2.6, 17.2, -6], [0, 0, 0], [1, 0.6, 1]),
+    ...[[-3.6, 6], [3.6, 6], [-3.6, -6], [3.6, -6]].map(([x, z]) => P(cyl(1.5, 1.4, 8, 6), W, [x, 4, z])),
+    ...[[-3.6, 6], [3.6, 6], [-3.6, -6], [3.6, -6]].map(([x, z]) => P(cyl(1.6, 1.6, 1.6, 6), K, [x, 0.8, z])),
+    P(sph(4.6, 9, 7), W, [0, 18, 11], [0, 0, 0], [1, 1, 1.05]),
+    P(sph(3, 8, 6), PK, [0, 16, 15], [0, 0, 0], [1.2, 0.85, 0.8]),
+    P(sph(0.5, 4, 3), '#7A3A40', [-1.1, 16.4, 17.3]), P(sph(0.5, 4, 3), '#7A3A40', [1.1, 16.4, 17.3]),
+    P(sph(0.8, 5, 4), K, [-1.9, 19.8, 15]), P(sph(0.8, 5, 4), K, [1.9, 19.8, 15]),
+    P(cone(0.8, 2.6, 5), '#FFF3D6', [-2.6, 22.6, 10.6], [0, 0, 0.5]), P(cone(0.8, 2.6, 5), '#FFF3D6', [2.6, 22.6, 10.6], [0, 0, -0.5]),
+    P(sph(1.6, 6, 4), K, [-4.8, 20.4, 10.4], [0, 0, 0], [1.4, 0.6, 0.8]), P(sph(1.6, 6, 4), K, [4.8, 20.4, 10.4], [0, 0, 0], [1.4, 0.6, 0.8]),
+    P(cyl(1.4, 1.8, 2.2, 7), '#FFC21A', [0, 12.4, 12.6]),
+    P(sph(2.4, 7, 5), PK, [0, 7.6, -3], [0, 0, 0], [1, 0.7, 1]),
+    P(cyl(0.5, 0.5, 6, 4), W, [0, 14, -12.4], [0.5, 0, 0]), P(sph(1.1, 5, 4), K, [0, 11.4, -14]),
+  ]);
+}
+export function sheepGeo() {   // fluffy cloud of wool, dark face and legs
+  const W = '#FFFFFF', K = '#3A3036';
+  const parts = [];
+  for (const [x, y, z, r] of [[0, 11, 0, 6.2], [3.4, 12.6, 3, 4.4], [-3.4, 12.6, 3, 4.4], [3.4, 12.4, -3.4, 4.4], [-3.4, 12.4, -3.4, 4.4], [0, 15.2, 0, 4.6], [0, 11.4, -5.6, 4]]) parts.push(P(ico(r, 1), W, [x, y, z]));
+  for (const [x, z] of [[-2.8, 4], [2.8, 4], [-2.8, -4], [2.8, -4]]) parts.push(P(cyl(1.1, 1, 6.5, 5), K, [x, 3.2, z]));
+  parts.push(P(sph(3.4, 8, 6), K, [0, 13.6, 8.6], [0, 0, 0], [0.9, 1, 1.15]));
+  parts.push(P(ico(2.6, 0), W, [0, 17, 7.6]));
+  parts.push(P(sph(1.6, 5, 4), K, [-3.6, 14.4, 7.4], [0, 0, 0], [1.4, 0.5, 0.7]), P(sph(1.6, 5, 4), K, [3.6, 14.4, 7.4], [0, 0, 0], [1.4, 0.5, 0.7]));
+  parts.push(P(sph(0.6, 4, 3), '#FFFFFF', [-1.3, 14.4, 11.4]), P(sph(0.6, 4, 3), '#FFFFFF', [1.3, 14.4, 11.4]));
+  return merge(parts);
+}
+export function hiveGeo() {   // stacked white bee box with a yellow roof and a bee or two
+  return merge([
+    P(box(16, 3, 14), '#C8874A', [0, 1.5, 0]),
+    P(box(14, 6, 12), '#FFF6E0', [0, 6, 0]), P(box(14.4, 0.8, 12.4), '#E3D3B0', [0, 9.1, 0]),
+    P(box(14, 6, 12), '#FFF6E0', [0, 12.4, 0]), P(box(14.4, 0.8, 12.4), '#E3D3B0', [0, 15.5, 0]),
+    P(box(17, 1.6, 15), '#FFC21A', [0, 16.6, 0]), P(box(13, 1.4, 11), '#F29C0E', [0, 18, 0]),
+    P(box(5, 1.2, 0.6), '#3A2A10', [0, 4.6, 6.2]),
+    P(sph(1.2, 6, 4), '#FFD23F', [6, 20, 4], [0, 0, 0], [1.3, 1, 1]), P(box(0.5, 1.6, 2.4), '#2A2A30', [6, 20, 4]),
+    P(sph(1.1, 6, 4), '#FFD23F', [-7, 13, 8], [0, 0, 0], [1.3, 1, 1]), P(box(0.5, 1.5, 2.2), '#2A2A30', [-7, 13, 8]),
+  ]);
+}
+export function appleTreeGeo() {   // round orchard tree full of red apples
+  const parts = [P(cyl(1.8, 2.6, 13, 7), '#8E5627', [0, 6.5, 0]), P(ico(10, 1), '#3FA236', [0, 19, 0]), P(ico(7, 0), '#5DBB3A', [4, 24, 3]), P(ico(6.5, 0), '#2F8A2A', [-5, 17, -3])];
+  for (const [x, y, z] of [[7, 18, 6], [-7, 20, 5], [3, 25, 8], [-4, 14, 8], [8, 14, -2], [-8, 23, -2], [0, 28, 2], [5, 21, -8]]) parts.push(P(sph(1.8, 6, 5), '#E8283C', [x, y, z]));
   return merge(parts);
 }
 
@@ -490,4 +667,4 @@ export const Env = {
     out.push(P(box(18, 12, 1), '#FFFFFF', [cx, H0 * 0.55, b.y + b.h + 0.6]));
   },
 };
-export const PROC_COL = { bouquet: ['#FFE16B', '#E8B21E'], basket: ['#F2C08A', '#C98A4B'], perfume: ['#FFB8D8', '#E86AA6'], crate: ['#8DB6FF', '#5B8FE8'], ketchup: ['#FF8A6E', '#E8452C'] };
+export const PROC_COL = { plank: ['#C8874A', '#8E5627'], chair: ['#F2C08A', '#C98A4B'], cheese: ['#FFE16B', '#E8B21E'], icecream: ['#FFC2DA', '#8DB6FF'], popcorn: ['#FF8A6E', '#E8452C'], pie: ['#F2C08A', '#E8871E'], jam: ['#FF8FB0', '#C8102E'], yarn: ['#FFB3D8', '#B07ACC'], juice: ['#9BE460', '#4CB24E'], bouquet: ['#FFE16B', '#E8B21E'], basket: ['#F2C08A', '#C98A4B'], perfume: ['#FFB8D8', '#E86AA6'], crate: ['#8DB6FF', '#5B8FE8'], ketchup: ['#FF8A6E', '#E8452C'] };

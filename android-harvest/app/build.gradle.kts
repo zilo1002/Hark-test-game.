@@ -10,8 +10,8 @@ android {
         applicationId = "com.zilo.banmuharvest"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "3.0"
+        versionCode = 6
+        versionName = "3.3"
     }
 
     // fixed debug key (checked in) so every debug build installs over the previous one
@@ -36,7 +36,7 @@ android {
     }
 }
 
-// the game itself lives in ../harvest (also served by GitHub Pages); copy it into the APK's assets
+// the game itself lives in ../harvest; copy it into the APK's assets
 val syncGame by tasks.registering(Sync::class) {
     from(rootProject.file("../harvest")) {
         include("index.html", "style.css", "js/**", "vendor/**")

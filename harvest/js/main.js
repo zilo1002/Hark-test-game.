@@ -20,7 +20,8 @@ let modalOpen = false, cashFxT = 0, winDone = false, harvestFxT = 0, saleHapT = 
 const restoredAt = {};            // session-only animation stamps for the home screen
 
 const ITEM_BITS = { wheat: ['#F6CB4A', '#FFE07A', '#C9962A'], potato: ['#5DBB3A', '#9C6331', '#C98A4B'], egg: ['#FFF3D6', '#FFFFFF'], tomato: ['#EE4630', '#5DBB3A'],
-                    tulip: ['#F2486E', '#FF8FB0', '#FFB3C8', '#5DBB3A'], rose: ['#E0283C', '#FF5A78', '#8E0E1E', '#3E8F25'], gold: ['#FFC21A', '#FFE16B', '#F29C0E', '#5DBB3A'] };
+                    tulip: ['#F2486E', '#FF8FB0', '#FFB3C8', '#5DBB3A'], rose: ['#E0283C', '#FF5A78', '#8E0E1E', '#3E8F25'], gold: ['#FFC21A', '#FFE16B', '#F29C0E', '#5DBB3A'],
+                    log: ['#9A5A2E', '#F2CF8A', '#5DBB3A', '#C99A5E'], corn: ['#FFD23F', '#6CCB3E', '#F2B529'], pumpkin: ['#F2871E', '#5DBB3A', '#FFAE58'], berry: ['#E8243C', '#5DBB3A', '#FFFFFF'] };
 
 const ui = new UI({
   home: () => goHome(),
@@ -185,7 +186,7 @@ function frame(now) {
     saveT += dt; if (saveT > 5) { saveT = 0; snapshot(); }
   } else {
     fx.update(dt);
-    drawHome(R.g, R.W, R.H, { ...data, restoredAt }, time, R.dpr, R.W > R.H * 1.15);
+    drawHome(R.g, R.W, R.H, { ...data, restoredAt }, time, R.dpr, R.W > R.H * 1.15, ui.page || 1);
     R.g.setTransform(R.dpr, 0, 0, R.dpr, 0, 0); R.fxScreen(fx);
   }
   requestAnimationFrame(frame);

@@ -49,6 +49,10 @@ button { font: inherit; cursor: pointer; border: 0; }
 .starPill span { color: #FFD23F; font-size: 22px; }
 .panel { background: rgba(255,252,242,.96); border-top: 4px solid #fff; border-radius: 22px 22px 0 0; padding: 12px 12px calc(env(safe-area-inset-bottom) + 12px); color: #4A3A20; box-shadow: 0 -4px 0 rgba(0,0,0,.08); }
 .phead { font-weight: 900; font-size: 14px; margin-bottom: 8px; }
+.htabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.htabs button { flex: 1; padding: 6px 4px; border-radius: 12px; border: 3px solid #CFE0B8; background: #F4F8EC; color: #6A5A3A; font-weight: 900; font-size: 13px; }
+.htabs button.on { background: linear-gradient(#FFE58A, #FFC21A); border-color: #fff; color: #5A3A00; box-shadow: 0 3px 0 #C8901A; }
+.htabs button em { font-style: normal; font-size: 11px; color: #E08A00; margin-left: 3px; }
 .phead span { color: #2B92B8; font-weight: 800; font-size: 12px; }
 .restore { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
 .restore::-webkit-scrollbar { display: none; }
