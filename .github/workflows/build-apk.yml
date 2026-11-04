@@ -27,19 +27,21 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
-
+      # the hosted ubuntu runner ships the Android SDK in $ANDROID_HOME; make sure platform 34 + build-tools 34.0.0 are there
       - name: Install SDK platform 34 + build-tools 34.0.0
-        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0" > /dev/null
+        run: |
+          SM=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          yes | "$SM" --licenses > /dev/null || true
+          "$SM" --install "platforms;android-34" "build-tools;34.0.0" > /dev/null
+          ls "$ANDROID_HOME/build-tools/34.0.0" | head
 
       - name: Build APK
         working-directory: android-harvest
         env:
-          SDK: ${{ env.ANDROID_HOME }}
           OUT_DIR: ${{ github.workspace }}/dist
         run: |
           chmod +x build-apk.sh
-          ./build-apk.sh
+          SDK="$ANDROID_HOME" ./build-apk.sh
           cp "$OUT_DIR/banmu-harvest-debug.apk" "$OUT_DIR/banmu-harvest.apk"
           echo "VERSION_NAME=$(grep -m1 '^VERSION_NAME=' build-apk.sh | cut -d= -f2)" >> "$GITHUB_ENV"
 
