@@ -506,17 +506,21 @@ export class World {
           if (dd <= hr2) { cand.push(i); cd.push(dd); }
         }
         if (!cand.length) continue;
-        let allow = f.spill ? Math.floor((f.pile.cap - f.pile.total - f.pile.pending) / f.spill) : space();
-        let list = cand;
+        // Everything inside the radius is always cut (clean swath, like the ads). Only the nearest
+        // `allow` plants are carried; the rest burst away as cut blooms once the stack is full.
+        let allow = Math.max(0, f.spill ? Math.floor((f.pile.cap - f.pile.total - f.pile.pending) / f.spill) : space());
+        let keep = null;
         if (allow < cand.length) {
-          if (allow <= 0) continue;
+          keep = new Set();
           const ord = cand.map((i, k) => k).sort((a, b) => cd[a] - cd[b] || cand[a] - cand[b]);
-          list = ord.slice(0, allow).map((k) => cand[k]);
+          for (let k = 0; k < allow; k++) keep.add(cand[ord[k]]);
         }
         let cut = 0, cx = 0, cy = 0;
-        for (const i of list) {
+        for (const i of cand) {
           const px = f.px(i), py = f.py(i);
-          if (f.spill) {
+          if (keep && !keep.has(i)) {
+            // cut, not carried
+          } else if (f.spill) {
             for (let k = 0; k < f.spill; k++) {
               const tx = px + (this.rnd() - 0.5) * 34, ty = py + (this.rnd() - 0.5) * 34;
               f.pile.pending++;

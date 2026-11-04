@@ -13,7 +13,7 @@ rm -rf "$B"; mkdir -p "$B/res" "$B/gen" "$B/classes" "$B/dex" "$B/assets/harvest
 ( cd "$HERE/../harvest" && tar cf - index.html style.css js vendor ) | ( cd "$B/assets/harvest" && tar xf - )
 "$AAPT2" compile --dir "$APP/res" -o "$B/res/res.zip"
 sed 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android">#<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.zilo.banmuharvest">#' "$APP/AndroidManifest.xml" > "$B/AndroidManifest.xml"
-"$AAPT2" link -I "$JAR" --manifest "$B/AndroidManifest.xml" -o "$B/base.apk" --java "$B/gen" -A "$B/assets" "$B/res/res.zip" --min-sdk-version 24 --target-sdk-version 34 --version-code 3 --version-name 3.0
+"$AAPT2" link -I "$JAR" --manifest "$B/AndroidManifest.xml" -o "$B/base.apk" --java "$B/gen" -A "$B/assets" "$B/res/res.zip" --min-sdk-version 24 --target-sdk-version 34 --version-code 4 --version-name 3.1
 javac -encoding UTF-8 -source 8 -target 8 -bootclasspath "$JAR" -classpath "$JAR" -d "$B/classes" -Xlint:-options $(find "$APP/java" "$B/gen" -name '*.java')
 java -cp "$BT/lib/d8.jar" com.android.tools.r8.D8 --release --min-api 24 --lib "$JAR" --output "$B/dex" $(find "$B/classes" -name '*.class')
 cp "$B/base.apk" "$B/unsigned.apk"; ( cd "$B/dex" && zip -q -j "$B/unsigned.apk" classes.dex )

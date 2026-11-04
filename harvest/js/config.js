@@ -17,10 +17,10 @@ export const CFG = {
     plantCap: 4000,    // max plants drawn per frame (LOD beyond this)
   },
 
-  player: { speed: 135, pickR: 30, harvestR: 22, cutRate: 80, cap: 40, pickRate: 32, dropRate: 34, cashR: 40,
+  player: { speed: 135, pickR: 30, harvestR: 34, cutRate: 80, cap: 40, pickRate: 32, dropRate: 34, cashR: 40,
             payTime: 1.3, payMin: 25, body: 10 },
-  vehicle: { speed: 180, pickR: 48, harvestR: 40, cutRate: 220, cap: 240, pickRate: 150, dropRate: 120, capMul: 4 },
-  worker: { speed: 92, pickR: 26, harvestR: 18, cutRate: 26, cap: 30, pickRate: 18, dropRate: 24 },
+  vehicle: { speed: 180, pickR: 56, harvestR: 58, cutRate: 220, cap: 240, pickRate: 150, dropRate: 120, capMul: 4 },
+  worker: { speed: 92, pickR: 28, harvestR: 26, cutRate: 26, cap: 30, pickRate: 18, dropRate: 24 },
 
   items: {
     wheat:   { name: '小麦',   unit: '捆', price: 1,  step: 4.6 },
