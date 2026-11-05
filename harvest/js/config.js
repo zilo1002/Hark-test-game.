@@ -67,6 +67,14 @@ export const CFG = {
     honey:    { name: '蜂蜜',   unit: '罐', price: 3,  step: 6.6 },
     apple:    { name: '苹果',   unit: '个', price: 2,  step: 5.4 },
     juice:    { name: '苹果汁', unit: '瓶', price: 13, step: 8.5 },
+    // v3.7 — levels 31–38: mill & bakery, fish pond & smokehouse, vineyard, greenhouse, night farm
+    flour:    { name: '面粉',   unit: '袋', price: 7,  step: 6.0 },
+    bread:    { name: '面包',   unit: '个', price: 26, step: 5.2 },
+    fish:     { name: '鱼',     unit: '条', price: 3,  step: 3.8 },
+    smoked:   { name: '熏鱼',   unit: '条', price: 18, step: 4.0 },
+    grape:    { name: '葡萄',   unit: '串', price: 2,  step: 5.0 },
+    gjuice:   { name: '葡萄汁', unit: '瓶', price: 13, step: 8.5 },
+    pepper:   { name: '甜椒',   unit: '个', price: 3,  step: 5.6 },
   },
 
   pile: { cell: 10, layer: 4.4, slope: 3, cap: 3800 },
@@ -81,6 +89,12 @@ export const CFG = {
     corn:    { grow: 7.0 },
     pumpkin: { grow: 9.0 },
     berry:   { grow: 8.0 },
+    // v3.7: fish swim in a pond 'field' (wade in with the net); grapes grow in trellis rows (field gapY = row spacing);
+    // tomatoes and sweet peppers as greenhouse field crops (tomato bushes in coops stay as they were)
+    fish:    { grow: 8.0 },
+    grape:   { grow: 8.0 },
+    tomato:  { grow: 8.0 },
+    pepper:  { grow: 8.0 },
   },
   // gap: spacing of the stalls along the fences (cows / sheep / hives / apple trees are bigger than hens)
   producers: { hen: { period: 1.25, burst: 3 }, bush: { period: 1.5, burst: 2 },
@@ -732,6 +746,183 @@ export const CFG = {
         { id: 'k', x: 760, y: 620, price: 400, icon: 'gear', label: '快机器', req: ['d'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }, { id: 'M3', mul: 0.6 }, { id: 'M4', mul: 0.6 }] } },
       ],
       deco: { theme: 'farm', paths: [[480, 560, 620, 100], [760, 200, 80, 360]], hedges: [[960, 860, 120, 22]], trees: [[1060, 900, 'round'], [1060, 60, 'cone']], bushes: [[760, 40], [1060, 760]], barn: [760, 900 - 790] } },
+
+    // ======================= v3.7: levels 31–38 =======================
+    // 31 — the wheat mill: wheat into flour, the mill's sails turn while it grinds
+    { name: '麦田磨坊', W: 820, H: 680, start: [460, 400], par: 160, bill: 20,
+      goal: { type: 'produce', item: 'flour', n: 330 },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 320, h: 300, gap: 9 },
+        { id: 'F2', type: 'field', crop: 'wheat', x: 40, y: 390, w: 300, h: 250, gap: 9, hidden: true },
+        { id: 'M1', type: 'proc', in: 'wheat', out: 'flour', ratio: 5, time: 0.5, x: 640, y: 200, outTo: 'C1' },
+        { id: 'C1', type: 'counter', items: ['wheat', 'flour'], x: 650, y: 420 },
+      ],
+      tiles: [
+        { id: 'a', x: 440, y: 540, price: 50, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 40 } } },
+        { id: 'b', x: 420, y: 150, price: 150, icon: 'worker', label: '雇园丁', req: ['a'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'c', x: 400, y: 450, price: 100, icon: 'plot', label: '开新田', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'd', x: 460, y: 640, price: 230, icon: 'worker', label: '雇园丁', req: ['c'], effect: { worker: { from: ['F2'], to: ['M1'] } } },
+        { id: 'e', x: 740, y: 90, price: 230, icon: 'gear', label: '快磨盘', req: ['b'], effect: { proc: [{ id: 'M1', mul: 0.6 }] } },
+        { id: 'f', x: 560, y: 640, price: 250, icon: 'cashier', label: '店员', req: ['d'], effect: { cashier: ['C1'] } },
+        { id: 'g', x: 480, y: 280, price: 280, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'h', x: 530, y: 520, price: 180, icon: 'sprinkler', label: '洒水器', req: ['c'], effect: { sprinkler: ['F1', 'F2'] } },
+      ],
+      deco: { theme: 'farm', paths: [[380, 350, 440, 100], [500, 180, 90, 170]], hedges: [[700, 560, 100, 22]], trees: [[780, 640, 'round'], [780, 280, 'round']], bushes: [[400, 40], [780, 40]] } },
+
+    // 32 — the bakery: wheat → flour → bread, two machines in a row
+    { name: '面包房', W: 880, H: 740, start: [500, 420], par: 180, bill: 20,
+      goal: { type: 'produce', item: 'bread', n: 130 },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 330, h: 300, gap: 9 },
+        { id: 'F2', type: 'field', crop: 'wheat', x: 40, y: 390, w: 330, h: 300, gap: 9, hidden: true },
+        { id: 'M1', type: 'proc', in: 'wheat', out: 'flour', ratio: 4, time: 0.45, x: 640, y: 160, outTo: 'M2' },
+        { id: 'M2', type: 'proc', in: 'flour', out: 'bread', ratio: 3, time: 0.6, x: 760, y: 330, outTo: 'C1' },
+        { id: 'C1', type: 'counter', items: ['wheat', 'bread'], x: 720, y: 520 },
+      ],
+      tiles: [
+        { id: 'a', x: 460, y: 560, price: 50, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 50 } } },
+        { id: 'b', x: 450, y: 150, price: 160, icon: 'worker', label: '雇园丁', req: ['a'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'c', x: 420, y: 460, price: 100, icon: 'plot', label: '开新田', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'd', x: 480, y: 670, price: 240, icon: 'worker', label: '雇园丁', req: ['c'], effect: { worker: { from: ['F2'], to: ['M1'] } } },
+        { id: 'e', x: 520, y: 280, price: 300, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'f', x: 840, y: 180, price: 260, icon: 'gear', label: '快烤箱', req: ['b'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }] } },
+        { id: 'g', x: 600, y: 680, price: 260, icon: 'cashier', label: '店员', req: ['d'], effect: { cashier: ['C1'] } },
+        { id: 'h', x: 560, y: 460, price: 180, icon: 'sprinkler', label: '洒水器', req: ['c'], effect: { sprinkler: ['F1', 'F2'] } },
+      ],
+      deco: { theme: 'farm', paths: [[400, 360, 480, 100], [520, 130, 90, 230]], hedges: [[780, 660, 90, 22]], trees: [[840, 700, 'round'], [840, 60, 'round']], bushes: [[420, 40], [840, 440]] } },
+
+    // 33 — the fish pond: wade in with the net, fish leap onto your stack; fishermen help
+    { name: '鱼塘', W: 800, H: 660, start: [450, 330], par: 160, bill: 20,
+      goal: { type: 'sell', item: 'fish', n: 1000 },
+      objects: [
+        { id: 'P1', type: 'field', crop: 'fish', x: 40, y: 40, w: 300, h: 250, gap: 16 },
+        { id: 'P2', type: 'field', crop: 'fish', x: 40, y: 340, w: 300, h: 280, gap: 16, hidden: true },
+        { id: 'C1', type: 'counter', items: ['fish'], x: 630, y: 330 },
+      ],
+      tiles: [
+        { id: 'a', x: 400, y: 470, price: 30, icon: 'cap', label: '大鱼篓', effect: { up: { key: 'cap', v: 30 } } },
+        { id: 'b', x: 390, y: 380, price: 80, icon: 'plot', label: '挖鱼塘', req: ['a'], effect: { show: ['P2'] } },
+        { id: 'c', x: 460, y: 580, price: 130, icon: 'fisher', label: '雇渔夫', req: ['a'], effect: { worker: { from: ['P1', 'P2'], to: ['C1'] } } },
+        { id: 'd', x: 410, y: 150, price: 100, icon: 'speed', label: '雨靴', req: ['b'], effect: { up: { key: 'speed', v: 25 } } },
+        { id: 'e', x: 540, y: 590, price: 210, icon: 'fisher', label: '雇渔夫', req: ['c'], effect: { worker: { from: ['P1', 'P2'], to: ['C1'] } } },
+        { id: 'f', x: 500, y: 80, price: 150, icon: 'net', label: '大渔网', req: ['d'], effect: { up: { key: 'radius', v: 6 } } },
+        { id: 'g', x: 700, y: 200, price: 220, icon: 'cashier', label: '店员', req: ['c'], effect: { cashier: ['C1'] } },
+        { id: 'h', x: 400, y: 270, price: 160, icon: 'sprinkler', label: '增氧机', req: ['b'], effect: { sprinkler: ['P1', 'P2'] } },
+        { id: 'i', x: 620, y: 590, price: 300, icon: 'fisher', label: '雇渔夫', req: ['e'], effect: { worker: { from: ['P1', 'P2'], to: ['C1'] } } },
+      ],
+      deco: { theme: 'farm', paths: [[360, 290, 440, 90], [440, 370, 90, 260]], hedges: [[680, 560, 100, 22]], trees: [[760, 600, 'round'], [760, 60, 'cone']], bushes: [[620, 40], [760, 470]] } },
+
+    // 34 — the smokehouse: fish into smoked fish
+    { name: '熏鱼房', W: 820, H: 680, start: [460, 400], par: 160, bill: 20,
+      goal: { type: 'produce', item: 'smoked', n: 330 },
+      objects: [
+        { id: 'P1', type: 'field', crop: 'fish', x: 40, y: 40, w: 320, h: 300, gap: 16 },
+        { id: 'P2', type: 'field', crop: 'fish', x: 40, y: 390, w: 300, h: 250, gap: 16, hidden: true },
+        { id: 'M1', type: 'proc', in: 'fish', out: 'smoked', ratio: 5, time: 0.5, x: 640, y: 200, outTo: 'C1' },
+        { id: 'C1', type: 'counter', items: ['fish', 'smoked'], x: 650, y: 420 },
+      ],
+      tiles: [
+        { id: 'a', x: 440, y: 540, price: 50, icon: 'cap', label: '大鱼篓', effect: { up: { key: 'cap', v: 40 } } },
+        { id: 'b', x: 420, y: 150, price: 150, icon: 'fisher', label: '雇渔夫', req: ['a'], effect: { worker: { from: ['P1'], to: ['M1'] } } },
+        { id: 'c', x: 400, y: 450, price: 100, icon: 'plot', label: '挖鱼塘', req: ['a'], effect: { show: ['P2'] } },
+        { id: 'd', x: 460, y: 640, price: 230, icon: 'fisher', label: '雇渔夫', req: ['c'], effect: { worker: { from: ['P2'], to: ['M1'] } } },
+        { id: 'e', x: 740, y: 90, price: 230, icon: 'gear', label: '快熏炉', req: ['b'], effect: { proc: [{ id: 'M1', mul: 0.6 }] } },
+        { id: 'f', x: 560, y: 640, price: 250, icon: 'cashier', label: '店员', req: ['d'], effect: { cashier: ['C1'] } },
+        { id: 'g', x: 480, y: 280, price: 260, icon: 'fisher', label: '雇渔夫', req: ['b'], effect: { worker: { from: ['P1', 'P2'], to: ['M1'] } } },
+        { id: 'h', x: 530, y: 520, price: 180, icon: 'sprinkler', label: '增氧机', req: ['c'], effect: { sprinkler: ['P1', 'P2'] } },
+      ],
+      deco: { theme: 'farm', paths: [[380, 350, 440, 100], [500, 180, 90, 170]], hedges: [[700, 560, 100, 22]], trees: [[780, 640, 'cone'], [780, 280, 'round']], bushes: [[400, 40], [780, 40]] } },
+
+    // 35 — the vineyard: trellis rows of grapes, walk along a row and the clusters fly onto your stack
+    { name: '葡萄园', W: 820, H: 700, start: [460, 400], par: 200, bill: 20,
+      goal: { type: 'earn', n: 3500 },
+      objects: [
+        { id: 'G1', type: 'field', crop: 'grape', x: 40, y: 40, w: 320, h: 300, gap: 9, gapY: 24 },
+        { id: 'G2', type: 'field', crop: 'grape', x: 40, y: 390, w: 320, h: 270, gap: 9, gapY: 24, hidden: true },
+        { id: 'C1', type: 'counter', items: ['grape'], x: 660, y: 420 },
+      ],
+      tiles: [
+        { id: 'a', x: 430, y: 520, price: 40, icon: 'cap', label: '大果篮', effect: { up: { key: 'cap', v: 40 } } },
+        { id: 'b', x: 400, y: 440, price: 80, icon: 'plot', label: '种葡萄', req: ['a'], effect: { show: ['G2'] } },
+        { id: 'c', x: 440, y: 620, price: 150, icon: 'worker', label: '雇园丁', req: ['a'], effect: { worker: { from: ['G1', 'G2'], to: ['C1'] } } },
+        { id: 'd', x: 430, y: 130, price: 110, icon: 'speed', label: '跑鞋', req: ['b'], effect: { up: { key: 'speed', v: 25 } } },
+        { id: 'e', x: 540, y: 630, price: 230, icon: 'worker', label: '雇园丁', req: ['c'], effect: { worker: { from: ['G1', 'G2'], to: ['C1'] } } },
+        { id: 'f', x: 520, y: 70, price: 150, icon: 'shears', label: '大剪刀', req: ['d'], effect: { up: { key: 'radius', v: 6 } } },
+        { id: 'g', x: 480, y: 250, price: 280, icon: 'loader', label: '园丁换铲车', req: ['c'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'h', x: 760, y: 300, price: 220, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1'] } },
+        { id: 'i', x: 520, y: 520, price: 170, icon: 'sprinkler', label: '洒水器', req: ['b'], effect: { sprinkler: ['G1', 'G2'] } },
+      ],
+      deco: { theme: 'garden', paths: [[380, 350, 440, 100], [500, 180, 90, 170]], hedges: [[720, 580, 90, 22]], trees: [[780, 660, 'cone'], [780, 60, 'cone']], bushes: [[380, 680], [600, 40]] } },
+
+    // 36 — the grape juicer
+    { name: '葡萄汁坊', W: 820, H: 700, start: [460, 430], par: 180, bill: 20,
+      goal: { type: 'sell', item: 'gjuice', n: 300 },
+      objects: [
+        { id: 'G1', type: 'field', crop: 'grape', x: 40, y: 40, w: 320, h: 300, gap: 9, gapY: 24 },
+        { id: 'G2', type: 'field', crop: 'grape', x: 40, y: 390, w: 300, h: 270, gap: 9, gapY: 24, hidden: true },
+        { id: 'M1', type: 'proc', in: 'grape', out: 'gjuice', ratio: 5, time: 0.5, x: 650, y: 210, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['grape', 'gjuice'], x: 660, y: 440 },
+      ],
+      tiles: [
+        { id: 'a', x: 440, y: 560, price: 50, icon: 'cap', label: '大果篮', effect: { up: { key: 'cap', v: 40 } } },
+        { id: 'b', x: 650, y: 210, price: 150, icon: 'gjuice', label: '葡萄榨汁机', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 400, y: 460, price: 90, icon: 'plot', label: '种葡萄', req: ['a'], effect: { show: ['G2'] } },
+        { id: 'd', x: 450, y: 650, price: 180, icon: 'worker', label: '雇园丁', req: ['b'], effect: { worker: { from: ['G1', 'G2'], to: ['M1'] } } },
+        { id: 'e', x: 550, y: 655, price: 250, icon: 'worker', label: '雇园丁', req: ['d'], effect: { worker: { from: ['G1', 'G2'], to: ['M1'] } } },
+        { id: 'f', x: 750, y: 100, price: 230, icon: 'gear', label: '快榨汁机', req: ['b'], effect: { proc: [{ id: 'M1', mul: 0.6 }] } },
+        { id: 'g', x: 500, y: 270, price: 290, icon: 'loader', label: '园丁换铲车', req: ['d'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'h', x: 760, y: 330, price: 230, icon: 'cashier', label: '店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'i', x: 540, y: 540, price: 170, icon: 'sprinkler', label: '洒水器', req: ['c'], effect: { sprinkler: ['G1', 'G2'] } },
+      ],
+      deco: { theme: 'garden', paths: [[380, 380, 440, 100], [530, 190, 80, 190]], hedges: [[40, 680 - 18, 160, 14]], trees: [[780, 650, 'cone'], [780, 40, 'round']], bushes: [[600, 40], [400, 40]] } },
+
+    // 37 — the greenhouse: tomatoes and sweet peppers under glass
+    { name: '玻璃温室', W: 900, H: 780, start: [520, 430], par: 190, bill: 20,
+      goal: { type: 'earn', n: 8200 },
+      objects: [
+        { id: 'T1', type: 'field', crop: 'tomato', x: 50, y: 50, w: 290, h: 280, gap: 11 },
+        { id: 'P1', type: 'field', crop: 'pepper', x: 50, y: 420, w: 290, h: 300, gap: 11, hidden: true },
+        { id: 'C1', type: 'counter', items: ['tomato', 'pepper'], x: 740, y: 300 },
+        { id: 'C2', type: 'counter', items: ['pepper', 'tomato'], x: 740, y: 540, hidden: true },
+      ],
+      tiles: [
+        { id: 'a', x: 480, y: 560, price: 50, icon: 'cap', label: '大果篮', effect: { up: { key: 'cap', v: 50 } } },
+        { id: 'b', x: 420, y: 480, price: 120, icon: 'pepper', label: '种甜椒', req: ['a'], effect: { show: ['P1'] } },
+        { id: 'c', x: 440, y: 150, price: 160, icon: 'worker', label: '雇园丁', req: ['a'], effect: { worker: { from: ['T1'], to: ['C1'] } } },
+        { id: 'd', x: 440, y: 690, price: 220, icon: 'worker', label: '雇园丁', req: ['b'], effect: { worker: { from: ['P1'], to: ['C2', 'C1'] } } },
+        { id: 'e', x: 740, y: 540, price: 160, icon: 'counter', label: '出售台', req: ['b'], effect: { show: ['C2'] } },
+        { id: 'f', x: 560, y: 150, price: 320, icon: 'mower', label: '割草机', req: ['c'], effect: { vehicle: true } },
+        { id: 'g', x: 560, y: 260, price: 320, icon: 'loader', label: '园丁换铲车', req: ['c'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'h', x: 850, y: 420, price: 260, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1', 'C2'] } },
+        { id: 'i', x: 440, y: 360, price: 200, icon: 'sprinkler', label: '洒水器', req: ['b'], effect: { sprinkler: ['T1', 'P1'] } },
+      ],
+      deco: { theme: 'garden', greenhouse: [[38, 38, 314, 304], [38, 408, 314, 324]], paths: [[380, 380, 520, 100], [640, 120, 80, 260]], hedges: [[820, 700, 70, 22]], trees: [[860, 740, 'cone'], [860, 60, 'round']], bushes: [[700, 40], [480, 40]] } },
+
+    // 38 — the night farm: lanterns and fireflies; wheat → flour → bread, and greenhouse tomatoes → ketchup
+    { name: '夜间农场', W: 1000, H: 860, start: [560, 500], par: 230, bill: 50,
+      goal: { type: 'earn', n: 13600 },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 300, h: 300, gap: 9 },
+        { id: 'T1', type: 'field', crop: 'tomato', x: 50, y: 430, w: 290, h: 300, gap: 11 },
+        { id: 'M1', type: 'proc', in: 'wheat', out: 'flour', ratio: 4, time: 0.45, x: 700, y: 140, outTo: 'M2' },
+        { id: 'M2', type: 'proc', in: 'flour', out: 'bread', ratio: 3, time: 0.55, x: 860, y: 280, outTo: 'C1' },
+        { id: 'M3', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 5, time: 0.45, x: 640, y: 760, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['wheat', 'tomato', 'bread', 'ketchup'], x: 850, y: 520 },
+      ],
+      tiles: [
+        { id: 'a', x: 560, y: 610, price: 60, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
+        { id: 'b', x: 470, y: 140, price: 200, icon: 'worker', label: '雇园丁', req: ['a'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'c', x: 640, y: 760, price: 260, icon: 'ketchup', label: '番茄酱机', req: ['a'], effect: { show: ['M3'] } },
+        { id: 'd', x: 460, y: 700, price: 280, icon: 'worker', label: '雇园丁', req: ['c'], effect: { worker: { from: ['T1'], to: ['M3'] } } },
+        { id: 'e', x: 600, y: 260, price: 380, icon: 'mower', label: '割草机', req: ['b'], effect: { vehicle: true } },
+        { id: 'f', x: 470, y: 400, price: 300, icon: 'worker', label: '雇园丁', req: ['b'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'g', x: 950, y: 410, price: 400, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1'] } },
+        { id: 'h', x: 640, y: 470, price: 460, icon: 'loader', label: '园丁换铲车', req: ['d'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'i', x: 760, y: 640, price: 420, icon: 'gear', label: '快机器', req: ['f'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }, { id: 'M3', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'farm', night: true, greenhouse: [[38, 418, 314, 324]],
+              lanterns: [[380, 60], [380, 360], [380, 760], [560, 380], [740, 380], [930, 640], [520, 820], [900, 100], [380, 560]],
+              paths: [[420, 420, 580, 100], [580, 120, 80, 300]], hedges: [[840, 770, 90, 22]], trees: [[960, 820, 'round'], [960, 40, 'cone']], bushes: [[760, 40], [960, 720]], barn: [500, 70] } },
   ],
 
   // ---- meta: restore the farm & manor garden with stars ------------------------------

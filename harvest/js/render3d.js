@@ -12,7 +12,7 @@ import { FONT, elastic, hash } from './util.js';
 import { customerStyle } from './chars.js';
 import * as M from './models.js';
 
-const TAU = Math.PI * 2, PITCH = 0.84, SINP = Math.sin(PITCH), COSP = Math.cos(PITCH), R2 = Math.SQRT1_2;
+const H2 = Math.PI / 2, TAU = Math.PI * 2, PITCH = 0.84, SINP = Math.sin(PITCH), COSP = Math.cos(PITCH), R2 = Math.SQRT1_2;
 const VIEW = { landW: 620, landH: 350, portW: 380, portH: 600, fov: 30 };
 const QUALITY = [
   { name: 'low', pr: 1, shadow: 0, plantShadow: false, aa: false },
@@ -26,6 +26,7 @@ const VIP = { shirt: '#FFD23F', vest: '#E8B21E', pants: '#7A3E9D', hair: '#3A221
 const GOLD_MAT = new THREE.MeshLambertMaterial({ color: 0xFFE46A, emissive: 0xB07800 });
 const LUMBERJACK = { shirt: '#D9382A', vest: '#2D3A5A', pants: '#4A5A8A', hair: '#6B3A1E', hat: 'beanie', capColor: '#F29C0E', beard: '#7A3E1D', sleeve: '#D9382A' };
 const MILKER = { shirt: '#FFFFFF', overalls: '#3BA7FF', pants: '#3BA7FF', hair: '#3A2210', hat: 'cap', capColor: '#FFFFFF', sleeve: '#FFFFFF' };
+const FISHER = { shirt: '#FFC21A', overalls: '#3567C8', pants: '#3567C8', hair: '#3A2210', hat: 'rain', capColor: '#FFC21A', sleeve: '#FFC21A', boots: '#2F8F3A' };
 const CASHIER = { shirt: '#4CD08A', vest: '#2E8A5A', hair: '#3A2210', pants: '#2D3A5A', sleeve: '#4CD08A' };
 const ITEM_CAP = 1800;
 
@@ -147,6 +148,7 @@ export class Renderer {
     this.world = w; this.wt = w.t; this.stackLbl = null; this.comboScreen = null; this.fullAt = undefined;
     if (this.levelRoot) { this.scene.remove(this.levelRoot); this.levelRoot.traverse((o) => { if (o.isInstancedMesh) o.dispose(); else if (o.isMesh && o.userData.own) o.geometry.dispose(); if (o.material && o.userData.ownMat) { o.material.map?.dispose(); o.material.dispose(); } }); }
     const root = this.levelRoot = new THREE.Group(); this.scene.add(root);
+    this.applyMood(w);
     this.chars = new Map(); this.custPool = {}; this.tileObjs = new Map();
     this.buildGround(w);
     this.decoSlots = this.planDecos(w);
@@ -162,6 +164,15 @@ export class Renderer {
     const t = this.camTarget(w); this.cam.x = t.x; this.cam.y = t.y; this.clampCam();
     this.applyQuality();
     this.groundDirty = false;
+  }
+  // v3.7 夜间农场: moonlit lighting (dark blue sky/fog, dim cool light); every other level the sunny default
+  applyMood(w) {
+    const night = !!(w.deco && w.deco.night);
+    this.night = night;
+    this.gl.setClearColor(new THREE.Color(night ? '#0E1A3A' : COL.lawn2));
+    this.scene.fog.color.set(night ? '#101C40' : '#A8DDF0'); this.scene.fog.near = night ? 1100 : 1400; this.scene.fog.far = night ? 2400 : 2600;
+    this.hemi.color.set(night ? 0x8FA4E8 : 0xFFFFFF); this.hemi.groundColor.set(night ? 0x24304A : 0x7AA850); this.hemi.intensity = night ? 1.25 : 1.9;
+    this.sun.color.set(night ? 0xB8C8FF : 0xFFF4DD); this.sun.intensity = night ? 1.0 : 2.1;
   }
   buildGround(w) {
     const M0 = 1600;
@@ -202,10 +213,26 @@ export class Renderer {
     for (const c of w.counters) pave(c.cashPos.x - 28, c.y - 40, w.W - c.cashPos.x + 28 + pad, 132);
     for (const p of w.procs) pave(p.inZone.x - 8, p.y - 34, p.body.x + p.body.w - p.inZone.x + 18, 68);
     for (const f of w.fields) {
-      const bed = f.hidden ? COL.soil : { tulip: '#3F8A2C', rose: '#3A7A28', gold: '#4F9A26', wheat: '#8E6A34', potato: COL.soil, log: '#4F8A26', corn: '#9A7438', pumpkin: '#8A5A30', berry: '#3F8A2C' }[f.item];
-      const edge = f.hidden ? COL.soil2 : { tulip: '#2E6A1E', rose: '#2A5E1C', gold: '#3E8420', wheat: '#6E5026', potato: COL.soil2, log: '#3A6E1C', corn: '#76562A', pumpkin: '#6A4422', berry: '#2E6A1E' }[f.item];
+      const water = f.item === 'fish';
+      const bed = f.hidden && !water ? COL.soil : { tulip: '#3F8A2C', rose: '#3A7A28', gold: '#4F9A26', wheat: '#8E6A34', potato: COL.soil, log: '#4F8A26', corn: '#9A7438', pumpkin: '#8A5A30', berry: '#3F8A2C',
+        fish: f.hidden ? '#8FBFD8' : '#3FA8E0', grape: '#9A7A4A', tomato: '#8A5A30', pepper: '#8A5A30' }[f.item];
+      const edge = f.hidden && !water ? COL.soil2 : { tulip: '#2E6A1E', rose: '#2A5E1C', gold: '#3E8420', wheat: '#6E5026', potato: COL.soil2, log: '#3A6E1C', corn: '#76562A', pumpkin: '#6A4422', berry: '#2E6A1E',
+        fish: '#B9B2A4', grape: '#76562A', tomato: '#6A4422', pepper: '#6A4422' }[f.item];
       g.fillStyle = edge; g.fillRect(f.x - 6, f.y - 6, f.w + 12, f.h + 12);
       g.fillStyle = bed; g.fillRect(f.x - 3, f.y - 3, f.w + 6, f.h + 6);
+      if (water) {   // pond: a deeper middle, light ripples and sparkles, lily pads by the bank (a dug pond fills when bought)
+        if (f.hidden) continue;
+        const gr2 = g.createRadialGradient(f.x + f.w / 2, f.y + f.h / 2, 10, f.x + f.w / 2, f.y + f.h / 2, Math.max(f.w, f.h) * 0.7);
+        gr2.addColorStop(0, '#2A86C8'); gr2.addColorStop(1, '#5CC0EE'); g.fillStyle = gr2; g.fillRect(f.x - 3, f.y - 3, f.w + 6, f.h + 6);
+        for (let i = 0; i < f.w * f.h / 260; i++) { g.strokeStyle = i % 3 ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.4)'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(f.x + R(i + 8100) * f.w, f.y + R(i + 8300) * f.h, 4 + R(i) * 7, 1.4 + R(i + 1) * 1.6, 0, 0, Math.PI); g.stroke(); }
+        for (let i = 0; i < 14; i++) { const e = i % 4, u = R(i + 8600); const lx = e === 0 ? f.x + u * f.w : e === 1 ? f.x + f.w - 6 : e === 2 ? f.x + u * f.w : f.x + 6, ly = e === 0 ? f.y + 6 : e === 1 ? f.y + u * f.h : e === 2 ? f.y + f.h - 6 : f.y + u * f.h;
+          g.fillStyle = '#4FAE32'; g.beginPath(); g.arc(lx, ly, 5, 0.5, TAU - 0.2); g.lineTo(lx, ly); g.fill(); if (i % 3 === 0) { g.fillStyle = '#FF8FB0'; g.beginPath(); g.arc(lx + 1, ly - 1, 2, 0, TAU); g.fill(); } }
+        continue;
+      }
+      if (f.item === 'grape' && !f.hidden) {   // vineyard: straw-coloured aisles between the rows
+        for (let r = 0; r < f.rows; r++) { const yy = f.y + (r + 0.5) * f.gy; g.fillStyle = '#5E8A2E'; g.fillRect(f.x - 3, yy - 4, f.w + 6, 8); }
+        continue;
+      }
       if (f.item === 'log' && !f.hidden) {   // forest floor: leaf litter + moss dots instead of furrows
         for (let i = 0; i < f.w * f.h / 180; i++) { g.fillStyle = i % 3 ? 'rgba(30,70,15,0.25)' : 'rgba(200,150,60,0.3)'; g.beginPath(); g.ellipse(f.x + R(i + 7000) * f.w, f.y + R(i + 7300) * f.h, 2 + R(i) * 3, 1.2 + R(i + 1) * 2, R(i + 2) * 3, 0, TAU); g.fill(); }
         continue;
@@ -261,12 +288,39 @@ export class Renderer {
     if (dc.barn) M.Env.barn(out, dc.barn[0], dc.barn[1]);
     // low wooden rims round the field beds
     for (const f of w.fields) {
-      const c = f.item === 'wheat' || f.item === 'potato' || f.item === 'corn' || f.item === 'pumpkin' ? '#8E5627' : f.item === 'log' ? '#6B4A22' : '#2E6A1E';
+      if (f.item === 'grape') M.Env.trellis(out, f);
+      if (f.item === 'fish') {   // pond: a stone bank instead of a wooden rim, reeds in the corners
+        const st = '#C9C2B2';
+        out.push(M.P(M.box(f.w + 16, 3.4, 6), st, [f.x + f.w / 2, 1.7, f.y - 5])); out.push(M.P(M.box(f.w + 16, 3.4, 6), st, [f.x + f.w / 2, 1.7, f.y + f.h + 5]));
+        out.push(M.P(M.box(6, 3.4, f.h + 6), st, [f.x - 5, 1.7, f.y + f.h / 2])); out.push(M.P(M.box(6, 3.4, f.h + 6), st, [f.x + f.w + 5, 1.7, f.y + f.h / 2]));
+        for (const [cx, cy] of [[f.x + 4, f.y + 4], [f.x + f.w - 4, f.y + 4], [f.x + 4, f.y + f.h - 4], [f.x + f.w - 4, f.y + f.h - 4]]) for (let k = 0; k < 5; k++) { const a = k * 1.3; out.push(M.P(M.cyl(0.5, 0.7, 10 + (k % 3) * 3, 4), '#5DA53A', [cx + Math.cos(a) * 3, 5 + (k % 3) * 1.5, cy + Math.sin(a) * 3])); if (k % 2 === 0) out.push(M.P(M.cap(0.9, 2.2, 2, 5), '#8E5627', [cx + Math.cos(a) * 3, 11 + (k % 3) * 3, cy + Math.sin(a) * 3])); }
+        continue;
+      }
+      const c = f.item === 'wheat' || f.item === 'potato' || f.item === 'corn' || f.item === 'pumpkin' || f.item === 'grape' || f.item === 'tomato' || f.item === 'pepper' ? '#8E5627' : f.item === 'log' ? '#6B4A22' : '#2E6A1E';
       out.push(M.P(M.box(f.w + 14, 3, 4), c, [f.x + f.w / 2, 1.5, f.y - 5])); out.push(M.P(M.box(f.w + 14, 3, 4), c, [f.x + f.w / 2, 1.5, f.y + f.h + 5]));
       out.push(M.P(M.box(4, 3, f.h + 6), c, [f.x - 5, 1.5, f.y + f.h / 2])); out.push(M.P(M.box(4, 3, f.h + 6), c, [f.x + f.w + 5, 1.5, f.y + f.h / 2]));
     }
+    for (const gh of dc.greenhouse || []) M.Env.greenhouseFrame(out, ...gh);
+    for (const l of dc.lanterns || []) M.Env.lantern(out, l[0], l[1]);
     const mesh = new THREE.Mesh(M.merge(out), M.vcMat()); mesh.castShadow = true; mesh.receiveShadow = true; mesh.userData.own = true;
     this.levelRoot.add(mesh);
+    // v3.7 greenhouse glass: one see-through mesh (no depth write, so plants and people under it stay visible)
+    if ((dc.greenhouse || []).length) {
+      const gl = []; for (const gh of dc.greenhouse) M.Env.greenhouseGlass(gl, ...gh);
+      const gm = new THREE.Mesh(M.merge(gl), new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide }));
+      gm.renderOrder = 4; gm.userData.own = gm.userData.ownMat = true; this.levelRoot.add(gm);
+    }
+    // v3.7 night lanterns: unlit glowing globes + a soft warm pool of light on the ground
+    this.lanternGlow = [];
+    if ((dc.lanterns || []).length) {
+      const globes = [];
+      for (const l of dc.lanterns) globes.push(M.P(M.sph(3.4, 9, 7), '#FFE08A', [l[0] + 8, 23.6, l[1]], [0, 0, 0], [1, 1.2, 1]), M.P(M.cyl(2.4, 2.4, 1, 8), '#2A2A30', [l[0] + 8, 19.4, l[1]]));
+      const gm = new THREE.Mesh(M.merge(globes), new THREE.MeshBasicMaterial({ vertexColors: true })); gm.userData.own = gm.userData.ownMat = true; this.levelRoot.add(gm);
+      for (const l of dc.lanterns) {
+        const pool = this.decal(150, 150, (g, W, H) => { const gr = g.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W / 2); gr.addColorStop(0, 'rgba(255,200,110,0.32)'); gr.addColorStop(0.45, 'rgba(255,180,90,0.12)'); gr.addColorStop(1, 'rgba(255,170,60,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H); }, 1.4);
+        pool.material.blending = THREE.AdditiveBlending; pool.position.set(l[0] + 8, 0.35, l[1]); this.levelRoot.add(pool); this.lanternGlow.push({ x: l[0] + 8, y: l[1], m: pool });
+      }
+    }
   }
   // 商店 decorations: outside the fence, along the south side either side of the gate (the side
   // nearest the camera), then along the west side. Purely scenery: no collision, no gameplay.
@@ -309,7 +363,7 @@ export class Renderer {
       stub.frustumCulled = false; stub.receiveShadow = true;
       const ang = new Float32Array(f.n), sz = new Float32Array(f.n), last = new Float32Array(f.n).fill(-1);
       for (let i = 0; i < f.n; i++) {
-        ang[i] = hash(i * 13 + f.x) * TAU; sz[i] = 0.88 + hash(i * 7 + f.y) * 0.24;
+        ang[i] = f.item === 'grape' ? (hash(i * 13 + f.x) - 0.5) * 0.08 : hash(i * 13 + f.x) * TAU; sz[i] = 0.88 + hash(i * 7 + f.y) * 0.24;
         put(stub.instanceMatrix.array, i, f.px(i), 0, f.py(i), ang[i], 0);
       }
       stub.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -317,7 +371,7 @@ export class Renderer {
       const gold = new THREE.InstancedMesh(M.cropGeo(f.item, 0), GOLD_MAT, 96);
       gold.count = 0; gold.frustumCulled = false; gold.castShadow = true; gold.instanceMatrix.setUsage(THREE.DynamicDrawUsage); grp.add(gold);
       const spr = M.makeSprinkler(); spr.root.position.set(f.x + f.w / 2, 0, f.y + f.h / 2); spr.root.visible = false; this.levelRoot.add(spr.root);
-      this.fieldObjs.push({ f, grp, meshes, stub, gold, spr, goldPrev: new Uint8Array(f.n), stubOn: new Uint8Array(f.n), slot, vi, ang, sz, last, scale: (f.gap / 9) * ({ wheat: 1.3, tulip: 1.15, gold: 1.2, rose: 1.15, potato: 0.42, log: 0.95, corn: 1.3, pumpkin: 0.8, berry: 1.35 }[f.item] || 1) });
+      this.fieldObjs.push({ f, grp, meshes, stub, gold, spr, goldPrev: new Uint8Array(f.n), stubOn: new Uint8Array(f.n), slot, vi, ang, sz, last, scale: (f.gap / 9) * ({ wheat: 1.3, tulip: 1.15, gold: 1.2, rose: 1.15, potato: 0.42, log: 0.95, corn: 1.3, pumpkin: 0.8, berry: 1.35, fish: 0.68, grape: 1.0, tomato: 1.15, pepper: 1.15 }[f.item] || 1) });
     }
   }
   updateFields() {
@@ -444,8 +498,22 @@ export class Renderer {
           ...Array.from({ length: 12 }, (_, i) => { const a = i / 12 * Math.PI * 2; return M.P(M.cone(1.6, 3, 3), '#AEB6C2', [Math.cos(a) * 11.6, Math.sin(a) * 11.6, 0], [0, 0, a - Math.PI / 2]); })]), M.vcMat());
         blade.position.set(-p.body.w / 2 + 16, CFG.proc.bodyH + 6, p.body.h / 2 - 6); blade.castShadow = true; grp.add(blade); grp.userData.blade = blade;
       }
+      if (p.outItem === 'flour') {   // 磨坊: a little tower with turning sails on the front face
+        const tw = new THREE.Mesh(M.merge([M.P(M.cyl(7, 9, 16, 8), '#FFF3DC', [0, 8, 0]), M.P(M.cone(9.4, 9, 8), '#E8452C', [0, 20.5, 0])]), M.vcMat());
+        tw.position.set(-p.body.w / 2 + 12, CFG.proc.bodyH, 0); tw.castShadow = true; grp.add(tw);
+        const sails = new THREE.Mesh(M.windmillSails(), M.vcMat()); sails.scale.setScalar(1.25); sails.position.set(-p.body.w / 2 + 12, CFG.proc.bodyH + 14, 9.5); sails.castShadow = true; grp.add(sails); grp.userData.sails = sails;
+      } else if (p.outItem === 'bread') {   // 面包房: a brick dome oven with a glowing mouth
+        const ov = new THREE.Mesh(M.merge([M.P(M.sph(11, 10, 8), '#C8553A', [0, 0, 0], [0, 0, 0], [1, 0.8, 1]), M.P(M.sph(9, 9, 6), '#D9714E', [0, 2, 0], [0, 0, 0], [0.9, 0.8, 0.9]),
+          M.P(M.box(9, 6, 3), '#3A1A10', [0, 1.5, 9.6]), M.P(M.box(7, 4, 3.2), '#FFB040', [0, 1, 9.8]), M.P(M.cyl(2, 2.4, 9, 7), '#8E3A26', [5, 9, -4])]), M.vcMat());
+        ov.position.set(-p.body.w / 2 + 16, CFG.proc.bodyH, 2); ov.castShadow = true; grp.add(ov);
+      } else if (p.outItem === 'smoked') {   // 熏鱼房: a dark plank shed roof with a hanging fish row
+        const roof = new THREE.CylinderGeometry(1, 1, 1, 3, 1);
+        const sh = new THREE.Mesh(M.merge([M.P(roof, '#5A3A22', [-p.body.w / 2 + 18, CFG.proc.bodyH + 7, 0], [0, 0, Math.PI / 2], [10, 30, p.body.h * 0.55]),
+          M.P(M.box(1, 1, 30), '#3A2A1E', [-p.body.w / 2 + 6, CFG.proc.bodyH + 3, 0]), ...[-9, -3, 3, 9].map((z) => M.P(M.sph(1, 6, 4), '#C8702A', [-p.body.w / 2 + 6, CFG.proc.bodyH - 1, z], [0, 0, H2], [3.6, 1.4, 1.4]))]), M.vcMat());
+        sh.castShadow = true; grp.add(sh);
+      }
       const sign = new THREE.Mesh(M.itemGeo(p.outItem), M.vcMat()); sign.position.set(4, CFG.proc.bodyH + 10, 0); sign.scale.setScalar(1.3); sign.castShadow = true; grp.add(sign);
-      const puffs = [0, 1, 2].map(() => { const s = new THREE.Mesh(M.sph(1, 7, 5), new THREE.MeshLambertMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.8, depthWrite: false })); s.userData.ownMat = true; grp.add(s); return s; });
+      const puffs = [0, 1, 2].map(() => { const s = new THREE.Mesh(M.sph(1, 7, 5), new THREE.MeshLambertMaterial({ color: p.outItem === 'smoked' ? 0x9A9AA4 : 0xFFFFFF, transparent: true, opacity: 0.8, depthWrite: false })); s.userData.ownMat = true; grp.add(s); return s; });
       const zone = this.decal(p.inZone.w, p.inZone.h, (g, W, H) => this.paintZone(g, W, H, null, p.inItem));
       zone.position.set(p.inZone.cx, 0.3, p.inZone.cy); this.levelRoot.add(zone);
       return { p, grp, body, gear, sign, puffs, zone };
@@ -501,7 +569,7 @@ export class Renderer {
       const blob = new THREE.Mesh(M.BLOB_GEO, M.BLOB_MAT); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.3; blob.scale.set(17, 21, 1); root.add(blob);
       o = { c, pp, ld, loader: true, ang: 0.8, root };
     } else if (c.kind === 'worker') {
-      const pp = M.makePerson(this.wLook(c.cart ? (c.from && this.world.objs[c.from[0]] && this.world.objs[c.from[0]].producer === 'cow' ? MILKER : CARTER) : c.lumber ? LUMBERJACK : GARDENER));
+      const pp = M.makePerson(this.wLook(c.cart ? (c.from && this.world.objs[c.from[0]] && this.world.objs[c.from[0]].producer === 'cow' ? MILKER : CARTER) : c.lumber ? LUMBERJACK : c.fisher ? FISHER : GARDENER));
       const root = new THREE.Group(); root.add(pp.root);
       let cart = null; if (c.cart) { cart = M.makeCart(); cart.root.position.set(0, 0, -20); root.add(cart.root); }
       this.levelRoot.add(root);
@@ -523,7 +591,7 @@ export class Renderer {
       o.mow.root.children[0].visible = veh; for (const wl of o.mow.wheels) { wl.visible = veh; if (veh && c.moving) wl.rotation.x += dt * sp * 0.2; }
       o.pp.root.position.set(0, veh ? 9 : 0, veh ? -4 : 0);
       o.pp.blob.visible = !veh;
-      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving && !veh, carry: carry && !veh, cutting: cutting && !veh, seated: veh, seed: 1, axe: c.cutItem === 'log' });
+      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving && !veh, carry: carry && !veh, cutting: cutting && !veh, seated: veh, seed: 1, axe: c.cutItem === 'log', net: c.cutItem === 'fish' });
       if (veh) { o.pp.arms[0].rotation.set(-1.2, 0, 0.3); o.pp.arms[1].rotation.set(-1.2, 0, -0.3); o.pp.tool.visible = false; }
     } else if (o.loader) {
       M.posePerson(o.pp, { t, walk: c.walk, moving: false, carry: false, cutting: false, seated: true, seed: c.seed + 2 });
@@ -532,7 +600,7 @@ export class Renderer {
       o.ld.body.position.y = c.moving ? Math.abs(Math.sin(c.walk * 1.5)) * 0.6 : 0;
       o.ld.root.rotation.x = cutting ? Math.sin(t * 30) * 0.015 : 0;
     } else {
-      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving, carry: carry && !c.cart && !cutting, cutting: cutting && !c.cart, seed: c.seed + 2, showTool: !c.cart && !carry, axe: !!c.lumber });
+      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving, carry: carry && !c.cart && !cutting, cutting: cutting && !c.cart, seed: c.seed + 2, showTool: !c.cart && !carry, axe: !!c.lumber, net: !!c.fisher });
       if (o.cart) for (const wl of o.cart.wheels) if (c.moving) wl.rotation.x += dt * sp * 0.3;
     }
   }
@@ -588,7 +656,8 @@ export class Renderer {
     const full = c.stack.length + c.incoming >= c.cap;
     // v3.4: only the player's stack gets a count / MAX pill (worker counts all over the field read as
     // numbers flying around); it is anchored on the stack's base column, not the swaying top item
-    if (n > 0 && isPlayer) labels.push({ k: 'stack', x: b.x, y: b.y, z: top.z + 6, n, full, big: true });
+    // v3.7 写死: the player's count / MAX is a fixed HUD badge (ui.js #stackBadge), not a label on the stack
+    void full;
     if (isPlayer && n === 0) this.comboScreen = null;
     if (isPlayer) this.comboAnchor = n > 0 ? { x: top.x, y: top.y, z: top.z + 6, stack: true } : { x: c.x, y: c.y, z: 54, stack: false };
     else if (c.lv) labels.push({ k: 'lv', x: c.x, y: c.y, z: o.loader ? 50 : 50, lv: c.lv, pop: this.wt - c.lvT, name: c.crewName });
@@ -655,6 +724,7 @@ export class Renderer {
       o.grp.scale.setScalar(a); o.body.position.x = sh; o.zone.scale.setScalar(a);
       if (p.work) o.gear.rotation.x += dt * 5;
       if (o.grp.userData.blade) o.grp.userData.blade.rotation.z -= dt * (p.work ? 14 : 1.2);
+      if (o.grp.userData.sails) o.grp.userData.sails.rotation.z -= dt * (p.work ? 4 : 0.6);
       o.sign.rotation.y = time * 0.8; o.sign.position.y = CFG.proc.bodyH + 10 + Math.sin(time * 2) * 1.2;
       o.puffs.forEach((s, i) => {
         const u = (time * 0.8 + i / 3) % 1; s.visible = p.work > 0;
@@ -662,6 +732,7 @@ export class Renderer {
       });
       if (p.buf > 0) labels.push({ k: 'buf', x: p.body.x, y: p.y, z: CFG.proc.bodyH + 30, n: p.buf });
     }
+    for (const lg of this.lanternGlow || []) lg.m.material.opacity = 0.85 + 0.15 * Math.sin(time * 5 + lg.x * 0.1) * Math.sin(time * 3.3 + lg.y);
     for (const o of this.decoObjs || []) { if (o.spin) o.spin.rotation.z = time * 1.4; if (o.d.id === 'balloon') o.g.position.y = 2 + Math.sin(time * 1.2) * 2; }
     // unlock tiles
     for (const [t, o] of this.tileObjs) {
@@ -742,13 +813,13 @@ export class Renderer {
     for (const L of labels) {
       if (L.k === 'tile') {
         const t = L.t, S = CFG.tile.size, [px, py] = this.proj(t.x + S * 0.3, t.y + S * 0.3, 1);
-        const rem = Math.ceil(t.price - t.paid), txt = `${rem}`, fs = Math.max(12, 12 * z) * L.a;
+        const rem = Math.ceil(t.price - t.paid), txt = `${rem}`, fs = Math.max(12, 12 * z);   // v3.7: fixed size, no pop-in scaling
         g.font = FONT(fs); const tw = g.measureText(txt).width, bw = fs * 1.5, bh = fs * 0.95, total = bw + 4 + tw;
         this.billIcon(px - total / 2 + bw / 2, py, bw, bh, -0.08);
         this.label(txt, px - total / 2 + bw + 4, py, fs, L.afford ? '#FFFFFF' : '#E8F4F6', L.afford ? '#0E6A78' : '#2A3440', 'left');
         if (L.afford || Math.hypot(p.x - t.x, p.y - t.y) < 140) {
           const [lx, ly] = this.proj(t.x - S * 0.5, t.y - S * 0.5, 2);
-          this.label(t.buy ? `${t.label} +${t.buy}` : t.label, lx, ly, Math.max(11, 11 * z) * L.a, '#FFFFFF', '#1E3A44');
+          this.label(t.buy ? `${t.label} +${t.buy}` : t.label, lx, ly, Math.max(11, 11 * z), '#FFFFFF', '#1E3A44');
         }
       } else if (L.k === 'stack') {
         // ONE pill for the player's load: count, or MAX when full. Its screen position is smoothed
@@ -774,13 +845,13 @@ export class Renderer {
         }
         this.comboScreen = { x: sx, y: sy + px * 0.72 };
       } else if (L.k === 'lv') {   // 园丁成长 badge
-        const [sx0, sy] = this.proj(L.x, L.y, L.z), sx = sx0 - 26 * Math.max(1, z * 0.8), pop = L.pop < 0.5 ? 1 + Math.sin(L.pop / 0.5 * Math.PI) * 0.6 : 1, px = Math.max(8, 7.5 * z) * pop;
+        const [sx0, sy] = this.proj(L.x, L.y, L.z), sx = Math.round(sx0 - 26 * Math.max(1, z * 0.8)), px = Math.max(8, 7.5 * z);   // v3.7: no level-up pop
         const txt = L.name || `Lv${L.lv}`; g.font = FONT(px); const tw = g.measureText(txt).width;
         g.fillStyle = L.lv >= 5 ? '#FF8A1E' : L.lv >= 3 ? '#FFC21A' : '#6FC3FF';
         g.beginPath(); g.roundRect(sx - tw / 2 - 5, sy - px * 0.7, tw + 10, px * 1.4, px * 0.7); g.fill();
         this.label(txt, sx, sy, px, '#FFFFFF', '#5A3A10');
       } else if (L.k === 'vip') {   // VIP thought bubble: the item + ×2
-        const [sx, sy] = this.proj(L.x, L.y, L.z), s = Math.max(0.8, z * 0.8), bob = Math.sin(this.time * 3) * 2;
+        const [sx, sy] = this.proj(L.x, L.y, L.z), s = Math.max(0.8, z * 0.8), bob = 0;   // v3.7: no bobbing
         g.save(); g.translate(sx, sy - 16 * s + bob);
         g.fillStyle = 'rgba(255,255,255,0.96)'; g.strokeStyle = '#E8B21E'; g.lineWidth = 2;
         g.beginPath(); g.roundRect(-24 * s, -13 * s, 48 * s, 26 * s, 13 * s); g.fill(); g.stroke();
@@ -808,6 +879,20 @@ export class Renderer {
       g.restore();
     }
     g.globalAlpha = 1;
+    // v3.7 夜间农场: fireflies drifting round the lanterns and over the fields
+    if (this.night && this.lanternGlow && this.lanternGlow.length) {
+      const L = this.lanternGlow;
+      for (let k = 0; k < 56; k++) {
+        const c = L[k % L.length], r = 30 + hash(k * 3 + 1) * 80, a0 = hash(k * 5 + 2) * TAU, sp = 0.25 + hash(k * 7 + 3) * 0.35;
+        const x = c.x + Math.cos(a0 + t * sp) * r + Math.sin(t * 1.3 + k) * 8, y = c.y + Math.sin(a0 + t * sp * 0.8) * r * 0.8, h = 10 + hash(k * 11) * 26 + Math.sin(t * 2 + k) * 4;
+        const [sx, sy] = this.proj(x, y, h);
+        if (sx < -10 || sy < -10 || sx > this.W + 10 || sy > this.H + 10) continue;
+        const bl = 0.35 + 0.65 * Math.max(0, Math.sin(t * 2.6 + k * 1.7)), rr = Math.max(1.2, 1.4 * z);
+        g.globalAlpha = bl * 0.35; g.fillStyle = '#FFF59A'; g.beginPath(); g.arc(sx, sy, rr * 3.2, 0, TAU); g.fill();
+        g.globalAlpha = bl; g.fillStyle = '#FFFDE0'; g.beginPath(); g.arc(sx, sy, rr, 0, TAU); g.fill();
+      }
+      g.globalAlpha = 1;
+    }
     for (const o of this.sprinklers) {
       const f = o.f, hx = f.x + f.w / 2, hy = f.y + f.h / 2, R = Math.min(f.w, f.h) * 0.45, head = 24 * 1.2;
       g.fillStyle = 'rgba(150,215,255,0.8)';
@@ -822,17 +907,17 @@ export class Renderer {
       g.globalAlpha = 1;
     }
     // 丰收狂热 meter under the stack count (or over the head with empty hands)
-    const A = this.comboAnchor, fever = world.feverT > 0;
-    if (A && (world.combo > 0.01 || fever)) {
-      let [sx, sy0] = this.proj(A.x, A.y, A.z), sy = sy0 - 6;
-      if (A.stack && this.comboScreen) { sx = this.comboScreen.x; sy = this.comboScreen.y + 12 * Math.max(1, z * 0.9) + (world.player.stack.length + world.player.incoming >= world.player.cap && this.time - (this.fullAt ?? -9) < 2.2 ? 14 * Math.max(1, z) : 0); }
+    const fever = world.feverT > 0;
+    if (world.combo > 0.01 || fever) {
+      // v3.7 写死: the meter sits at a fixed spot just above the bottom HUD (stack badge), it never follows the stack
+      const sx = Math.round(this.W / 2), sy = Math.round(this.H - 84);
       const w = 64 * Math.max(1, z * 0.8), h = 8 * Math.max(1, z * 0.8), f = fever ? world.feverT / CFG.fever.dur : world.combo;
       g.fillStyle = 'rgba(30,30,30,0.6)'; g.beginPath(); g.roundRect(sx - w / 2 - 2, sy - h / 2 - 2, w + 4, h + 4, h); g.fill();
       const gr = g.createLinearGradient(sx - w / 2, 0, sx + w / 2, 0);
       if (fever) { const p = (t * 2) % 1; gr.addColorStop(0, '#FFD23F'); gr.addColorStop(p, '#FFFFFF'); gr.addColorStop(1, '#FF8A1E'); }
       else { gr.addColorStop(0, '#FF8A1E'); gr.addColorStop(1, '#FFD23F'); }
       g.fillStyle = gr; g.beginPath(); g.roundRect(sx - w / 2, sy - h / 2, Math.max(h, w * f), h, h / 2); g.fill();
-      if (fever) this.label('丰收狂热!', sx, sy + h * 1.9, Math.max(11, 11 * z) * (1 + Math.sin(t * 10) * 0.06), '#FFE55A', '#8A3A00');
+      void z;
     }
   }
   fxWorld(fx) {

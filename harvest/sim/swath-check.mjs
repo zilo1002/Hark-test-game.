@@ -14,7 +14,7 @@ const segDist2 = (px, py, ax, ay, bx, by) => {
 };
 CFG.fever.perItem = 0;   // fever would widen the swath mid-run
 let fails = 0, runs = 0;
-for (const li of [0, 1, 4, 7, 13, 15, 19, 20, 21]) {   // + v3.3: trees, corn, strawberries, pumpkins
+for (const li of [0, 1, 4, 7, 13, 15, 19, 20, 21, 32, 34, 36]) {   // + v3.3: trees, corn, strawberries, pumpkins; + v3.7: fish pond, grape rows (gapY), greenhouse tomatoes
   const L = CFG.levels[li];
   for (const f0 of L.objects.filter((o) => o.type === 'field' && !o.hidden && !CFG.crops[o.crop].spill)) {
     for (const [dir, label] of [[[1, 0], 'east'], [[0, 1], 'south'], [[0.7071, 0.7071], 'diagonal']]) {
@@ -50,7 +50,7 @@ for (const li of [0, 1, 4, 7, 13, 15, 19, 20, 21]) {   // + v3.3: trees, corn, s
 console.log(fails ? `\n${fails}/${runs} swaths left plants behind` : `\nall ${runs} swaths clean (zero leftovers)`);
 // ---- stop at max capacity
 let mfails = 0;
-for (const li of [0, 1, 7, 15]) {   // 第16关: trees drop 3 logs each, the last one only what still fits
+for (const li of [0, 1, 7, 15, 32, 34]) {   // v3.7: 第33关 fish, 第35关 grape rows; 第16关: trees drop 3 logs each, the last one only what still fits
   const L = CFG.levels[li], f0 = L.objects.find((o) => o.type === 'field' && !o.hidden);
   const w = new World(li, { quiet: true, seed: 5 }); w.solids = [];
   const f = w.objs[f0.id], p = w.player;
@@ -65,7 +65,7 @@ for (const li of [0, 1, 7, 15]) {   // 第16关: trees drop 3 logs each, the las
 }
 fails += mfails;
 // ---- gardeners / loaders never cut while full, and always go back to unload
-for (const li of [0, 7, 13, 15, 25, 29]) {
+for (const li of [0, 7, 13, 15, 25, 29, 31, 32, 34, 36, 37]) {
   const w = new World(li, { quiet: true, seed: 9 });
   for (const t of w.tiles) if (!t.done) w.completeTile(t, true);
   let over = 0, cutFull = 0, trips = 0;

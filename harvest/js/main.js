@@ -27,7 +27,8 @@ const restoredAt = {};            // session-only animation stamps for the home 
 
 const ITEM_BITS = { wheat: ['#F6CB4A', '#FFE07A', '#C9962A'], potato: ['#5DBB3A', '#9C6331', '#C98A4B'], egg: ['#FFF3D6', '#FFFFFF'], tomato: ['#EE4630', '#5DBB3A'],
                     tulip: ['#F2486E', '#FF8FB0', '#FFB3C8', '#5DBB3A'], rose: ['#E0283C', '#FF5A78', '#8E0E1E', '#3E8F25'], gold: ['#FFC21A', '#FFE16B', '#F29C0E', '#5DBB3A'],
-                    log: ['#9A5A2E', '#F2CF8A', '#5DBB3A', '#C99A5E'], corn: ['#FFD23F', '#6CCB3E', '#F2B529'], pumpkin: ['#F2871E', '#5DBB3A', '#FFAE58'], berry: ['#E8243C', '#5DBB3A', '#FFFFFF'] };
+                    log: ['#9A5A2E', '#F2CF8A', '#5DBB3A', '#C99A5E'], corn: ['#FFD23F', '#6CCB3E', '#F2B529'], pumpkin: ['#F2871E', '#5DBB3A', '#FFAE58'], berry: ['#E8243C', '#5DBB3A', '#FFFFFF'],
+                    fish: ['#BDE8FF', '#FFFFFF', '#4FA8F0', '#FF8A3D'], grape: ['#7A3EA8', '#8E4EC0', '#5DBB3A'], pepper: ['#E8302C', '#FFC21A', '#5DBB3A'] };
 
 const ui = new UI({
   home: () => goHome(),
@@ -102,7 +103,7 @@ function credit() {
     const d = (w.done || 0) - (w.xpPaid || 0); if (d <= 0) continue;
     w.xpPaid = w.done;
     const up = Crew.addXp(data.crew, w.crewId, d);
-    if (up > 0 && mode === 'play') { const m = data.crew.find((x) => x.id === w.crewId); fx.text(w.x, w.y, 80, `${w.crewName} 升到 ${m.lv} 级！`, '#9BFF6A', true); snd.play('appear'); }
+    if (up > 0 && mode === 'play') { const m = data.crew.find((x) => x.id === w.crewId); ui.note(`${w.crewName} 升到 ${m.lv} 级！`, performance.now() / 1000); snd.play('appear'); }
   }
 }
 
@@ -167,7 +168,7 @@ function handleEvents() {
         if (e.who === 'player') { snd.play('harvest'); if (world.feverT > 0) hap.tick(18, 38, 255); else hap.tick(16, 70, 235); }   // continuous strong rumble while cutting (faster in fever)
         break;
       case 'drop': snd.play('drop'); break;
-      case 'sale': fx.num(`sale:${e.x | 0}:${e.y | 0}`, e.x, e.y, 50, e.amount, '#B9FF7A'); snd.play('sale'); if (time - saleHapT > 0.18) { saleHapT = time; hap.buzz(34, 255); } break;
+      case 'sale': ui.earn(e.amount, performance.now() / 1000); snd.play('sale'); if (time - saleHapT > 0.18) { saleHapT = time; hap.buzz(34, 255); } break;
       case 'pay': for (let i = 0; i < Math.min(4, 1 + Math.floor(e.amount / 6)); i++) fx.wbill(e.x, e.y, e.tx + (Math.random() - 0.5) * 20, e.ty + (Math.random() - 0.5) * 8, i * 0.06); break;
       case 'cashierPay': for (let i = 0; i < 3; i++) fx.bill(R.X(e.x, e.y), R.Y(e.x, e.y, 30), coin.x, coin.y, i * 0.07); setTimeout(() => ui.bumpCoin(), 450); snd.play('coin'); break;
       case 'cash':
@@ -178,7 +179,7 @@ function handleEvents() {
         fx.burst(e.x, e.y, 10, 46, ['#FF4D4D', '#FFD23F', '#3BA7FF', '#4CD08A', '#FF6FA8', '#FFFFFF'], 130, 170, 3.2, 'conf', 1.2);
         fx.burst(e.x, e.y, 20, 10, ['#FFF27A'], 60, 120, 4, 'star', 0.9);
         fx.ring(e.x, e.y, '#FFFFFF', 60); fx.shake(9, 0.32); fx.flash = 0.7;
-        fx.text(e.x, e.y, 50, '解锁！', '#FFF27A', true);
+        ui.note('解锁！', performance.now() / 1000);
         snd.play('unlock'); hap.pattern([50, 45, 90], [255, 255]); break;
       case 'tileAppear': snd.play('appear'); fx.ring(e.x, e.y, '#FFF27A', 36); break;
       case 'full':   // stack at max: cutting stops, the arrow swings to the counter. The MAX pill on the
@@ -190,17 +191,17 @@ function handleEvents() {
       case 'golden':   // 金色作物
         fx.burst(e.x, e.y, 14, 26, ['#FFD23F', '#FFF27A', '#FFFFFF', '#F29C0E'], 110, 160, 3.2, 'star', 1.0);
         fx.ring(e.x, e.y, '#FFE55A', 46);
-        if (e.who === 'player') { fx.num('gold', world.player.x, world.player.y, 64, e.amount, '#FFE55A');
+        if (e.who === 'player') { ui.earn(e.amount, performance.now() / 1000); ui.note('金色作物！', performance.now() / 1000);
           if (time - goldFxT > 0.25) { goldFxT = time; for (let i = 0; i < 4; i++) fx.bill(R.X(e.x, e.y), R.Y(e.x, e.y, 30), coin.x, coin.y, i * 0.05); setTimeout(() => ui.bumpCoin(), 450); snd.play('coin'); hap.pattern([60, 30, 110], [255, 255]); } }
         break;
       case 'fever':
-        fx.text(e.x, e.y, 90, '丰收狂热！', '#FFE55A', true); fx.ring(e.x, e.y, '#FFD23F', 90); fx.flash = 0.6; fx.shake(6, 0.25);
+        ui.note('丰收狂热！', performance.now() / 1000); fx.ring(e.x, e.y, '#FFD23F', 90); fx.flash = 0.6; fx.shake(6, 0.25);
         snd.play('unlock'); hap.pattern([40, 30, 40, 30, 120], [255, 255, 255]); break;
       case 'feverEnd': break;
-      case 'workerLevel': fx.text(e.x, e.y, 64, `升级! Lv${e.lv}`, '#9BFF6A', true); fx.burst(e.x, e.y, 40, 12, ['#9BFF6A', '#FFFFFF', '#FFD23F'], 50, 90, 2.6, 'star', 0.8); snd.play('appear'); break;
-      case 'loaderUp': fx.burst(e.x, e.y, 10, 30, ['#FFC21A', '#FFFFFF', '#3BA7FF'], 100, 140, 3, 'conf', 1.0); fx.text(e.x, e.y, 70, '铲车!', '#FFE55A', true); break;
+      case 'workerLevel': ui.note(`雇工升级 Lv${e.lv}`, performance.now() / 1000); fx.burst(e.x, e.y, 40, 12, ['#9BFF6A', '#FFFFFF', '#FFD23F'], 50, 90, 2.6, 'star', 0.8); snd.play('appear'); break;
+      case 'loaderUp': fx.burst(e.x, e.y, 10, 30, ['#FFC21A', '#FFFFFF', '#3BA7FF'], 100, 140, 3, 'conf', 1.0); ui.note('铲车!', performance.now() / 1000); break;
       case 'vipPay':   // VIP pays double: coin shower
-        fx.num(`vip:${e.x | 0}`, e.x, e.y, 70, e.amount, '#FFE55A', true, 'VIP ×2 +');
+        ui.note('VIP 付双倍！', performance.now() / 1000);
         fx.burst(e.x, e.y, 40, 22, ['#FFD23F', '#FFF27A', '#FFFFFF'], 90, 150, 3, 'star', 1.0);
         if (e.cashier) { for (let i = 0; i < 10; i++) fx.bill(R.X(e.x, e.y), R.Y(e.x, e.y, 30), coin.x, coin.y, i * 0.05); setTimeout(() => ui.bumpCoin(), 500); }
         else for (let i = 0; i < 10; i++) fx.wbill(e.x + 30, e.y, e.tx + (Math.random() - 0.5) * 24, e.ty + (Math.random() - 0.5) * 10, i * 0.05);
@@ -276,7 +277,7 @@ if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
         let ix = 0, iy = 0; if (g) { const ex = g.x - p.x, ey = g.y - p.y, e = Math.hypot(ex, ey) || 1; ix = ex / e; iy = ey / e; }
         world.update(1 / 30, ix, iy); world.events.length = 0;
       }
-      R.follow(0, true); ui.updateHUD(world); ui.tip(''); ui.el.banner.classList.add('hidden');
+      R.follow(0, true); ui.updateHUD(world, true); ui.tip(''); ui.el.banner.classList.add('hidden');
       return p.stack.length + p.incoming;
     },
     // run the guide-following bot for `secs` of game time; stopAt: stop moving after that many seconds
@@ -290,7 +291,7 @@ if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
         if (i < stopAt * 30 && g && Math.hypot(g.x - p.x, g.y - p.y) > 3) { const wp = world.steer(p, g.x, g.y); const ex = wp.x - p.x, ey = wp.y - p.y, e = Math.hypot(ex, ey) || 1; ix = ex / e; iy = ey / e; }
         world.update(1 / 30, ix, iy); world.events.length = 0;
       }
-      input.everMoved = true; R.follow(0, true); ui.updateHUD(world); ui.tip(''); ui.el.banner.classList.add('hidden');
+      input.everMoved = true; R.follow(0, true); ui.updateHUD(world, true); ui.tip(''); ui.el.banner.classList.add('hidden');
       return { stack: p.stack.length, money: Math.round(world.money), t: Math.round(world.t), customers: world.customers.length };
     },
   };

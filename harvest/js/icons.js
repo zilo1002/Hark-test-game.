@@ -108,6 +108,14 @@ export function drawIcon(g, kind, t = 0) {
       break;
     }
     case 'lumber': g.save(); g.translate(-2, 12); g.scale(0.62, 0.62); person(g, t, 0, false, { ...BOY, shirt: '#D9382A', overalls: null, pants: '#4A5A8A', sickle: false }); g.restore(); g.translate(8, -1); g.scale(0.6, 0.6); drawIcon(g, 'axe', t); break;
+    // ---- v3.7 tile icons ----
+    case 'fisher': g.save(); g.translate(-3, 12); g.scale(0.62, 0.62); person(g, t, 0, false, { ...BOY, shirt: '#FFC21A', overalls: '#3567C8', sickle: false }); g.restore(); g.translate(8, -2); g.scale(0.7, 0.7); drawIcon(g, 'net', t); break;
+    case 'net':
+      g.rotate(-0.45); g.strokeStyle = '#A8741E'; g.lineWidth = 2.2; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 12); g.lineTo(0, -2); g.stroke();
+      g.fillStyle = 'rgba(244,240,224,0.85)'; g.strokeStyle = '#3A3A44'; g.lineWidth = 1.6; g.beginPath(); g.ellipse(0, -7, 6.4, 5, 0, 0, 6.3); g.fill(); g.stroke();
+      g.strokeStyle = 'rgba(90,80,60,0.6)'; g.lineWidth = 0.6; for (const k of [-3, 0, 3]) { g.beginPath(); g.moveTo(k, -11.6); g.lineTo(k, -2.4); g.stroke(); g.beginPath(); g.moveTo(-6, -7 + k); g.lineTo(6, -7 + k); g.stroke(); }
+      g.save(); g.translate(4, -9); g.scale(0.5, 0.5); ITEM_DRAW.fish(g); g.restore();
+      break;
     case 'axe':
       g.rotate(-0.5); g.fillStyle = '#A8741E'; g.strokeStyle = COL.outline; g.lineWidth = 1; g.beginPath(); g.roundRect(-1.4, -10, 2.8, 20, 1); g.fill(); g.stroke();
       g.fillStyle = '#C9D2DC'; g.beginPath(); g.moveTo(1, -9); g.lineTo(9, -11); g.quadraticCurveTo(11, -5, 9, 0); g.lineTo(1, -3); g.closePath(); g.fill(); g.stroke();

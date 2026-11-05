@@ -249,11 +249,51 @@ function juice(g) {
   g.fillStyle = '#E8283C'; g.beginPath(); g.arc(0, 2.5, 1.7, 0, TAU); g.fill();
   g.fillStyle = '#E8452C'; g.beginPath(); g.arc(1.6, -5, 1, 0, TAU); g.fill();
 }
+// ---- v3.7 item icons ----
+function flour(g) {
+  ol(g, '#F6F0E0', '#9C8A60', 0.8); g.beginPath(); g.moveTo(-5.4, 7); g.quadraticCurveTo(-7, 0, -4, -4); g.lineTo(-2, -6); g.lineTo(2, -6); g.lineTo(4, -4); g.quadraticCurveTo(7, 0, 5.4, 7); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#3B7FE0'; g.fillRect(-5.8, 1, 11.6, 2.4);
+  g.fillStyle = '#D9C9A0'; g.beginPath(); g.roundRect(-2.4, -7.6, 4.8, 2.4, 1); g.fill();
+  g.fillStyle = '#FFC21A'; E(g, 0, -1.6, 1.4, 2); g.fill(); g.strokeStyle = '#C9962A'; g.lineWidth = 0.6; g.beginPath(); g.moveTo(0, -3.4); g.lineTo(0, 0.4); g.stroke();
+}
+function bread(g) {
+  ol(g, '#D9822E', '#8E4A1E', 0.8); E(g, 0, 1, 7.6, 4.4); g.fill(); g.stroke();
+  g.fillStyle = '#F2A64E'; E(g, 0, 0, 6.4, 3.2); g.fill();
+  g.strokeStyle = '#FFE0A8'; g.lineWidth = 1.1; g.lineCap = 'round'; for (const x of [-3, 0, 3]) { g.beginPath(); g.moveTo(x - 1, 1.2); g.lineTo(x + 1, -1.6); g.stroke(); }
+}
+function fishBody(g, c, belly, fin, eye) {
+  ol(g, fin, fin, 0.6); g.beginPath(); g.moveTo(-4.6, 0); g.lineTo(-8.6, -3.6); g.lineTo(-8, 0); g.lineTo(-8.6, 3.6); g.closePath(); g.fill();
+  ol(g, c, fin, 0.8); E(g, 0.4, 0, 6, 3.4); g.fill(); g.stroke();
+  g.fillStyle = belly; E(g, 1, 1.4, 4.2, 1.4); g.fill();
+  g.fillStyle = fin; g.beginPath(); g.moveTo(-1.6, -3); g.lineTo(1, -5.2); g.lineTo(2.4, -3); g.closePath(); g.fill();
+  g.fillStyle = eye; g.beginPath(); g.arc(3.8, -0.8, 0.9, 0, TAU); g.fill();
+}
+function fish(g) { fishBody(g, '#4FA8F0', '#E8F6FF', '#2F86D0', '#1A1A1A'); }
+function smoked(g) { fishBody(g, '#C8702A', '#E8A050', '#8E4A1E', '#3A1A08'); g.fillStyle = '#F2E2B0'; g.fillRect(-1.6, -3.4, 1.2, 6.8); g.fillRect(1.6, -3.4, 1.2, 6.8); }
+function grape(g) {
+  g.strokeStyle = '#6B3A1E'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, -6); g.lineTo(0.6, -8.4); g.stroke();
+  g.fillStyle = '#4FAE32'; E(g, 3, -7, 2.8, 1.4, -0.4); g.fill();
+  for (const [x, y] of [[-3.4, -4], [0, -4.4], [3.4, -4], [-1.8, -1], [1.8, -1], [-3.6, -1.4], [3.6, -1.4], [0, 2], [-2, 2.4], [2, 2.4], [0, 5]]) { ol(g, (x + y) % 2 ? '#8E4EC0' : '#7A3EA8', '#4A1E70', 0.5); g.beginPath(); g.arc(x, y, 2, 0, TAU); g.fill(); g.stroke(); }
+  g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.arc(-0.6, -5, 0.7, 0, TAU); g.fill();
+}
+function gjuice(g) {
+  ol(g, '#F4EEFF', '#6A4A8A', 0.8); g.beginPath(); g.moveTo(-4, 8); g.lineTo(-4, -3); g.lineTo(0, -7); g.lineTo(4, -3); g.lineTo(4, 8); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#8A3EC8'; g.fillRect(-4, 0, 8, 5);
+  g.fillStyle = '#C89AF0'; for (const [x, y] of [[-1, 2], [1, 2], [0, 3.6]]) { g.beginPath(); g.arc(x, y, 1, 0, TAU); g.fill(); }
+  g.fillStyle = '#6A2E98'; g.beginPath(); g.arc(1.6, -5, 1, 0, TAU); g.fill();
+}
+function pepper(g) {
+  ol(g, '#FFC21A', '#B5860A', 0.8); g.beginPath(); g.moveTo(0, -3.6); g.bezierCurveTo(-6, -5, -6.4, 3, -3, 6); g.quadraticCurveTo(-1.4, 7, 0, 5.8); g.quadraticCurveTo(1.4, 7, 3, 6); g.bezierCurveTo(6.4, 3, 6, -5, 0, -3.6); g.fill(); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,0.6)'; E(g, -2.6, -0.6, 0.9, 2, 0.2); g.fill();
+  g.fillStyle = '#3E9B2A'; g.beginPath(); g.ellipse(0, -4, 3, 1.2, 0, 0, TAU); g.fill(); g.strokeStyle = '#2F7A1E'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -4.4); g.lineTo(0.8, -7); g.stroke();
+}
 export const ITEM_DRAW = { egg, potato, tomato, wheat, crate, ketchup, bill, cash, tulip, rose, gold, bouquet, basket, perfume,
-  log, plank, chair, milk, cheese, icecream, corn, popcorn, pumpkin, pie, berry, jam, wool, yarn, honey, apple, juice };
+  log, plank, chair, milk, cheese, icecream, corn, popcorn, pumpkin, pie, berry, jam, wool, yarn, honey, apple, juice,
+  flour, bread, fish, smoked, grape, gjuice, pepper };
 const ITEM_SIZE = { egg: [12, 13], potato: [14, 12], tomato: [13, 13], wheat: [18, 12], crate: [18, 15], ketchup: [11, 20], bill: [16, 10], cash: [18, 13],
                     tulip: [18, 12], rose: [18, 12], gold: [14, 10], bouquet: [16, 15], basket: [15, 16], perfume: [12, 16],
-                    log: [18, 12], plank: [18, 12], chair: [14, 18], milk: [10, 18], cheese: [16, 12], icecream: [11, 19], corn: [18, 12], popcorn: [13, 17], pumpkin: [16, 14], pie: [17, 11], berry: [12, 14], jam: [12, 16], wool: [16, 15], yarn: [15, 15], honey: [12, 16], apple: [13, 14], juice: [10, 18] };
+                    log: [18, 12], plank: [18, 12], chair: [14, 18], milk: [10, 18], cheese: [16, 12], icecream: [11, 19], corn: [18, 12], popcorn: [13, 17], pumpkin: [16, 14], pie: [17, 11], berry: [12, 14], jam: [12, 16], wool: [16, 15], yarn: [15, 15], honey: [12, 16], apple: [13, 14], juice: [10, 18],
+                    flour: [15, 17], bread: [17, 11], fish: [19, 12], smoked: [19, 12], grape: [12, 17], gjuice: [10, 18], pepper: [14, 15] };
 
 // ---- field plants: (0,0) is the ground point, -y up. stage 0 stubble … 4 in bloom ----------------
 const TULIP_C = [['#F2486E', '#B5183E'], ['#FF6F9C', '#C9356A'], ['#E8243C', '#9E0E22'], ['#FF8FB0', '#D0507A']];

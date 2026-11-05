@@ -221,6 +221,47 @@ const ITEM_PARTS = {
     P(sph(1.6, 7, 5), '#E8283C', [0, -1.4, 3.1], [0, 0, 0], [1, 1, 0.4]),
     P(cyl(0, 3.2, 2.4, 4), '#FFF3E0', [0, 5.2, 0], [0, Math.PI / 4, 0]), P(cyl(0.9, 0.9, 1, 6), '#E8452C', [1.4, 5.4, 1.4]),
   ],
+  // ---- v3.7 items ----
+  flour: () => [   // a fat flour sack lying on its side: blue band, wheat badge, tied neck
+    P(cap(3.0, 6.2, 3, 9), '#F6F0E0', [0, 0, 0], [0, 0, H], [1, 0.92, 1.18]),
+    P(cyl(3.08, 3.08, 1.5, 9), '#3B7FE0', [-1.6, 0, 0], [0, 0, H], [1, 0.93, 1.19]),
+    P(cyl(1.0, 1.6, 1.8, 7), '#D9C9A0', [6.6, 0, 0], [0, 0, H]), P(ico(1.3, 0), '#F6F0E0', [8.0, 0, 0]),
+    P(box(2.6, 0.5, 2.2), '#FFC21A', [1.8, 2.75, 0], [0, 0.3, 0]),
+  ],
+  bread: () => [   // golden loaf with three slashes
+    P(cap(2.9, 6, 3, 9), '#D9822E', [0, 0, 0], [0, 0, H], [1, 0.82, 1.15]),
+    P(cap(2.5, 5.4, 3, 9), '#F2A64E', [0, 0.5, 0], [0, 0, H], [1, 0.8, 1.05]),
+    ...[-3, 0, 3].map((x) => P(box(0.8, 0.6, 3.6), '#FFE0A8', [x, 2.6, 0], [0, 0.5, 0])),
+  ],
+  fish: () => [   // a chubby blue fish lying flat
+    P(sph(1, 9, 6), '#4FA8F0', [0, 0, 0], [0, 0, 0], [6.0, 2.4, 2.6]),
+    P(sph(1, 8, 5), '#E8F6FF', [0.6, -0.9, 0], [0, 0, 0], [4.8, 1.3, 2.0]),
+    P(cone(2.6, 3.4, 4), '#2F86D0', [-7.2, 0, 0], [0, 0, -H], [1, 1, 0.45]),
+    P(cone(1.4, 2.6, 4), '#2F86D0', [0, 2.6, 0], [0, 0, 0], [1.6, 1, 0.4]),
+    P(sph(0.7, 5, 4), '#1A1A1A', [4.2, 0.6, 1.9]), P(sph(0.7, 5, 4), '#1A1A1A', [4.2, 0.6, -1.9]),
+  ],
+  smoked: () => [   // a golden-brown smoked fish tied with string
+    P(sph(1, 9, 6), '#C8702A', [0, 0, 0], [0, 0, 0], [6.0, 2.4, 2.6]),
+    P(sph(1, 8, 5), '#E8A050', [0.6, 0.8, 0], [0, 0, 0], [4.6, 1.4, 1.9]),
+    P(cone(2.6, 3.4, 4), '#8E4A1E', [-7.2, 0, 0], [0, 0, -H], [1, 1, 0.45]),
+    P(cyl(2.7, 2.7, 0.6, 8), '#F2E2B0', [-2, 0, 0], [0, 0, H], [1, 1, 1.05]), P(cyl(2.7, 2.7, 0.6, 8), '#F2E2B0', [2, 0, 0], [0, 0, H], [1, 1, 1.05]),
+    P(sph(0.6, 5, 4), '#3A1A08', [4.2, 0.6, 1.9]),
+  ],
+  grape: () => {   // a purple bunch with a leaf, lying on its side
+    const out = [P(cyl(0.45, 0.45, 3, 4), '#6B3A1E', [5.4, 0.4, 0], [0, 0, H]), P(cone(2.4, 4, 4), '#4FAE32', [4.6, 1.6, 1.4], [0.4, 0, H], [1, 1, 0.35])];
+    for (const [x, y, z] of [[3, 0, -1.6], [3, 0, 1.6], [3, 1.8, 0], [0.4, 0, -2.4], [0.4, 0, 0], [0.4, 0, 2.4], [0.4, 2, -1.2], [0.4, 2, 1.2], [-2.2, 0, -1.4], [-2.2, 0, 1.4], [-2.2, 1.9, 0], [-4.4, 0.4, 0]]) out.push(P(ico(1.55, 0), (x + z) % 2 ? '#8E4EC0' : '#7A3EA8', [x, y, z]));
+    return out;
+  },
+  gjuice: () => [
+    P(box(6, 9, 6), '#F4EEFF', [0, -0.4, 0]), P(box(6.2, 4.4, 6.2), '#8A3EC8', [0, -1.4, 0]),
+    P(sph(1.6, 7, 5), '#C89AF0', [0, -1.4, 3.1], [0, 0, 0], [1, 1, 0.4]),
+    P(cyl(0, 3.2, 2.4, 4), '#F4EEFF', [0, 5.2, 0], [0, Math.PI / 4, 0]), P(cyl(0.9, 0.9, 1, 6), '#6A2E98', [1.4, 5.4, 1.4]),
+  ],
+  pepper: () => [   // a glossy yellow bell pepper
+    P(sph(3.4, 9, 7), '#FFC21A', [0, 0, 0], [0, 0, 0], [1.05, 1.05, 1.05]),
+    P(sph(2, 7, 5), '#FFD84A', [1.6, 0.4, 1.4]), P(sph(2, 7, 5), '#F2AE0E', [-1.6, 0.2, -1.2]),
+    P(cone(1.8, 1.2, 6), '#3E9B2A', [0, 3.4, 0], [Math.PI, 0, 0]), P(cyl(0.5, 0.6, 2.2, 5), '#2F7A1E', [0, 4.6, 0]),
+  ],
   bill: () => [P(box(11, 0.9, 6), '#57C35A'), P(box(3, 1.1, 3), '#E9FFE0', [0, 0.05, 0])],
   cash: () => [P(box(12, 2.6, 7), '#57C35A'), P(box(12.3, 2.8, 2), '#2F8F3A'), P(box(2.6, 2.9, 2.2), '#E9FFE0')],
 };
@@ -229,7 +270,8 @@ export function itemGeo(type) { return ITEM_GEO[type] || (ITEM_GEO[type] = merge
 export const ITEM_TYPES = Object.keys(ITEM_PARTS);
 // half height of each item, so stacks and piles rest items on their bottom face
 export const ITEM_HALF = { wheat: 2.6, tulip: 2.2, gold: 1.7, rose: 2.2, egg: 2.2, potato: 2.4, tomato: 2.8, crate: 3.3, ketchup: 4.4, bouquet: 3.4, basket: 3.4, perfume: 4.0, bill: 0.45, cash: 1.4,
-  log: 2.8, plank: 1.3, chair: 5.9, milk: 4.6, cheese: 2.7, icecream: 6, corn: 2.2, popcorn: 4.4, pumpkin: 3.7, pie: 1.9, berry: 3.4, jam: 3.8, wool: 3.6, yarn: 4, honey: 3.8, apple: 3.3, juice: 4.9 };
+  log: 2.8, plank: 1.3, chair: 5.9, milk: 4.6, cheese: 2.7, icecream: 6, corn: 2.2, popcorn: 4.4, pumpkin: 3.7, pie: 1.9, berry: 3.4, jam: 3.8, wool: 3.6, yarn: 4, honey: 3.8, apple: 3.3, juice: 4.9,
+  flour: 2.9, bread: 2.4, fish: 2.4, smoked: 2.4, grape: 1.6, gjuice: 4.9, pepper: 3.4 };
 
 // ------------------------------------------------------------------ crops (field plants)
 // Plants stand on y=0 and are ~11-14 units tall; scaled by growth. Stubble is what stays after a cut.
@@ -300,8 +342,39 @@ Object.assign(CROP_PARTS, {
     P(sph(0.9, 5, 4), '#FFFFFF', [-1.2, 5.6, -1.6]),
   ],
 });
+// v3.7 crops. fish: a fish leaping out of a ripple (the pond bed is painted water); grape: one trellis bay of a
+// vine row (long along x, never rotated, see render3d); tomato / pepper: staked greenhouse plants.
+Object.assign(CROP_PARTS, {
+  fish: () => [
+    P(tor(4.2, 0.55, 3, 12), '#DFF4FF', [0, 0.4, 0], [H, 0, 0]),
+    P(sph(1, 9, 6), '#FFFFFF', [0, 4.2, 0], [0, 0, 0.55], [4.6, 2.0, 1.9]),
+    P(sph(1, 8, 5), '#F4FBFF', [0.6, 3.6, 0], [0, 0, 0.55], [3.4, 1.1, 1.5]),
+    P(cone(2.0, 2.8, 4), '#FFFFFF', [-4.4, 1.8, 0], [0, 0, -H + 0.55], [1, 1, 0.45]),
+    P(sph(0.5, 5, 4), '#1A1A1A', [3.1, 6.6, 1.3]), P(sph(0.5, 5, 4), '#1A1A1A', [3.1, 6.6, -1.3]),
+    P(sph(0.9, 5, 4), '#BDE8FF', [3.6, 1.2, 1.8]), P(sph(0.7, 5, 4), '#BDE8FF', [-2.6, 0.9, -2.2]), P(sph(0.6, 5, 4), '#FFFFFF', [1.4, 1.6, -2.6]),
+  ],
+  grape: () => [
+    P(cyl(0.7, 0.9, 8, 5), '#7A4A22', [0, 4, 0]),
+    P(box(9.6, 5.4, 4.6), '#3E9B2A', [0, 11.4, 0]), P(ico(3.2, 0), '#5DBB3A', [-2.6, 13.6, 0.4]), P(ico(3.0, 0), '#4FAE32', [2.8, 13.2, -0.4]),
+    P(cone(2.0, 4.6, 6), '#FFFFFF', [-2.4, 6.6, 2.6], [Math.PI, 0, 0]), P(ico(1.5, 0), '#FFFFFF', [-2.4, 8.4, 2.6]),
+    P(cone(1.9, 4.2, 6), '#FFFFFF', [2.4, 6.8, -2.6], [Math.PI, 0, 0]), P(ico(1.4, 0), '#FFFFFF', [2.4, 8.5, -2.6]),
+    P(cone(1.6, 3.8, 6), '#FFFFFF', [2.6, 7.0, 2.5], [Math.PI, 0, 0]),
+  ],
+  tomato: () => [
+    P(cyl(0.45, 0.45, 13, 4), '#C99A5E', [0.6, 6.5, 0]),
+    P(ico(4.2, 0), '#3E9B2A', [0, 5.2, 0], [0, 0, 0], [1, 1.25, 1]), P(ico(3.2, 0), '#5DBB3A', [1.2, 9.4, -0.8], [0.3, 0.4, 0]),
+    P(sph(1.7, 7, 5), '#FFFFFF', [2.8, 5.4, 2.0]), P(sph(1.6, 7, 5), '#FFFFFF', [-2.6, 7.0, 2.2]), P(sph(1.5, 7, 5), '#FFFFFF', [0.8, 9.6, 2.8]),
+    P(sph(1.5, 7, 5), '#FFFFFF', [-2.4, 4.2, -2.4]), P(sph(1.4, 7, 5), '#FFFFFF', [3.0, 8.4, -2.2]),
+  ],
+  pepper: () => [
+    P(ico(4.0, 0), '#2F8A2A', [0, 4.6, 0], [0, 0, 0], [1.1, 1.0, 1.1]), P(ico(2.8, 0), '#4FAE32', [-1.2, 8.0, 0.6], [0.4, 0, 0.2]),
+    P(sph(1.9, 7, 5), '#FFFFFF', [2.8, 4.2, 2.2], [0, 0, 0], [1, 1.2, 1]), P(sph(1.8, 7, 5), '#FFFFFF', [-2.8, 5.2, 2.0], [0, 0, 0], [1, 1.2, 1]),
+    P(sph(1.7, 7, 5), '#FFFFFF', [0.6, 7.6, -2.6], [0, 0, 0], [1, 1.2, 1]),
+    P(cyl(0.3, 0.3, 1.4, 4), '#2F7A1E', [2.8, 6.6, 2.2]), P(cyl(0.3, 0.3, 1.4, 4), '#2F7A1E', [-2.8, 7.5, 2.0]),
+  ],
+});
 // tint colours for the white parts of each crop (applied with instance colour = whole plant tint is avoided)
-const CROP_TINT = { log: ['#3FA236', '#4FB233', '#2F9A2E'], corn: ['#FFD23F', '#FFC21A'], pumpkin: ['#F2871E', '#FF9F38', '#E8771A'], berry: ['#E8243C', '#F03A50'], tulip: ['#F2486E', '#FF6F92', '#E8365E', '#FF4F7A'], gold: ['#FFC21A', '#FFB10A', '#FFD23F', '#FFC21A'], rose: ['#E0283C', '#C8102E', '#F03A50', '#D81E36'], potato: ['#FFFFFF'], wheat: ['#FFFFFF'] };
+const CROP_TINT = { fish: ['#FF8A3D', '#4FA8F0', '#FFC21A', '#C8D4E0'], grape: ['#7A3EA8', '#8E4EC0', '#6A2E98'], tomato: ['#EE4630', '#E8302C', '#FF6A3A'], pepper: ['#E8302C', '#FFC21A', '#5DBB3A', '#FF8A1E'], log: ['#3FA236', '#4FB233', '#2F9A2E'], corn: ['#FFD23F', '#FFC21A'], pumpkin: ['#F2871E', '#FF9F38', '#E8771A'], berry: ['#E8243C', '#F03A50'], tulip: ['#F2486E', '#FF6F92', '#E8365E', '#FF4F7A'], gold: ['#FFC21A', '#FFB10A', '#FFD23F', '#FFC21A'], rose: ['#E0283C', '#C8102E', '#F03A50', '#D81E36'], potato: ['#FFFFFF'], wheat: ['#FFFFFF'] };
 const CROP_GEO = {};
 export function cropGeo(crop, variant = 0) {
   const k = crop + variant;
@@ -322,6 +395,10 @@ export function stubbleGeo(crop) {
   }
   if (crop === 'pumpkin') return (STUB_GEO[crop] = merge([P(cone(4.5, 1.0, 7), '#3E9B2A', [0, 0.5, 0]), P(cylO(0.5, 0.5, 2.0, 3), '#5DBB3A', [0, 1.2, 0])]));
   if (crop === 'berry') return (STUB_GEO[crop] = merge([P(ico(2.6, 0), '#3E9B2A', [0, 1.4, 0], [0, 0, 0], [1, 0.55, 1])]));
+  // v3.7: an empty ripple where a fish was netted; a picked vine bay keeps its leaves; picked greenhouse plants stay green
+  if (crop === 'fish') return (STUB_GEO[crop] = merge([P(tor(3.4, 0.4, 3, 10), '#CDEBFA', [0, 0.3, 0], [H, 0, 0]), P(sph(0.6, 5, 4), '#FFFFFF', [1.4, 0.6, 1])]));
+  if (crop === 'grape') return (STUB_GEO[crop] = merge([P(cyl(0.6, 0.8, 7, 5), '#7A4A22', [0, 3.5, 0]), P(box(8.6, 4.4, 4), '#4FAE32', [0, 9.6, 0])]));
+  if (crop === 'tomato' || crop === 'pepper') return (STUB_GEO[crop] = merge([P(ico(3.2, 0), '#4FAE32', [0, 3.2, 0], [0, 0, 0], [1, 0.9, 1]), ...(crop === 'tomato' ? [P(cyl(0.4, 0.4, 9, 4), '#C99A5E', [0.6, 4.5, 0])] : [])]));
   return (STUB_GEO[crop] = merge(crop === 'potato'
     ? [P(cone(4.5, 1.2, 6), c, [0, 0.6, 0]), P(cylO(0.5, 0.5, 2.5, 3), '#5DBB3A', [0, 1.6, 0])]
     : [
@@ -398,6 +475,11 @@ export function makePerson(o = {}) {
     head.add(mesh(sph(7.9, 10, 6, 0), o.capColor || '#3B7FE0', 0, 2.4, 0, 1, 0.75, 1));
     head.add(mesh(box(8, 0.9, 6), o.capColor || '#3B7FE0', 0, 2.6, 7.4));
   }
+  else if (o.hat === 'rain') {   // v3.7 渔夫: a yellow sou'wester, long brim at the back
+    head.add(mesh(sph(7.9, 10, 6, 0), o.capColor || '#FFC21A', 0, 2.6, 0, 1, 0.78, 1));
+    head.add(mesh(cyl(10.5, 11.5, 1.1, 12), o.capColor || '#FFC21A', 0, 3.6, -1.4, 1, 1, 1.05));
+    head.add(mesh(cyl(8.05, 8.05, 1.1, 10), '#E8A20E', 0, 4.6, 0));
+  }
   else if (o.hat === 'cowboy') {
     head.add(mesh(cyl(12.5, 12.5, 0.9, 14), '#A0622D', 0, 5.0, 0, 1, 1, 0.82));
     for (const s of [-1, 1]) head.add(mesh(box(3, 0.9, 16), '#A0622D', s * 11.2, 6.3, 0, 1, 1, 0.8));
@@ -438,9 +520,16 @@ export function makePerson(o = {}) {
   axe.add(mesh(box(1.4, 4.4, 5), '#C9D2DC', 0, 7.6, 2.2)); axe.add(mesh(box(1.6, 4.6, 1.2), '#E8452C', 0, 7.6, -0.2));
   axe.position.set(0, -9, 1.4); axe.rotation.set(H, 0, 0); axe.visible = false;
   arms[1].add(axe);
+  // v3.7 landing net for fish (swapped in like the axe)
+  const net = new THREE.Group();
+  net.add(mesh(cyl(0.6, 0.6, 12, 5), '#C99A5E', 0, 3.5, 0));
+  const hoop = new THREE.Mesh(tor(3.4, 0.45, 3, 10), M('#3A3A44')); hoop.position.set(0, 11, 2.6); hoop.rotation.set(0, H, 0); net.add(hoop);
+  const bag = new THREE.Mesh(cone(3.2, 5, 8), new THREE.MeshLambertMaterial({ color: '#F4F0E0', transparent: true, opacity: 0.75, flatShading: true })); bag.position.set(0, 11, 5.4); bag.rotation.set(-H, 0, 0); net.add(bag);
+  net.position.set(0, -9, 1.4); net.rotation.set(H, 0, 0); net.visible = false;
+  arms[1].add(net);
   // contact shadow blob (cheap, always on)
   const blob = new THREE.Mesh(BLOB_GEO, BLOB_MAT); blob.rotation.x = -H; blob.position.y = 0.3; blob.scale.set(10, 8, 1); root.add(blob);
-  return { root, body, legs, arms, torso, head, tool, axe, blob, o };
+  return { root, body, legs, arms, torso, head, tool, axe, net, blob, o };
 }
 export const HAIR_GEO = new THREE.SphereGeometry(7.9, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.5);
 export const BLOB_GEO = new THREE.CircleGeometry(1, 14);
@@ -450,7 +539,8 @@ export const BLOB_MAT = new THREE.MeshBasicMaterial({ color: 0x1E4A10, transpare
 export function posePerson(pp, s) {
   const { legs, arms, body, torso, head, axe } = pp;
   // tool = the sickle, or the axe when the last swing was at a tree
-  const tool = s.axe ? axe : pp.tool; (s.axe ? pp.tool : axe).visible = false;
+  const tool = s.net ? pp.net : s.axe ? axe : pp.tool;
+  for (const tl of [pp.tool, axe, pp.net]) if (tl && tl !== tool) tl.visible = false;
   const sw = s.moving ? Math.sin(s.walk) : 0;
   const bob = s.moving ? Math.abs(Math.sin(s.walk)) * 1.6 : Math.sin(s.t * 3 + (s.seed || 0)) * 0.3;
   body.position.y = bob;
@@ -680,6 +770,39 @@ export const Env = {
     out.push(P(box(12, 10, 1.4), '#FFFFFF', [X, h + 5, y + d + 4]));
     void x;
   },
+  // ---- v3.7 scenery ----
+  // grape trellis: posts at both ends of every vine row (and every ~60 units), two wires along the row
+  trellis(out, f) {
+    const x0 = f.x - 3, x1 = f.x + f.w + 3, n = Math.max(1, Math.round((x1 - x0) / 60));
+    for (let r = 0; r < f.rows; r++) {
+      const y = f.y + (r + 0.5) * f.gy;
+      for (let i = 0; i <= n; i++) out.push(P(box(1.6, 17, 1.6), '#A0703A', [x0 + (x1 - x0) * i / n, 8.5, y]));
+      out.push(P(box(x1 - x0, 0.5, 0.5), '#5A5E68', [(x0 + x1) / 2, 15.6, y])); out.push(P(box(x1 - x0, 0.5, 0.5), '#5A5E68', [(x0 + x1) / 2, 9.4, y]));
+    }
+  },
+  // greenhouse: white frame (posts, eaves, gable ridge and rafters). The glass is a separate see-through mesh.
+  greenhouseFrame(out, x, y, w, h) {
+    const H0 = 26, R = 44, cy = y + h / 2, W2 = '#F4F6F8';
+    const nx = Math.max(2, Math.round(w / 52)), ny = Math.max(2, Math.round(h / 52));
+    for (let i = 0; i <= nx; i++) { const xx = x + w * i / nx; for (const yy of [y, y + h]) out.push(P(box(2.2, H0, 2.2), W2, [xx, H0 / 2, yy])); const a = Math.atan2(R - H0, h / 2), L = Math.hypot(h / 2, R - H0); out.push(P(box(1.6, 1.6, L), W2, [xx, (H0 + R) / 2, y + h / 4], [-a, 0, 0])); out.push(P(box(1.6, 1.6, L), W2, [xx, (H0 + R) / 2, y + h * 3 / 4], [a, 0, 0])); }
+    for (let j = 1; j < ny; j++) { const yy = y + h * j / ny; for (const xx of [x, x + w]) out.push(P(box(2.2, H0, 2.2), W2, [xx, H0 / 2, yy])); }
+    for (const yy of [y, y + h]) out.push(P(box(w + 2, 2, 2), W2, [x + w / 2, H0, yy]));
+    for (const xx of [x, x + w]) out.push(P(box(2, 2, h + 2), W2, [xx, H0, cy]));
+    out.push(P(box(w + 4, 2.4, 2.4), W2, [x + w / 2, R, cy]));
+    for (const xx of [x, x + w]) { const a = Math.atan2(R - H0, h / 2), L = Math.hypot(h / 2, R - H0); out.push(P(box(2, 2, L), W2, [xx, (H0 + R) / 2, y + h / 4], [-a, 0, 0])); out.push(P(box(2, 2, L), W2, [xx, (H0 + R) / 2, y + h * 3 / 4], [a, 0, 0])); }
+    out.push(P(box(w + 4, 3, 3), '#C9CED8', [x + w / 2, 1.5, y])); out.push(P(box(w + 4, 3, 3), '#C9CED8', [x + w / 2, 1.5, y + h]));
+  },
+  greenhouseGlass(out, x, y, w, h) {
+    const H0 = 26, R = 44, cy = y + h / 2, G2 = '#D8F4FF', a = Math.atan2(R - H0, h / 2), L = Math.hypot(h / 2, R - H0);
+    out.push(P(box(w, H0 - 4, 0.4), G2, [x + w / 2, H0 / 2 + 2, y])); out.push(P(box(w, H0 - 4, 0.4), G2, [x + w / 2, H0 / 2 + 2, y + h]));
+    out.push(P(box(0.4, H0 - 4, h), G2, [x, H0 / 2 + 2, cy])); out.push(P(box(0.4, H0 - 4, h), G2, [x + w, H0 / 2 + 2, cy]));
+    out.push(P(box(w, 0.4, L), G2, [x + w / 2, (H0 + R) / 2, y + h / 4], [-a, 0, 0])); out.push(P(box(w, 0.4, L), G2, [x + w / 2, (H0 + R) / 2, y + h * 3 / 4], [a, 0, 0]));
+  },
+  // night lantern: dark post with a crooked arm; the glowing globe is drawn separately (unlit material)
+  lantern(out, x, y) {
+    out.push(P(cyl(1.3, 1.8, 30, 6), '#3A2A1E', [x, 15, y]), P(box(9, 1.2, 1.2), '#3A2A1E', [x + 4, 29, y]), P(cyl(3, 3.6, 2, 8), '#2A2A30', [x, 1, y]));
+    out.push(P(cyl(2.2, 3.2, 1.6, 8), '#2A2A30', [x + 8, 27.6, y]));
+  },
   // checkout desk (long along y): blue body, light top, register
   counter(out, c, K) {
     const d = c.desk;
@@ -701,7 +824,7 @@ export const Env = {
     out.push(P(box(18, 12, 1), '#FFFFFF', [cx, H0 * 0.55, b.y + b.h + 0.6]));
   },
 };
-export const PROC_COL = { plank: ['#C8874A', '#8E5627'], chair: ['#F2C08A', '#C98A4B'], cheese: ['#FFE16B', '#E8B21E'], icecream: ['#FFC2DA', '#8DB6FF'], popcorn: ['#FF8A6E', '#E8452C'], pie: ['#F2C08A', '#E8871E'], jam: ['#FF8FB0', '#C8102E'], yarn: ['#FFB3D8', '#B07ACC'], juice: ['#9BE460', '#4CB24E'], bouquet: ['#FFE16B', '#E8B21E'], basket: ['#F2C08A', '#C98A4B'], perfume: ['#FFB8D8', '#E86AA6'], crate: ['#8DB6FF', '#5B8FE8'], ketchup: ['#FF8A6E', '#E8452C'] };
+export const PROC_COL = { flour: ['#FFF3DC', '#D9A05A'], bread: ['#F2C08A', '#B8552E'], smoked: ['#A0703A', '#5A3A22'], gjuice: ['#C89AF0', '#7A3EA8'], plank: ['#C8874A', '#8E5627'], chair: ['#F2C08A', '#C98A4B'], cheese: ['#FFE16B', '#E8B21E'], icecream: ['#FFC2DA', '#8DB6FF'], popcorn: ['#FF8A6E', '#E8452C'], pie: ['#F2C08A', '#E8871E'], jam: ['#FF8FB0', '#C8102E'], yarn: ['#FFB3D8', '#B07ACC'], juice: ['#9BE460', '#4CB24E'], bouquet: ['#FFE16B', '#E8B21E'], basket: ['#F2C08A', '#C98A4B'], perfume: ['#FFB8D8', '#E86AA6'], crate: ['#8DB6FF', '#5B8FE8'], ketchup: ['#FF8A6E', '#E8452C'] };
 
 // ------------------------------------------------------------------ 商店 decorations (v3.4)
 // Each sits on its origin, ~person-sized to a little bigger; used outside the fence in levels.

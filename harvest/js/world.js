@@ -115,8 +115,10 @@ export class Field {
     const cr = CFG.crops[o.crop];
     Object.assign(this, o);
     this.kind = 'field'; this.item = o.crop; this.hidden = !!o.hidden; this.appearT = -9;
-    this.cols = Math.max(1, Math.floor(o.w / o.gap)); this.rows = Math.max(1, Math.floor(o.h / o.gap));
-    this.w = this.cols * o.gap; this.h = this.rows * o.gap;
+    // gy: row spacing (v3.7 grape trellis rows use gapY > gap; every other field is a square grid)
+    this.gy = o.gapY || o.gap;
+    this.cols = Math.max(1, Math.floor(o.w / o.gap)); this.rows = Math.max(1, Math.floor(o.h / this.gy));
+    this.w = this.cols * o.gap; this.h = this.rows * this.gy;
     const n = this.n = this.cols * this.rows;
     this.g = new Float32Array(n).fill(1);
     this.jx = new Int8Array(n); this.jy = new Int8Array(n); this.v = new Uint8Array(n); this.pop = new Float32Array(n); this.cutAt = new Float32Array(n).fill(-9);
@@ -126,7 +128,7 @@ export class Field {
     this.ripe = n; this.grow = cr.grow; this.yield = cr.yield || 1; this.growMul = 1; this.sprinkler = false; this.spill = cr.spill || 0; this.pile = null;
   }
   px(i) { return this.x + ((i % this.cols) + 0.5 + this.jx[i] / 300) * this.gap; }
-  py(i) { return this.y + (((i / this.cols) | 0) + 0.5 + this.jy[i] / 300) * this.gap; }
+  py(i) { return this.y + (((i / this.cols) | 0) + 0.5 + this.jy[i] / 300) * this.gy; }
   // nearest ripe plant (coarse stride for speed on big fields)
   nearestRipe(x, y) {
     if (this.ripe <= 0) return -1;
@@ -134,7 +136,7 @@ export class Field {
     let best = -1, bd = 1e18;
     for (let r = 0; r < R; r += s) for (let c = (r / s) & 1 ? 1 : 0; c < C; c += s) {
       const i = r * C + c; if (this.g[i] < 1) continue;
-      const dx = this.x + (c + 0.5) * this.gap - x, dy = this.y + (r + 0.5) * this.gap - y, dd = dx * dx + dy * dy;
+      const dx = this.x + (c + 0.5) * this.gap - x, dy = this.y + (r + 0.5) * this.gy - y, dd = dx * dx + dy * dy;
       if (dd < bd) { bd = dd; best = i; }
     }
     if (best < 0) for (let i = 0; i < this.n; i++) if (this.g[i] >= 1) { const dd = d2(this.px(i), this.py(i), x, y); if (dd < bd) { bd = dd; best = i; } }
@@ -420,6 +422,7 @@ export class World {
       w.from = e.worker.from; w.to = e.worker.to; w.state = 'collect'; w.wait = 0; w.tgt = null; w.retarget = 0;
       w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = t.icon === 'cart' || t.icon === 'milker';
       w.lumber = w.from.some((id) => this.objs[id] && this.objs[id].item === 'log');
+      w.fisher = w.from.some((id) => this.objs[id] && this.objs[id].item === 'fish');   // v3.7 渔夫 (render: net + rain hat)
       w.lv = 1; w.trips = 0; w.lvT = -9; w.loader = this.loaders && !w.cart;
       w.done = 0; const cm = this.crew && this.crew[this.workers.length];
       if (cm) { w.crewId = cm.id; w.crewName = cm.name; w.crewMul = cm.mul; }
@@ -609,9 +612,9 @@ export class World {
         if (f.hidden || f.ripe <= 0 || (srcs && !srcs.includes(f)) || !this.hasSink(f.item)) continue;
         const hr = c.harvestR;
         if (c.x < f.x - hr || c.x > f.x + f.w + hr || c.y < f.y - hr || c.y > f.y + f.h + hr) continue;
-        const gp = f.gap, C = f.cols;
+        const gp = f.gap, gy = f.gy, C = f.cols;
         const c0 = Math.max(0, Math.floor((c.x - hr - f.x) / gp) - 1), c1 = Math.min(C - 1, Math.floor((c.x + hr - f.x) / gp) + 1);
-        const r0 = Math.max(0, Math.floor((c.y - hr - f.y) / gp) - 1), r1 = Math.min(f.rows - 1, Math.floor((c.y + hr - f.y) / gp) + 1);
+        const r0 = Math.max(0, Math.floor((c.y - hr - f.y) / gy) - 1), r1 = Math.min(f.rows - 1, Math.floor((c.y + hr - f.y) / gy) + 1);
         const hr2 = hr * hr;
         cand.length = 0; cd.length = 0;
         for (let r = r0; r <= r1; r++) for (let col = c0; col <= c1; col++) {

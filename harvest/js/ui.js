@@ -62,16 +62,33 @@ export class UI {
   }
   closeAll() { for (const m of this.stack) m.classList.add('hidden'); this.stack = []; this.h.modal(false); }
   coinCenter() { const r = this.el.coin.getBoundingClientRect(); return { x: r.left + 24, y: r.top + r.height / 2 }; }
-  bumpCoin() { const c = this.el.coin; c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump'); clearTimeout(this._bt); this._bt = setTimeout(() => c.classList.remove('bump'), 90); }
+  bumpCoin() { }   // v3.7 写死: the money pill no longer bounces
+  // recent earnings, shown as one fixed "+N" line under the money pill (sums the last 2.5 s)
+  earn(amount, now) { (this._earn || (this._earn = [])).push([now, amount]); }
+  // short static message above the stack badge (unlock / fever / level-ups): no motion, just shown then hidden
+  note(text, now) { this._note = text; this._noteT = now; }
 
   showHUD(world) {
-    this.el.home.classList.add('hidden'); this.el.hud.classList.remove('hidden');
+    this.el.home.classList.add('hidden'); this.el.hud.classList.remove('hidden'); $('hudBottom').classList.remove('hidden');
+    this._earn = []; this._note = ''; this._hudAt = -1e9; this._earnS = null; this._stackS = null; this._noteS = null;
     this.el.lv.textContent = `等级 ${world.li + 1}`;
     this.el.goal.textContent = `${world.L.name} · ${goalText(world.L.goal)}`;
     this.lastMoney = -1; this.lastGoal = '';
     this.updateHUD(world);
   }
-  updateHUD(world) {
+  updateHUD(world, force) {
+    // v3.7 写死: values update in place, at most ~4× per second, so digits never flicker or roll
+    const now = performance.now() / 1000;
+    if (!force && now - (this._hudAt || -1e9) < 0.25) return;
+    this._hudAt = now;
+    const p0 = world.player, n0 = p0.stack.length + p0.incoming, full = n0 >= p0.cap && p0.stack.length > 0;
+    const st = full ? 'MAX · 去出售' : `${p0.stack.length}/${p0.cap}`;
+    if (st !== this._stackS) { const b = $('stackBadge'); b.textContent = st; b.classList.toggle('full', full); this._stackS = st; }
+    const E = this._earn || []; while (E.length && now - E[0][0] > 2.5) E.shift();
+    const sum = Math.round(E.reduce((a, x) => a + x[1], 0)), es = sum > 0 ? `+${sum.toLocaleString('en-US')}` : '';
+    if (es !== this._earnS) { const e = $('earn'); e.textContent = es || '\u00a0'; e.classList.toggle('on', !!es); this._earnS = es; }
+    const ns = this._note && now - this._noteT < 1.8 ? this._note : '';
+    if (ns !== this._noteS) { const e = $('hudNote'); e.textContent = ns || '\u00a0'; e.classList.toggle('on', !!ns); this._noteS = ns; }
     const m = Math.floor(world.money);
     if (m !== this.lastMoney) { this.el.money.textContent = m.toLocaleString('en-US'); this.lastMoney = m; }
     const p = world.progress();
@@ -105,7 +122,7 @@ export class UI {
   }
 
   showHome(data) {
-    this.el.hud.classList.add('hidden'); this.tip(''); this.el.home.classList.remove('hidden');
+    this.el.hud.classList.add('hidden'); $('hudBottom').classList.add('hidden'); this.tip(''); this.el.home.classList.remove('hidden');
     this.renderHome(data);
   }
   renderHome(data) {
