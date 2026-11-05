@@ -12,6 +12,8 @@ import * as Shop from './shop.js';
 import { Preview } from './preview3d.js';
 import * as Crew from './crew.js';
 import * as Orders from './orders.js';
+import * as Seasons from './seasons.js';
+import * as Daily from './daily.js';
 
 const cv = document.getElementById('cv'), gl = document.getElementById('gl');
 const R = new Renderer(cv, gl), fx = new FX(), input = new Input(cv), snd = new Sound(), hap = new Haptics();
@@ -60,6 +62,10 @@ const ui = new UI({
     return r;
   },
   swap: (i) => { const ok = Orders.swapOrder(data, i); if (ok) { Save.save(data); snd.play('appear'); } else snd.play('full'); return ok; },
+  // 每日挑战
+  dailyStart: () => { snd.unlock(); snd.play('tap'); startDaily(); },
+  locked: () => { snd.play('full'); hap.tick(30, 0); },
+  save: () => Save.save(data),
   shopToggle: (id) => { const r = Shop.toggle(data, id); Save.save(data); applyLook(); snd.play(r === 'on' ? 'appear' : 'tap'); hap.tick(14, 0); return r; },
 });
 
@@ -78,11 +84,17 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
+let forceRain = null;   // ?debug: force the next run rainy / dry
 function start(li) {
   const resume = data.cur && data.cur.li === li;
   const crew = Crew.levelCrew(data.crew, li);   // 雇工: who works this level, with their 特长
-  world = new World(li, { crew });
-  if (resume) { try { world.restore(data.cur); } catch (_) { world = new World(li, { crew }); } }
+  // v4.0 四季与天气: this week's season; 1 run in 5 is rainy (a resumed run keeps its weather)
+  const env = resume && data.cur.env && typeof data.cur.env === 'object'
+    ? { season: Seasons.currentSeason(), rain: !!data.cur.env.rain }
+    : { season: Seasons.currentSeason(), rain: forceRain !== null ? forceRain && li > 0 : Seasons.rollRain(li) };
+  forceRain = null;
+  world = new World(li, { crew, ...env });
+  if (resume) { try { world.restore(data.cur); } catch (_) { world = new World(li, { crew, ...env }); } }
   else data.cur = world.snapshot();
   Orders.ensureOrders(data); ordBase = Orders.cloneStats(world.stats); ordItems = Orders.levelItems(li);
   data.played = true; Save.save(data);
@@ -92,7 +104,33 @@ function start(li) {
   modalOpen = false; input.enabled = true; input.everMoved = resume || li > 0 ? input.everMoved : false;
 }
 
-function snapshot() { if (world && !world.won) { credit(); data.cur = world.snapshot(); Save.save(data); } }
+// v4.0 每日挑战: today's remix, 3 minutes. It never touches data.cur, so a level in progress stays resumable.
+let dailyDc = null;
+function startDaily() {
+  if (!Daily.dailyOpen(data)) return;
+  if (world && !world.won && !world.daily) snapshot();
+  const dc = dailyDc = Daily.dailyFor(data);
+  if (Daily.ensureDay(data, dc.day, dc)) Save.save(data);
+  const crew = Crew.levelCrew(data.crew, dc.li);
+  world = new World(dc.li, { crew, seed: dc.seed, level: dc.L, daily: dc, timeLimit: CFG.daily.time, season: Seasons.currentSeason(), ...dc.opts });
+  Orders.ensureOrders(data); ordBase = Orders.cloneStats(world.stats); ordItems = Orders.levelItems(dc.li);
+  R.setWorld(world); R.setMode('play'); R.follow(0, true); fx.clear();
+  mode = 'play'; winDone = false; guide = null; guideT = 0;
+  ui.hideAll(); ui.showHUD(world); ui.banner(world);
+  modalOpen = false; input.enabled = true; input.everMoved = true;
+}
+function dailyWin() {
+  credit();
+  const r = Daily.recordDaily(data, dailyDc || world.daily, world.score);
+  Save.save(data);
+  snd.play('win'); hap.pattern([70, 70, 70, 70, 260], [255, 255, 255]);
+  if (r.tier) fx.confetti(R.W, R.H, 80 + r.tier * 50);
+  ui.updateHUD(world, true);
+  setTimeout(() => ui.showDailyRes(r, dailyDc || world.daily), 650);
+  return r;
+}
+
+function snapshot() { if (world && world.daily) { credit(); Save.save(data); return; } if (world && !world.won) { credit(); data.cur = world.snapshot(); Save.save(data); } }
 
 // v3.6: what happened in the level since the last call goes to the 订单 and the 雇工 XP
 function credit() {
@@ -108,7 +146,8 @@ function credit() {
 }
 
 function goHome(fromWin) {
-  if (world && !world.won) snapshot(); else if (world) { credit(); Save.save(data); }
+  if (world && world.daily) { credit(); Save.save(data); world = null; }   // leaving a daily run mid-way gives it up
+  else if (world && !world.won) snapshot(); else if (world) { credit(); Save.save(data); }
   Orders.ensureOrders(data);
   mode = 'home'; R.setMode('home'); ui.hideAll(); ui.el.banner.classList.add('hidden'); ui.showHome(data); fx.clear();
   input.enabled = true; modalOpen = false;
@@ -145,7 +184,7 @@ function win() {
 
 // ---------------------------------------------------------------- tutorial tips
 function tutorialTip() {
-  if (!world || world.li !== 0 || world.won) return '';
+  if (!world || world.li !== 0 || world.won || world.daily) return '';
   const p = world.player, s = world.stats;
   if (!input.everMoved) return '按住屏幕拖动，摇杆控制走路';
   if (s.unlocks > 0) return '';
@@ -210,7 +249,7 @@ function handleEvents() {
       case 'produce': fx.burst(e.x, e.y, 40, 4, ['#FFFFFF', '#FFE16B', '#FF8FB0'], 30, 60, 2.6, 'star', 0.7); break;
       case 'lay': break;
       case 'ground': R.groundDirty = true; break;
-      case 'win': if (!winDone) { winDone = true; win(); } break;
+      case 'win': if (!winDone) { winDone = true; if (world.daily) dailyWin(); else win(); } break;
     }
   }
   ev.length = 0;
@@ -228,6 +267,7 @@ function frame(now) {
     let left = dt;
     if (!modalOpen) while (left > 1e-4) { const s = Math.min(left, 1 / 60); world.update(s, world.won ? 0 : ix, world.won ? 0 : iy); left -= s; }
     handleEvents();
+    if (world.won && !winDone) { winDone = true; if (world.daily) dailyWin(); else win(); }   // in case the win event was dropped
     if (world.feverT > 0 && (feverFxT -= dt) <= 0) {   // golden sparkle trail
       feverFxT = 0.06; const p = world.player;
       fx.burst(p.x, p.y, 6, 3, ['#FFD23F', '#FFF27A', '#FFFFFF'], 25, 50, 2.4, 'star', 0.7);
@@ -235,7 +275,7 @@ function frame(now) {
     fx.update(dt);
     R.follow(dt);
     guideT -= dt; if (guideT <= 0) { guide = world.guide(); guideT = 0.15; }
-    const showHand = world.li === 0 && !input.everMoved && !world.won;
+    const showHand = world.li === 0 && !world.daily && !input.everMoved && !world.won;
     R.draw(world, fx, world.won ? null : guide, time, { hand: showHand });
     input.draw(R.g, R.W, R.H, !modalOpen && !world.won);
     hudT -= dt; if (hudT <= 0) { ui.updateHUD(world); ui.tip(tutorialTip()); hudT = 0.1; }
@@ -243,7 +283,7 @@ function frame(now) {
     saveT += dt; if (saveT > 5) { saveT = 0; snapshot(); }
   } else {
     fx.update(dt);
-    drawHome(R.g, R.W, R.H, { ...data, restoredAt }, time, R.dpr, R.W > R.H * 1.15, ui.page || 1);
+    drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: Seasons.currentSeason() }, time, R.dpr, R.W > R.H * 1.15, ui.page || 1);
     R.g.setTransform(R.dpr, 0, 0, R.dpr, 0, 0); R.fxScreen(fx);
     if (preview && ui.shopOpenNow()) {   // turntable preview inside the shop
       const c = preview.cv, w = c.clientWidth, h = c.clientHeight;
@@ -268,6 +308,11 @@ if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
     quality: (q) => { if (q !== undefined) { R.q = q; R.drops = 9; R.applyQuality(); } return ['low', 'mid', 'high'][R.q]; },
     start: (li) => { data.cur = null; start(li); },
     home: () => goHome(), restore: (id) => restore(id),
+    // v4.0: force the season (0–3 春夏秋冬, null = calendar), the next run's rain, start / finish the daily challenge
+    season: (s) => { Seasons.forceSeason(s); if (mode === 'home') ui.renderHome(data); return Seasons.seasonInfo(); },
+    rain: (on) => { forceRain = on === undefined ? true : !!on; return forceRain; },
+    daily: () => startDaily(), Daily, Seasons,
+    dailyFinish: () => { if (!world || !world.daily) return null; while (!world.won) { world.events.length = 0; world.update(1 / 30, 0, 0); } return world.score; },
     shop: () => ui.openShop(), Shop, Crew, Orders, credit, orders: () => ui.openOrders(), crew: () => ui.openCrew(), applyLook, save: () => Save.save(data),
     // walk the bot into a field until the stack is tall (for screenshots of a cutting run)
     tallStack(n, extraCap = 0) {

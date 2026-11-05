@@ -3,6 +3,7 @@ import { CFG } from './config.js';
 import { shopDefaults, normShop, migrateCoins } from './shop.js';
 import { crewDefaults, normCrew } from './crew.js';
 import { ordersDefaults, normOrders } from './orders.js';
+import { dailyDefaults, normDaily } from './daily.js';
 
 let memory = null;
 let storage = null;
@@ -14,7 +15,7 @@ try {
 export const storageAvailable = () => !!storage;
 
 export function defaults() {
-  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults() };
+  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults(), daily: dailyDefaults() };
 }
 
 export function load() {
@@ -33,6 +34,9 @@ export function load() {
     out.shop = normShop(d.shop);
     // v3.6: 雇工 roster and 订单板 (older saves start with a fresh Lv1 crew and today's orders)
     out.crew = normCrew(d.crew); out.orders = normOrders(d.orders);
+    // v4.0: 每日挑战 records (older saves start empty); an unknown in-progress env is simply re-rolled
+    out.daily = normDaily(d.daily);
+    if (out.cur && typeof out.cur !== 'object') out.cur = null;
     return out;
   } catch (_) { return defaults(); }
 }

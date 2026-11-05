@@ -4,6 +4,8 @@ import { starsLeft, storageAvailable } from './save.js';
 import { OUTFITS, DECOS, UNIFORMS, SLOTS, itemById, isOn } from './shop.js';
 import { ROSTER, TRAITS, traitBonus, xpNeed, CREW } from './crew.js';
 import { orderText, orderDone, TIER_NAME } from './orders.js';
+import { seasonInfo, cropNames } from './seasons.js';
+import { dailyOpen, dailyFor, ensureDay, TIER_LABEL } from './daily.js';
 
 const $ = (id) => document.getElementById(id);
 const TABS = { 1: '花园庄园', 2: '林场牧场', 3: '湖畔酒庄' };
@@ -40,9 +42,15 @@ export class UI {
     this.el.orders = $('orders'); this.el.crew = $('crew');
     $('btnOrders').onclick = () => this.openOrders();
     $('btnCrew').onclick = () => this.openCrew();
+    // 每日挑战
+    this.el.daily = $('daily'); this.el.dres = $('dailyRes');
+    $('btnDaily').onclick = () => this.openDaily();
+    $('btnDailyGo').onclick = () => { this.closeAll(); h.dailyStart(); };
+    $('btnDrAgain').onclick = () => { this.el.dres.classList.add('hidden'); h.dailyStart(); };
+    $('btnDrHome').onclick = () => { this.el.dres.classList.add('hidden'); h.home(); };
     this.el.play.onclick = () => h.play();
     $('btnNext').onclick = () => { this.el.win.classList.add('hidden'); h.next(); };
-    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop, this.el.orders, this.el.crew]) {
+    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop, this.el.orders, this.el.crew, this.el.daily]) {
       m.addEventListener('click', (e) => { if (e.target === m || e.target.hasAttribute('data-close')) this.closeModal(m); });
     }
     $('optSound').onchange = (e) => h.setting('sound', e.target.checked);
@@ -72,9 +80,15 @@ export class UI {
   showHUD(world) {
     this.el.home.classList.add('hidden'); this.el.hud.classList.remove('hidden'); $('hudBottom').classList.remove('hidden');
     this._earn = []; this._note = ''; this._hudAt = -1e9; this._earnS = null; this._stackS = null; this._noteS = null;
-    this.el.lv.textContent = `等级 ${world.li + 1}`;
-    this.el.goal.textContent = `${world.L.name} · ${goalText(world.L.goal)}`;
+    this.el.lv.textContent = world.daily ? '3:00' : `等级 ${world.li + 1}`;
+    this.el.lv.classList.toggle('timer', !!world.daily); this._tm = '';
+    this.el.goal.textContent = world.daily ? `每日挑战 · ${world.daily.name}` : `${world.L.name} · ${goalText(world.L.goal)}`;
     this.lastMoney = -1; this.lastGoal = '';
+    // v4.0: fixed season / rain pills under the goal (only when they matter in this level)
+    const sc = world.seasonCrops(), se = $('envSeason');
+    if (sc.length) { const S = CFG.seasons[world.season]; se.textContent = `${S.name} · ${cropNames(sc).join(' ')} 生长+${Math.round(CFG.season.bonus * 100)}%`; se.className = `sea s${world.season}`; }
+    else se.className = 'sea hidden';
+    $('envRain').classList.toggle('hidden', !world.rain);
     this.updateHUD(world);
   }
   updateHUD(world, force) {
@@ -92,6 +106,14 @@ export class UI {
     if (ns !== this._noteS) { const e = $('hudNote'); e.textContent = ns || '\u00a0'; e.classList.toggle('on', !!ns); this._noteS = ns; }
     const m = Math.floor(world.money);
     if (m !== this.lastMoney) { this.el.money.textContent = m.toLocaleString('en-US'); this.lastMoney = m; }
+    if (world.daily) {   // 每日挑战: the level badge is the countdown, the bar is money earned vs the gold mark
+      const left = Math.max(0, Math.ceil(world.timeLimit - world.t)), tm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+      if (tm !== this._tm) { this.el.lv.textContent = tm; this.el.lv.classList.toggle('hurry', left <= 20); this._tm = tm; }
+      const e = Math.floor(world.won ? world.score : world.stats.earned), T = world.daily.tiers, tier = e >= T[2] ? 3 : e >= T[1] ? 2 : e >= T[0] ? 1 : 0;
+      const s2 = `${e.toLocaleString('en-US')}${tier ? ' · ' + TIER_LABEL[tier] : ''}`;
+      if (s2 !== this.lastGoal) { this.el.bar.style.width = `${Math.min(100, e / T[2] * 100).toFixed(1)}%`; this.el.num.textContent = s2; this.lastGoal = s2; }
+      return;
+    }
     const p = world.progress();
     const s = `${Math.floor(p.v)}/${p.n}`;
     if (s !== this.lastGoal) { this.el.bar.style.width = `${(p.f * 100).toFixed(1)}%`; this.el.num.textContent = s; this.lastGoal = s; }
@@ -106,8 +128,8 @@ export class UI {
   }
   banner(world) {
     const b = this.el.banner;
-    $('bannerLv').textContent = `等级 ${world.li + 1} · ${world.L.name}`;
-    $('bannerGoal').textContent = `目标：${goalText(world.L.goal)}`;
+    $('bannerLv').textContent = world.daily ? `每日挑战 · ${world.L.name}` : `等级 ${world.li + 1} · ${world.L.name}`;
+    $('bannerGoal').textContent = world.daily ? `${world.daily.name}：${world.daily.desc} · 3 分钟` : `目标：${goalText(world.L.goal)}${world.rain ? ' · 今天下雨，生长 +25%' : ''}`;
     b.classList.add('hidden'); void b.offsetWidth; b.classList.remove('hidden');
     clearTimeout(this._bn); this._bn = setTimeout(() => b.classList.add('hidden'), 2500);
   }
@@ -118,7 +140,7 @@ export class UI {
   }
   openPause() {
     const w = this.h.world();
-    $('pauseInfo').textContent = w ? `等级 ${w.li + 1} · ${w.L.name} — ${goalText(w.L.goal)}` : '';
+    $('pauseInfo').textContent = !w ? '' : w.daily ? `每日挑战 · ${w.L.name} — ${w.daily.name}（回到庄园 = 放弃这一局）` : `等级 ${w.li + 1} · ${w.L.name} — ${goalText(w.L.goal)}`;
     this.openModal(this.el.pause);
   }
 
@@ -150,6 +172,14 @@ export class UI {
     const cheapest = metas.filter((m) => !restored.has(m.id)).reduce((a, m) => Math.min(a, m.cost), 99);
     this.el.hint.textContent = metas.every((m) => restored.has(m.id)) ? (page === 1 ? '· 庄园修好啦！' : page === 2 ? '· 牧场建好啦！' : '· 酒庄建好啦！')
       : locked3 ? '· 过第 38 关开放' : left >= cheapest ? '· 点一下就能修' : page === 2 && data.unlocked < 15 ? '· 第 16 关起拿星星' : '· 过关拿星星';
+    // v4.0 四季: the season of the real week, and the 每日挑战 button
+    const si = seasonInfo();
+    const sb = $('seasonBadge'); sb.textContent = si.name; sb.className = `sbadge s${si.i}`;
+    $('seasonText').textContent = `${si.full} · ${cropNames(si.crops).join(' ')} +${Math.round(CFG.season.bonus * 100)}% · ${si.left <= 1 ? '明天换季' : `${si.left} 天后换季`}`;
+    const db = $('btnDaily');
+    if (!dailyOpen(data)) { db.className = 'small dailyBtn lock'; db.innerHTML = `每日挑战<small>过第 ${CFG.daily.unlockAfter} 关开放</small>`; }
+    else { const D = data.daily, td = D && D.day === dailyFor(data).day ? D : null; db.className = 'small dailyBtn';
+      db.innerHTML = `每日挑战<small>${td && td.best ? `今日最佳 ${td.best.toLocaleString('en-US')}${td.paid ? ' · ' + TIER_LABEL[td.paid] : ''}` : '今天还没挑战'}</small>`; }
     const O = data.orders; $('ordDot').classList.toggle('hidden', !(O && O.list.some((o) => !o.claimed && orderDone(o))));
     this.el.list.innerHTML = '';
     for (const m of metas) {
@@ -239,6 +269,28 @@ export class UI {
       box.appendChild(row);
     });
   }
+  // ---------------------------------------------------------------- 每日挑战
+  openDaily() {
+    const d = this.h.data();
+    if (!dailyOpen(d)) { this.h.locked(); const b = $('btnDaily'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); return; }
+    this.h.tap();
+    const dc = dailyFor(d); if (ensureDay(d, dc.day, dc)) this.h.save();
+    const D = d.daily;
+    $('dailyCoins').textContent = (d.coins || 0).toLocaleString('en-US');
+    $('dailyLevel').textContent = `${dc.day.slice(5).replace('-', '月')}日 · ${dc.L.name}（第 ${dc.li + 1} 关的庄园）`;
+    $('dailyTwist').textContent = `今日变化「${dc.name}」：${dc.desc}`;
+    $('dailyTiers').innerHTML = dc.tiers.map((t, i) => `<div class="dtier t${i + 1}${D.paid > i ? ' got' : ''}">${TIER_LABEL[i + 1]}<b>${t.toLocaleString('en-US')}</b><small><i class="gc"></i>${CFG.daily.coins[i]}</small></div>`).join('');
+    $('dailyBest').textContent = `今日最佳 ${D.best.toLocaleString('en-US')}（挑战 ${D.plays} 次） · 历史最佳 ${D.allBest.toLocaleString('en-US')}${D.allBestDay ? `（${D.allBestDay.slice(5)}）` : ''}`;
+    this.openModal(this.el.daily);
+  }
+  showDailyRes(r, dc) {
+    $('drTitle').textContent = r.tier ? `${TIER_LABEL[r.tier]}！` : '时间到！';
+    const m = $('drMedal'); m.className = `medal m${r.tier}`; m.textContent = r.tier ? TIER_LABEL[r.tier].slice(0, 1) : '—';
+    const next = r.tier < 3 ? `离${TIER_LABEL[r.tier + 1]}还差 ${(dc.tiers[r.tier] - r.score).toLocaleString('en-US')}` : '今天的最高档拿到啦';
+    $('drStat').innerHTML = `3 分钟赚到 <b>${r.score.toLocaleString('en-US')}</b>${r.newBest && r.score > 0 ? ' · 新纪录' : ''}<br>今日最佳 <b>${r.best.toLocaleString('en-US')}</b> · 历史最佳 <b>${r.allBest.toLocaleString('en-US')}</b>`
+      + `<br>${r.coins > 0 ? `<span class="wcoin"><i class="gc"></i><b>+${r.coins}</b> 金币</span> · ` : ''}${next}`;
+    this.el.dres.classList.remove('hidden');
+  }
   shopOpenNow() { return !this.el.shop.classList.contains('hidden'); }
   openLevels() {
     const d = this.h.data(); const g = this.el.grid; g.innerHTML = '';
@@ -272,5 +324,5 @@ export class UI {
     $('winStat').innerHTML = `用时 <b>${mm}:${ss}</b>${earned > 0 ? ` · 新得 <b>★${earned}</b>` : ''}<br>${coins > 0 ? `<span class="wcoin"><i class="gc"></i><b>+${coins}</b> 金币</span> · ` : ''}去商店换新衣服、新装饰吧`;
     this.el.win.classList.remove('hidden');
   }
-  hideAll() { this.closeAll(); this.el.win.classList.add('hidden'); }
+  hideAll() { this.closeAll(); this.el.win.classList.add('hidden'); this.el.dres.classList.add('hidden'); }
 }

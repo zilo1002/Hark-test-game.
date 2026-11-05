@@ -21,10 +21,17 @@ export const SPOTS2 = {
 const OL = '#4A3A20';
 function shadow(g, x, y, rx, ry) { g.fillStyle = 'rgba(30,70,15,0.25)'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, TAU); g.fill(); }
 function rr(g, x, y, w, h, r, fill, stroke, lw = 1.4) { g.beginPath(); g.roundRect(x, y, w, h, r); g.fillStyle = fill; g.fill(); if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw; g.stroke(); } }
+// v4.0 四季: the estate follows the season of the real week (border trees, lawn, drifting petals / leaves / snow)
+let HSEASON = null;
+const HS = {
+  bg: [['#A8E27A', '#76C84C'], null, ['#C9CC6A', '#A3AE48'], ['#D6E6EF', '#B4CCD9']],
+  lawn: ['#92D958', null, '#B9C25A', '#EAF2F6'],
+  tree: [['#F7A8C8', '#F48DB6', '#FFC4DA', '#F9B6D0', '#FFFFFF'], null, ['#E8871E', '#C8551E', '#F6C343', '#D9662A', '#FFD86B'], ['#E3EDF2', '#D2E2EA', '#FFFFFF', '#C6D8E2', '#FFFFFF']],
+};
 function roundTree(g, t, blossom) {
   shadow(g, 0, 0, 30, 9);
   g.fillStyle = '#7A4A22'; g.fillRect(-5, -30, 10, 30);
-  const cols = blossom ? ['#F7A8C8', '#F48DB6', '#FFC4DA', '#FFD9E8', '#FFFFFF'] : ['#3E9A2A', '#378E26', '#4FB233', '#5CC23D', '#7BD655'];
+  const cols = blossom ? ['#F7A8C8', '#F48DB6', '#FFC4DA', '#FFD9E8', '#FFFFFF'] : (HSEASON !== null && HS.tree[HSEASON]) || ['#3E9A2A', '#378E26', '#4FB233', '#5CC23D', '#7BD655'];
   for (const [x, y, r, i] of [[-16, -42, 18, 0], [16, -42, 18, 1], [0, -60, 22, 2], [-8, -48, 14, 3], [9, -64, 10, 4]]) { g.fillStyle = cols[i]; g.beginPath(); g.arc(x + Math.sin(t + i) * 0.5, y, r, 0, TAU); g.fill(); }
   if (blossom) for (let i = 0; i < 6; i++) { const u = (t * 0.25 + i / 6) % 1; g.fillStyle = 'rgba(255,170,200,0.9)'; g.beginPath(); g.ellipse(-24 + i * 9 + Math.sin(t + i) * 6, -40 + u * 44, 2, 1.2, u * 6, 0, TAU); g.fill(); }
 }
@@ -539,14 +546,16 @@ export function homeLayout(W, H, land) {
 
 export function drawHome(g, W, H, save, t, dpr, land, page = 1) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#9BDB6A'); gr.addColorStop(1, '#6CBF45');
+  HSEASON = Number.isInteger(save.season) ? save.season : null;
+  const bgc = (HSEASON !== null && HS.bg[HSEASON]) || ['#9BDB6A', '#6CBF45'];
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, bgc[0]); gr.addColorStop(1, bgc[1]);
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
   for (let i = 0; i < 40; i++) { g.fillStyle = i % 2 ? 'rgba(255,255,255,0.06)' : 'rgba(40,110,20,0.07)'; g.beginPath(); g.ellipse((i * 137) % W, (i * 89) % H, 40, 18, 0, 0, TAU); g.fill(); }
   const { s, ox, oy } = homeLayout(W, H, land);
   g.save(); g.translate(ox, oy); g.scale(s, s);
   for (const [x, y, k] of [[-14, 70, 1], [378, 50, 0.9], [-24, 300, 0.9], [386, 270, 1.1], [10, 470, 0.8], [360, 470, 0.9], [110, 40, 0.7], [250, 34, 0.8]]) { g.save(); g.translate(x, y); g.scale(k, k); roundTree(g, t, false); g.restore(); }
   // the estate lawn with a gravel yard in front of the manor
-  g.fillStyle = '#86D14C'; g.beginPath(); g.ellipse(180, 270, 200, 170, 0, 0, TAU); g.fill();
+  g.fillStyle = (HSEASON !== null && HS.lawn[HSEASON]) || '#86D14C'; g.beginPath(); g.ellipse(180, 270, 200, 170, 0, 0, TAU); g.fill();
   g.fillStyle = '#E8D7A6'; g.beginPath(); g.ellipse(180, 190, 110, 34, 0, 0, TAU); g.fill();
   const restored = new Set(save.restored);
   const flat = ['path', 'pond', 'fence2', 'dock'];
@@ -582,4 +591,17 @@ export function drawHome(g, W, H, save, t, dpr, land, page = 1) {
   if (hat && hat !== 'straw') decoHat(g, look); else if (look.scarf) decoHat(g, { scarf: look.scarf });
   g.restore();
   g.restore();
+  // drifting petals / leaves / snow over the estate (screen space, a couple of dozen)
+  if (HSEASON === 0 || HSEASON === 2 || HSEASON === 3) {
+    const n = HSEASON === 3 ? 40 : 22, h = (k) => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+    for (let k = 0; k < n; k++) {
+      const y = (t * (26 + h(k) * 26) + h(k + 50) * (H + 40)) % (H + 40) - 20, x = ((h(k + 90) * (W + 60) + Math.sin(t * 0.8 + k) * 20 + t * 10) % (W + 60)) - 30;
+      const sz = HSEASON === 3 ? 1.8 + h(k + 7) * 2 : 3.2 + h(k + 7) * 2.4;
+      g.globalAlpha = 0.88;
+      if (HSEASON === 3) { g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(x, y, sz, 0, TAU); g.fill(); continue; }
+      g.fillStyle = HSEASON === 0 ? (k % 3 ? '#FFB8D0' : '#FFFFFF') : ['#E8871E', '#C8551E', '#F6C343'][k % 3];
+      g.save(); g.translate(x, y); g.rotate(t * (1 + h(k + 3)) + k); g.beginPath(); g.ellipse(0, 0, sz, sz * 0.5, 0, 0, TAU); g.fill(); g.restore();
+    }
+    g.globalAlpha = 1;
+  }
 }

@@ -41,6 +41,7 @@ function put(arr, k, x, y, z, ang, s, sy = s) {
 const angLerp = (a, b, k) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return a + d * k; };
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3();
 
+const SEASON_LAWN = [['#86D34A', '#76C43C'], null, ['#A8B848', '#97A63C'], ['#DCE8EE', '#CBDCE4']];   // 春 夏(default) 秋 冬
 export class Renderer {
   constructor(overlay, glCanvas) {
     this.cv = overlay; this.g = overlay.getContext('2d'); this.glCanvas = glCanvas;
@@ -166,17 +167,20 @@ export class Renderer {
     this.groundDirty = false;
   }
   // v3.7 夜间农场: moonlit lighting (dark blue sky/fog, dim cool light); every other level the sunny default
+  // v4.0 四季: lawn colours per season (null season = the default summer green); rain: a softer, greyer light
   applyMood(w) {
-    const night = !!(w.deco && w.deco.night);
-    this.night = night;
-    this.gl.setClearColor(new THREE.Color(night ? '#0E1A3A' : COL.lawn2));
-    this.scene.fog.color.set(night ? '#101C40' : '#A8DDF0'); this.scene.fog.near = night ? 1100 : 1400; this.scene.fog.far = night ? 2400 : 2600;
-    this.hemi.color.set(night ? 0x8FA4E8 : 0xFFFFFF); this.hemi.groundColor.set(night ? 0x24304A : 0x7AA850); this.hemi.intensity = night ? 1.25 : 1.9;
-    this.sun.color.set(night ? 0xB8C8FF : 0xFFF4DD); this.sun.intensity = night ? 1.0 : 2.1;
+    const night = !!(w.deco && w.deco.night), rain = !!w.rain;
+    this.night = night; this.rain = rain; this.season = Number.isInteger(w.season) ? w.season : null;
+    const L = this.season === null ? null : SEASON_LAWN[this.season];
+    this.lawn = L ? L[0] : COL.lawn; this.lawn2 = L ? L[1] : COL.lawn2;
+    this.gl.setClearColor(new THREE.Color(night ? '#0E1A3A' : this.lawn2));
+    this.scene.fog.color.set(night ? '#101C40' : rain ? '#AEBCC8' : this.season === 3 ? '#DCEAF2' : '#A8DDF0'); this.scene.fog.near = night ? 1100 : 1400; this.scene.fog.far = night ? 2400 : 2600;
+    this.hemi.color.set(night ? 0x8FA4E8 : rain ? 0xDCE6F0 : 0xFFFFFF); this.hemi.groundColor.set(night ? 0x24304A : 0x7AA850); this.hemi.intensity = night ? 1.25 : rain ? 1.75 : 1.9;
+    this.sun.color.set(night ? 0xB8C8FF : rain ? 0xE8EEF5 : 0xFFF4DD); this.sun.intensity = night ? 1.0 : rain ? 1.55 : 2.1;
   }
   buildGround(w) {
     const M0 = 1600;
-    const outer = new THREE.Mesh(new THREE.PlaneGeometry(w.W + M0 * 2, w.H + M0 * 2), new THREE.MeshLambertMaterial({ color: COL.lawn2 }));
+    const outer = new THREE.Mesh(new THREE.PlaneGeometry(w.W + M0 * 2, w.H + M0 * 2), new THREE.MeshLambertMaterial({ color: this.lawn2 || COL.lawn2 }));
     outer.rotation.x = -Math.PI / 2; outer.position.set(w.W / 2, -0.4, w.H / 2); outer.receiveShadow = true; outer.userData.own = outer.userData.ownMat = true;
     this.levelRoot.add(outer);
     const pad = 120, gw = w.W + pad * 2, gh = w.H + pad * 2;
@@ -194,10 +198,16 @@ export class Renderer {
     const g = this.groundCanvas.getContext('2d'), k = this.groundK, pad = this.groundPad, theme = w.deco.theme || 'garden';
     const R = (s) => hash(s * 7919 + w.li * 131);
     g.setTransform(k, 0, 0, k, pad * k, pad * k);
-    g.fillStyle = COL.lawn2; g.fillRect(-pad, -pad, w.W + pad * 2, w.H + pad * 2);
-    g.fillStyle = COL.lawn; g.fillRect(0, 0, w.W, w.H);
+    g.fillStyle = this.lawn2 || COL.lawn2; g.fillRect(-pad, -pad, w.W + pad * 2, w.H + pad * 2);
+    g.fillStyle = this.lawn || COL.lawn; g.fillRect(0, 0, w.W, w.H);
     for (let x = 0; x < w.W; x += 36) { g.fillStyle = (x / 36) % 2 ? 'rgba(255,255,255,0.06)' : 'rgba(40,110,20,0.06)'; g.fillRect(x, 0, 36, w.H); }
     for (let i = 0; i < 160; i++) { g.fillStyle = i % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(40,100,20,0.07)'; g.beginPath(); g.ellipse(R(i) * w.W, R(i + 500) * w.H, 14 + R(i + 900) * 30, 8 + R(i + 1300) * 16, 0, 0, TAU); g.fill(); }
+    // v4.0 四季 on the lawn: spring daisies, autumn leaf litter, winter snow drifts (painted once, under everything)
+    const se = this.season;
+    if (se === 0) for (let i = 0; i < w.W * w.H / 900; i++) { g.fillStyle = ['#FFFFFF', '#FFD9E8', '#FFE97A', '#FF8FB0'][i % 4]; g.beginPath(); g.arc(R(i + 9100) * (w.W + pad * 2) - pad, R(i + 9400) * (w.H + pad * 2) - pad, 1.6 + R(i + 9700) * 1.2, 0, TAU); g.fill(); }
+    if (se === 2) for (let i = 0; i < w.W * w.H / 500; i++) { g.fillStyle = ['#E8871E', '#C8551E', '#F6C343', '#B8742A'][i % 4]; g.globalAlpha = 0.75; g.beginPath(); g.ellipse(R(i + 9100) * (w.W + pad * 2) - pad, R(i + 9400) * (w.H + pad * 2) - pad, 3 + R(i + 9700) * 2, 1.6 + R(i) * 1.2, R(i + 3) * 3, 0, TAU); g.fill(); }
+    if (se === 3) { for (let i = 0; i < 90; i++) { g.fillStyle = i % 2 ? 'rgba(255,255,255,0.75)' : 'rgba(200,220,235,0.5)'; g.beginPath(); g.ellipse(R(i + 9100) * (w.W + pad * 2) - pad, R(i + 9400) * (w.H + pad * 2) - pad, 20 + R(i + 9700) * 40, 10 + R(i) * 16, 0, 0, TAU); g.fill(); } }
+    g.globalAlpha = 1;
     const pave = (x, y, pw, ph) => {
       if (theme === 'garden') {
         g.fillStyle = COL.paving2; g.fillRect(x - 2, y - 2, pw + 4, ph + 4); g.fillStyle = COL.paving; g.fillRect(x, y, pw, ph);
@@ -256,6 +266,7 @@ export class Renderer {
     this.groundTex.needsUpdate = true;
   }
   buildEnv(w) {
+    M.setSeason(Number.isInteger(w.season) ? w.season : null);
     const out = [], theme = w.deco.theme || 'garden', R = (s) => hash(s * 7919 + w.li * 131), SEG = 40;
     const wall = (x0, y0, x1, y1, pa, pb) => (theme === 'farm' ? M.Env.woodFence(out, x0, y0, x1, y1) : M.Env.stoneWall(out, x0, y0, x1, y1, pa, pb));
     const gates = w.gates().slice().sort((a, b) => a[0] - b[0]);
@@ -892,6 +903,32 @@ export class Renderer {
     }
   }
   // golden plant sparkles, sprinkler water arcs, 丰收狂热 meter
+  // v4.0 四季 / 雨: light screen-space particles over the scene (petals in spring, leaves in autumn, snow in
+  // winter; rain streaks on rainy runs). Few, cheap, no allocation; fewer still at low quality.
+  drawWeather(g, t) {
+    const W = this.W, H = this.H, lo = this.q === 0, se = this.season;
+    if (se === 0 || se === 2 || se === 3) {
+      const n = (se === 3 ? 46 : 26) >> (lo ? 1 : 0);
+      for (let k = 0; k < n; k++) {
+        const sp = (se === 3 ? 26 : 34) + hash(k * 3 + 1) * 30, fall = (t * sp + hash(k * 5 + 2) * (H + 40)) % (H + 40) - 20;
+        const x = (hash(k * 7 + 3) * (W + 60) - 30 + Math.sin(t * (0.6 + hash(k) * 0.8) + k) * 24 + t * (se === 3 ? 4 : 14)) % (W + 60);
+        const y = fall, sz = (se === 3 ? 1.6 + hash(k * 11) * 2.2 : 3 + hash(k * 11) * 2.4) * Math.max(1, this.z * 0.6);
+        g.globalAlpha = se === 3 ? 0.9 : 0.85;
+        if (se === 3) { g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(x, y, sz, 0, TAU); g.fill(); continue; }
+        g.fillStyle = se === 0 ? (k % 3 ? '#FFB8D0' : '#FFFFFF') : ['#E8871E', '#C8551E', '#F6C343'][k % 3];
+        g.save(); g.translate(x, y); g.rotate(t * (1 + hash(k) * 2) + k); g.beginPath(); g.ellipse(0, 0, sz, sz * 0.5, 0, 0, TAU); g.fill(); g.restore();
+      }
+      g.globalAlpha = 1;
+    }
+    if (this.rain) {
+      const n = lo ? 40 : 80; g.strokeStyle = 'rgba(210,230,255,0.55)'; g.lineWidth = 1.3; g.beginPath();
+      for (let k = 0; k < n; k++) {
+        const y = (t * (520 + hash(k * 13) * 180) + hash(k * 17 + 1) * (H + 60)) % (H + 60) - 30, x = (hash(k * 19 + 2) * (W + 80) - 40 - (y * 0.18)) ;
+        g.moveTo(x, y); g.lineTo(x - 4, y + 16);
+      }
+      g.stroke();
+    }
+  }
   drawExtras(world) {
     const g = this.g, z = this.z, t = this.time, sp = this.goldSpots;
     for (let k = 0; k < sp.length; k += 3) {
@@ -918,6 +955,7 @@ export class Renderer {
       }
       g.globalAlpha = 1;
     }
+    this.drawWeather(g, t);
     for (const o of this.sprinklers) {
       const f = o.f, hx = f.x + f.w / 2, hy = f.y + f.h / 2, R = Math.min(f.w, f.h) * 0.45, head = 24 * 1.2;
       g.fillStyle = 'rgba(150,215,255,0.8)';

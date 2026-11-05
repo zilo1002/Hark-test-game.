@@ -124,8 +124,10 @@ export class Field {
     this.jx = new Int8Array(n); this.jy = new Int8Array(n); this.v = new Uint8Array(n); this.pop = new Float32Array(n); this.cutAt = new Float32Array(n).fill(-9);
     for (let i = 0; i < n; i++) { this.jx[i] = Math.round((rnd() - 0.5) * 60); this.jy[i] = Math.round((rnd() - 0.5) * 60); this.v[i] = (rnd() * 4) | 0; }
     // 金色作物: a few sparkling golden plants; a cut golden plant re-rolls when it regrows
-    this.gold = new Uint8Array(n); for (let i = 0; i < n; i++) this.gold[i] = rnd() < CFG.golden.chance ? 1 : 0;
-    this.ripe = n; this.grow = cr.grow; this.yield = cr.yield || 1; this.growMul = 1; this.sprinkler = false; this.spill = cr.spill || 0; this.pile = null;
+    // v4.0 每日挑战 金色日: a field object may carry goldMul (×chance); every normal level keeps CFG.golden.chance
+    this.goldChance = CFG.golden.chance * (o.goldMul || 1);
+    this.gold = new Uint8Array(n); for (let i = 0; i < n; i++) this.gold[i] = rnd() < this.goldChance ? 1 : 0;
+    this.ripe = n; this.grow = cr.grow; this.yield = cr.yield || 1; this.growMul = 1; this.envMul = 1; this.sprinkler = false; this.spill = cr.spill || 0; this.pile = null;
   }
   px(i) { return this.x + ((i % this.cols) + 0.5 + this.jx[i] / 300) * this.gap; }
   py(i) { return this.y + (((i / this.cols) | 0) + 0.5 + this.jy[i] / 300) * this.gy; }
@@ -161,7 +163,15 @@ const itemPrice = (t) => CFG.items[t].price;
 export class World {
   constructor(levelIndex, opts = {}) {
     this.li = levelIndex;
-    this.L = CFG.levels[levelIndex];
+    // v4.0: opts.level = a remixed level object (每日挑战); otherwise the level from CFG
+    this.L = opts.level || CFG.levels[levelIndex];
+    this.daily = opts.level ? (opts.daily || {}) : null;
+    this.timeLimit = opts.timeLimit || 0;     // 每日挑战: the run ends at this many seconds (score = money earned)
+    this.vipMul = opts.vipMul || 1;
+    // v4.0 四季与天气: season index 0–3 (春夏秋冬) or null = neutral; rain = this run is rainy.
+    // Neutral (the sims' default) leaves every growth rate exactly as before.
+    this.season = Number.isInteger(opts.season) ? opts.season : null;
+    this.rain = !!opts.rain;
     this.W = this.L.W; this.H = this.L.H;
     this.rnd = rng32(opts.seed ?? (levelIndex + 1) * 7919);
     this.quiet = !!opts.quiet;      // sim: skip render-only events
@@ -181,9 +191,33 @@ export class World {
     this.L.tiles.forEach((t, i) => this.tiles.push({ ...t, order: i, paid: 0, bought: 0, done: false, visible: false,
       price0: t.price, payFx: 0, appearT: -9, cool: 0 }));
     this.player = makeCollector('player', this.L.start[0], this.L.start[1]);
+    this.applyEnv();
+    if (opts.money) this.money = opts.money;
+    if (opts.speedUp) this.upg.speed += opts.speedUp;
     this.refreshStats();
     this.rebuildSolids();
     this.updateTileVis(true);
+  }
+
+  // season crops grow +CFG.season.bonus, rain +CFG.rain.bonus (fields regrow faster, coop producers of
+  // that item lay faster). Returns the multiplier for an item.
+  envMul(item) {
+    let m = 1;
+    if (this.season !== null && CFG.seasons[this.season].crops.includes(item)) m *= 1 + CFG.season.bonus;
+    if (this.rain) m *= 1 + CFG.rain.bonus;
+    return m;
+  }
+  applyEnv() {
+    for (const f of this.fields) f.envMul = this.envMul(f.item);
+    for (const c of this.coops) { const m = this.envMul(c.item); if (m !== 1) c.period = CFG.producers[c.producer].period / m; }
+  }
+  // crops in this level that the season favours (for the HUD)
+  seasonCrops() {
+    if (this.season === null) return [];
+    const S = CFG.seasons[this.season].crops, out = [];
+    for (const f of this.fields) if (S.includes(f.item) && !out.includes(f.item)) out.push(f.item);
+    for (const c of this.coops) if (S.includes(c.item) && !out.includes(c.item)) out.push(c.item);
+    return out;
   }
 
   emit(type, data) { if (!this.quiet) { if (this.events.length < 800) this.events.push({ type, ...data }); } }
@@ -463,7 +497,7 @@ export class World {
     // fields regrow
     for (const f of this.fields) {
       if (f.hidden || f.ripe >= f.n) continue;
-      const g = f.g, pop = f.pop, k = dt * f.growMul / f.grow;
+      const g = f.g, pop = f.pop, k = dt * f.growMul * f.envMul / f.grow;
       for (let i = 0, n = f.n; i < n; i++) {
         const v = g[i];
         if (v < 1) { const nv = v + k; if (nv >= 1) { g[i] = 1; f.ripe++; pop[i] = 1; } else g[i] = nv; }
@@ -528,7 +562,8 @@ export class World {
       if (f.t >= f.dur) { this.landFly(f); f.active = false; this.fly[i] = this.fly[this.fly.length - 1]; this.fly.pop(); this.flyFree.push(f); }
     }
     for (const pl of this.piles) { const b = pl.bump; for (let i = 0; i < b.length; i++) if (b[i] > 0) b[i] = Math.max(0, b[i] - dt * 5); }
-    if (!this.won && this.progress().f >= 1) { this.won = true; this.winT = this.t; this.emit('win', {}); }
+    if (this.timeLimit) { if (!this.won && this.t >= this.timeLimit) { this.won = true; this.winT = this.timeLimit; this.score = Math.floor(this.stats.earned); this.emit('win', {}); } }
+    else if (!this.won && this.progress().f >= 1) { this.won = true; this.winT = this.t; this.emit('win', {}); }
   }
 
   collide(c, nx, ny, r) {
@@ -642,7 +677,7 @@ export class World {
             this.money += amount; this.stats.earned += amount;
             this.emit('golden', { x: px, y: py, amount, who: c.kind });
           }
-          f.gold[i] = this.rnd() < CFG.golden.chance ? 1 : 0;
+          f.gold[i] = this.rnd() < f.goldChance ? 1 : 0;
           if (f.spill) {
             for (let k = 0; k < f.spill; k++) {
               const tx = px + (this.rnd() - 0.5) * 34, ty = py + (this.rnd() - 0.5) * 34;
@@ -738,7 +773,8 @@ export class World {
       if (!t.visible) continue;
       if (Math.abs(p.x - t.x) > half || Math.abs(p.y - t.y) > half) continue;
       if (t.cool > 0) break;
-      if (this.money < 0.5) continue;
+      // (v4.0 fix: a last fraction of a coin still pays when the wallet covers it — it used to stall the tile forever)
+      if (this.money < 0.5 && this.money + 1e-6 < t.price - t.paid) continue;
       const rate = Math.max(t.price / CFG.player.payTime, CFG.player.payMin);
       const pay = Math.min(rate * dt, this.money, t.price - t.paid);
       this.money -= pay; t.paid += pay; t.payFx += pay;
@@ -757,7 +793,7 @@ export class World {
       const cu = { x: c.spawn.x + this.rnd() * 30, y: c.spawn.y + (this.rnd() - 0.5) * 20, counter: c, state: 'in',
                    want: C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)),
                    bag: [], incoming: 0, wait: 0, hue: Math.floor(this.rnd() * 8), walk: this.rnd() * 6, face: -1, vx: 0, vy: 0, leg: 0 };
-      if (this.rnd() < CFG.vip.chance) { cu.vip = true; cu.wish = c.items.reduce((a, b) => (itemPrice(b) > itemPrice(a) ? b : a), c.items[0]); }
+      if (this.rnd() < CFG.vip.chance * this.vipMul) { cu.vip = true; cu.wish = c.items.reduce((a, b) => (itemPrice(b) > itemPrice(a) ? b : a), c.items[0]); }
       c.queue.push(cu); this.customers.push(cu);
     }
     const front = c.queue[0];
@@ -944,7 +980,7 @@ export class World {
 
   // ---- save/restore of a level in progress ---------
   snapshot() {
-    return { li: this.li, t: this.t, money: this.money, stats: this.stats,
+    return { li: this.li, t: this.t, money: this.money, stats: this.stats, env: { season: this.season, rain: this.rain },
              tiles: this.tiles.map((t) => ({ id: t.id, paid: t.paid, bought: t.bought })),
              stack: this.player.stack.slice(0, 600),
              cash: this.counters.map((c) => c.cash), stock: this.counters.map((c) => c.stock.slice(0, 300)),

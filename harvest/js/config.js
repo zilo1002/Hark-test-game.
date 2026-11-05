@@ -3,7 +3,7 @@
 // The camera looks down from the south-east (see render3d.js), so screen-right is +x −y.
 
 export const CFG = {
-  version: 4,
+  version: 5,
   saveKey: 'banmu-harvest-v2',
 
   view: {
@@ -35,6 +35,22 @@ export const CFG = {
   // VIP 顾客: crown, thought bubble, pays `mul` × and showers coins
   vip: { chance: 0.1, mul: 2 },
   sprinkler: { growMul: 2 },
+  // v4.0 四季: the season follows the real calendar — one season per real week (春→夏→秋→冬, a full year
+  // every 4 weeks, the same for everyone). Each season's 3 crops regrow +20% (coop producers of that item
+  // lay +20% faster). Home shows the season; levels tint the ground and trees and drift petals / leaves / snow.
+  seasons: [
+    { id: 'spring', name: '春', full: '春天', crops: ['tulip', 'rose', 'berry'] },
+    { id: 'summer', name: '夏', full: '夏天', crops: ['tomato', 'corn', 'gold'] },
+    { id: 'autumn', name: '秋', full: '秋天', crops: ['wheat', 'pumpkin', 'grape'] },
+    { id: 'winter', name: '冬', full: '冬天', crops: ['potato', 'log', 'fish'] },
+  ],
+  season: { bonus: 0.2, days: 7, epoch: [2026, 0, 5] },   // epoch: a Monday (local date) that starts a spring week
+  // 雨天: a level run is rainy 1 time in 5 (never level 1, never the daily challenge unless it is its twist): +25% growth
+  rain: { chance: 0.2, bonus: 0.25 },
+  // v4.0 每日挑战: opens after level 10 is cleared. One remixed level a day (from the date), 3 minutes, score = money earned.
+  // Tier thresholds = fraction of what the balance bot earns in that remix (sim/daily-ref.mjs → js/daily-ref.js).
+  // 金币 per tier are paid once a day (reaching a higher tier later that day pays the difference).
+  daily: { unlockAfter: 10, time: 180, tiers: [0.45, 0.75, 1.0], coins: [50, 100, 200] },
 
   items: {
     wheat:   { name: '小麦',   unit: '捆', price: 1,  step: 4.6 },

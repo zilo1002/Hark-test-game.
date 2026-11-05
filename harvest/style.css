@@ -215,3 +215,33 @@ button { font: inherit; cursor: pointer; border: 0; }
 .coin b { min-width: 6ch; text-align: right; }
 .stackBadge { width: 150px; min-width: 0; box-sizing: border-box; }
 .hudNote { height: 20px; line-height: 20px; }
+
+/* v4.0 四季 / 天气 / 每日挑战 */
+.season { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 800; color: #5A4A2A; margin-bottom: 6px; line-height: 1.25; }
+.sbadge { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 900; border: 2px solid #fff; box-shadow: 0 2px 0 rgba(0,0,0,.15); }
+.sbadge.s0 { background: #FF8FB0; } .sbadge.s1 { background: #4CB24E; } .sbadge.s2 { background: #E8871E; } .sbadge.s3 { background: #6FA8DC; }
+.envHud { margin-top: 4px; display: flex; gap: 4px; flex-wrap: wrap; }
+.envHud span { font-size: 11px; font-weight: 800; color: #fff; border-radius: 9px; padding: 2px 7px; white-space: nowrap; text-shadow: 0 1px 0 rgba(0,0,0,.35); display: inline-flex; align-items: center; gap: 3px; }
+.envHud .sea { background: rgba(40,60,20,.55); } .envHud .sea.s0 { background: rgba(232,90,140,.8); } .envHud .sea.s1 { background: rgba(60,150,60,.8); } .envHud .sea.s2 { background: rgba(214,112,20,.85); } .envHud .sea.s3 { background: rgba(80,130,190,.85); }
+.envHud .rain { background: rgba(50,90,150,.85); }
+.cloudIco { width: 15px; height: 11px; display: inline-block; background: no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 22'%3E%3Cpath d='M8 13a5 5 0 0 1 1-10 7 7 0 0 1 13 2 4 4 0 0 1 0 8z' fill='%23fff'/%3E%3Cpath d='M9 16l-2 4M15 16l-2 4M21 16l-2 4' stroke='%23BFE3FF' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.hidden.sea, .hidden.rain { display: none; }
+.dailyBtn { margin-top: 8px; width: 100%; background: linear-gradient(#FFB84D, #F07A1E); box-shadow: 0 4px 0 #B3530E; text-shadow: 0 2px 0 #B3530E; }
+.dailyBtn small { font-size: 11px; font-weight: 800; opacity: .95; margin-left: 6px; }
+.dailyBtn.lock { background: linear-gradient(#D8D2C4, #B8B0A0); box-shadow: 0 4px 0 #8E8676; text-shadow: none; color: #fff; }
+.dailyCard { max-width: 380px; }
+.dlv { font-weight: 900; font-size: 17px; margin: 4px 0 2px; }
+.dtw { font-size: 13px; font-weight: 800; color: #B3530E; margin-bottom: 8px; }
+.dtiers { display: flex; gap: 6px; margin-bottom: 8px; }
+.dtier { flex: 1; border-radius: 12px; padding: 6px 4px; text-align: center; font-weight: 900; font-size: 12px; background: #F4EEDC; border: 2px solid #fff; }
+.dtier b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+.dtier small { display: inline-flex; align-items: center; gap: 2px; color: #C27A00; font-size: 11px; }
+.dtier.t1 { box-shadow: inset 0 -4px 0 #C98A4B; } .dtier.t2 { box-shadow: inset 0 -4px 0 #AEB6C2; } .dtier.t3 { box-shadow: inset 0 -4px 0 #FFC21A; }
+.dtier.got { background: #FFF3C4; } .dtier.got::after { content: '✓ 已领'; display: block; font-size: 10px; color: #4CB24E; }
+.dbest { font-size: 12.5px; font-weight: 800; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+.medal { width: 74px; height: 74px; margin: 26px auto 6px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 18px; color: #fff; border: 5px solid #fff; box-shadow: 0 4px 0 rgba(0,0,0,.18); background: #C8C0B0; text-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.medal.m1 { background: radial-gradient(circle at 35% 30%, #F2C08A, #B8743A); } .medal.m2 { background: radial-gradient(circle at 35% 30%, #F4F6FA, #9AA4B2); } .medal.m3 { background: radial-gradient(circle at 35% 30%, #FFF0A0, #F2A60E); }
+#dailyRes .brow { margin-top: 10px; align-items: center; } #dailyRes .brow .big { flex: 1.4; margin: 0; }
+@media (orientation: landscape) and (max-height: 420px) { .dailyCard .note { display: none; } .medal { width: 56px; height: 56px; margin-top: 22px; font-size: 15px; } }
+.lvBadge.timer { font-variant-numeric: tabular-nums; background: rgba(214,112,20,.88); min-width: 74px; text-align: center; }
+.lvBadge.timer.hurry { background: rgba(214,48,40,.92); }

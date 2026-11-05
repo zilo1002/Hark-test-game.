@@ -715,6 +715,23 @@ export function appleTreeGeo() {   // round orchard tree full of red apples
 }
 
 // ------------------------------------------------------------------ environment pieces (merged into static meshes)
+// v4.0 四季: env trees / hedges take the season's colours (null = the green default).
+// Set by the renderer before a level's scenery is built.
+let SEASON = null;
+export function setSeason(s) { SEASON = Number.isInteger(s) ? s : null; }
+const FOLIAGE = [
+  { '#2F8A2A': '#3FA236', '#3FA236': '#F7A8C8', '#5DBB3A': '#FFC4DA' },   // 春: blossom (cone pines stay green-ish)
+  null,                                                                    // 夏: the default greens
+  { '#2F8A2A': '#C8551E', '#3FA236': '#E8871E', '#5DBB3A': '#F6C343' },   // 秋: orange, red and gold
+  { '#2F8A2A': '#2E6E4A', '#3FA236': '#E9F1F5', '#5DBB3A': '#FFFFFF' },   // 冬: snow-capped
+];
+const fol = (c, kind) => {
+  const m = SEASON === null ? null : FOLIAGE[SEASON];
+  if (!m) return c;
+  if (SEASON === 0 && kind === 'cone') return c;            // spring pines stay green
+  if (SEASON === 3 && kind === 'cone' && c === '#3FA236') return '#3A8A5A';
+  return m[c] || c;
+};
 export const Env = {
   stoneWall(out, x0, y0, x1, y1, pa, pb) {
     const L = Math.hypot(x1 - x0, y1 - y0), a = Math.atan2(x1 - x0, y1 - y0), mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
@@ -742,19 +759,19 @@ export const Env = {
     }
   },
   hedge(out, x, y, w, d, h = 18) {
-    out.push(P(box(w, h, d), '#4FA82A', [x + w / 2, h / 2, y + d / 2]));
-    out.push(P(box(w - 2, 3, d - 2), '#7FD24A', [x + w / 2, h + 1, y + d / 2]));
+    out.push(P(box(w, h, d), SEASON === 2 ? '#8AA02A' : '#4FA82A', [x + w / 2, h / 2, y + d / 2]));
+    out.push(P(box(w - 2, 3, d - 2), SEASON === 3 ? '#F4F8FA' : SEASON === 2 ? '#C9B23A' : '#7FD24A', [x + w / 2, h + 1, y + d / 2]));
   },
   tree(out, x, y, kind, s = 1) {
     out.push(P(cyl(2.4 * s, 3.2 * s, 16 * s, 6), '#8E5627', [x, 8 * s, y]));
     if (kind === 'cone') {
-      out.push(P(cone(13 * s, 26 * s, 7), '#2F8A2A', [x, 26 * s, y]));
-      out.push(P(cone(10 * s, 20 * s, 7), '#3FA236', [x, 38 * s, y]));
-      out.push(P(cone(6 * s, 13 * s, 7), '#5DBB3A', [x, 48 * s, y]));
+      out.push(P(cone(13 * s, 26 * s, 7), fol('#2F8A2A', 'cone'), [x, 26 * s, y]));
+      out.push(P(cone(10 * s, 20 * s, 7), fol('#3FA236', 'cone'), [x, 38 * s, y]));
+      out.push(P(cone(6 * s, 13 * s, 7), fol('#5DBB3A', 'cone'), [x, 48 * s, y]));
     } else {
-      out.push(P(ico(15 * s, 1), '#3FA236', [x, 30 * s, y]));
-      out.push(P(ico(10 * s, 0), '#5DBB3A', [x + 6 * s, 38 * s, y + 4 * s]));
-      out.push(P(ico(9 * s, 0), '#2F8A2A', [x - 8 * s, 26 * s, y - 3 * s]));
+      out.push(P(ico(15 * s, 1), fol('#3FA236'), [x, 30 * s, y]));
+      out.push(P(ico(10 * s, 0), fol('#5DBB3A'), [x + 6 * s, 38 * s, y + 4 * s]));
+      out.push(P(ico(9 * s, 0), fol('#2F8A2A'), [x - 8 * s, 26 * s, y - 3 * s]));
     }
   },
   shrub(out, x, y, flower) {
