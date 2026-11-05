@@ -170,3 +170,33 @@ button { font: inherit; cursor: pointer; border: 0; }
 .pvSub { text-align: center; font-size: 11px; font-weight: 800; color: #7A6A4A; min-height: 1.1em; }
 .shake { animation: shk .35s; }
 @keyframes shk { 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(3px); } }
+
+/* ---------- v3.6 订单板 / 雇工 ---------- */
+.ordHud { margin-top: 4px; font-size: 11px; font-weight: 800; color: #fff; background: rgba(40,60,20,.55); border-radius: 9px; padding: 2px 8px; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.ordHud.done { background: rgba(232,150,14,.85); }
+.ordBtn { background: linear-gradient(#9BE460, #4CB24E); box-shadow: 0 4px 0 #2E7A2E; text-shadow: 0 2px 0 #2E7A2E; position: relative; }
+.crewBtn { background: linear-gradient(#8DD0FF, #3B8FE0); box-shadow: 0 4px 0 #2559A8; text-shadow: 0 2px 0 #2559A8; }
+.ordBtn .dot { position: absolute; right: 8px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #FF3B30; border: 2px solid #fff; }
+.ordCard { width: min(640px, 100%); display: flex; flex-direction: column; max-height: 100%; padding: 12px 12px 10px; }
+.ordList, .crewList { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; min-height: 0; flex: 1; }
+.ord, .cw { display: flex; align-items: center; gap: 10px; background: #FFF8E6; border: 3px solid #F2D9A0; border-radius: 16px; padding: 8px 10px; }
+.ord.done { border-color: #FFB21A; background: #FFF1C4; }
+.ord.claimed { opacity: .55; }
+.ord .oi { flex: 1; min-width: 0; }
+.ord .ot { font-weight: 900; font-size: 15px; color: #5A3A10; }
+.ord .ow { font-size: 11px; color: #9A7A40; font-weight: 700; }
+.ord .ob, .cw .cb { height: 9px; border-radius: 5px; background: #EADBB8; overflow: hidden; margin-top: 4px; }
+.ord .ob i, .cw .cb i { display: block; height: 100%; background: linear-gradient(90deg, #7BD655, #3EA82A); border-radius: 5px; }
+.ord .op { font-size: 11px; font-weight: 800; color: #5A7A30; margin-top: 2px; }
+.ord .or { text-align: right; font-weight: 900; color: #B5600C; font-size: 14px; white-space: nowrap; }
+.ord .or small { display: block; font-size: 11px; color: #A0527A; }
+.ord .oa { display: flex; flex-direction: column; gap: 4px; }
+.ord .oa button { margin: 0; padding: 6px 10px; font-size: 13px; min-width: 64px; }
+.tier { display: inline-block; font-size: 10px; font-weight: 900; color: #fff; border-radius: 6px; padding: 1px 5px; margin-right: 4px; vertical-align: 2px; }
+.tier.t0 { background: #4CB24E; } .tier.t1 { background: #3B8FE0; } .tier.t2 { background: #E8452C; }
+.cw .ca { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; font-weight: 900; color: #fff; background: #3B8FE0; border: 3px solid #fff; box-shadow: 0 2px 0 rgba(0,0,0,.15); flex: none; }
+.cw .ci { flex: 1; min-width: 0; }
+.cw .cn { font-weight: 900; font-size: 15px; color: #5A3A10; }
+.cw .cn b { color: #E8871E; margin-left: 6px; }
+.cw .ct { font-size: 11px; font-weight: 800; color: #3B7A2A; }
+.cw .cx { font-size: 10px; color: #9A7A40; font-weight: 700; margin-top: 2px; }

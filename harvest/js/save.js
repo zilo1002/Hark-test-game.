@@ -1,6 +1,8 @@
 // localStorage save with a graceful in-memory fallback (private mode, blocked storage, file://).
 import { CFG } from './config.js';
 import { shopDefaults, normShop, migrateCoins } from './shop.js';
+import { crewDefaults, normCrew } from './crew.js';
+import { ordersDefaults, normOrders } from './orders.js';
 
 let memory = null;
 let storage = null;
@@ -12,7 +14,7 @@ try {
 export const storageAvailable = () => !!storage;
 
 export function defaults() {
-  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true }, cur: null, played: false, coins: 0, shop: shopDefaults() };
+  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults() };
 }
 
 export function load() {
@@ -29,6 +31,8 @@ export function load() {
     if (typeof d.coins !== 'number' || !isFinite(d.coins)) out.coins = migrateCoins(totalStars(out), Math.min(out.unlocked || 0, CFG.levels.length));
     out.coins = Math.max(0, Math.floor(out.coins));
     out.shop = normShop(d.shop);
+    // v3.6: 雇工 roster and 订单板 (older saves start with a fresh Lv1 crew and today's orders)
+    out.crew = normCrew(d.crew); out.orders = normOrders(d.orders);
     return out;
   } catch (_) { return defaults(); }
 }

@@ -21,6 +21,7 @@
     <div class="goal">
       <div class="gtext" id="goalText"></div>
       <div class="bar"><i id="goalBar"></i><span id="goalNum"></span></div>
+      <div class="ordHud hidden" id="ordHud"></div>
     </div>
   </div>
   <div class="hr">
@@ -45,6 +46,7 @@
     <div class="restore" id="restoreList"></div>
     <button class="big" id="btnPlay">开始 第 1 关</button>
     <div class="brow"><button class="small shopBtn" id="btnShop"><i class="gc"></i>商店</button><button class="small" id="btnLevels">选择关卡</button></div>
+    <div class="brow"><button class="small ordBtn" id="btnOrders">订单<em class="dot hidden" id="ordDot"></em></button><button class="small crewBtn" id="btnCrew">雇工</button></div>
   </div>
 </div>
 
@@ -74,12 +76,24 @@
 
 <div id="shop" class="modal hidden"><div class="card wide shopCard">
   <div class="shopHead"><h2>商店</h2><div class="coinPill"><i class="gc"></i><b id="shopCoins">0</b></div><button class="xclose" data-close aria-label="关闭">✕</button></div>
-  <div class="htabs" id="shopTabs"><button data-t="outfit" class="on">服装</button><button data-t="deco">装饰</button></div>
+  <div class="htabs" id="shopTabs"><button data-t="outfit" class="on">服装</button><button data-t="deco">装饰</button><button data-t="uni">制服</button></div>
   <div class="shopBody">
     <div class="pv"><canvas id="shopPrev"></canvas><div class="pvside"><div class="pvName" id="shopName"></div><div class="pvSub" id="shopSub"></div><button class="small warm" id="shopAct">购买</button></div></div>
     <div class="sgrid" id="shopGrid"></div>
   </div>
   <div class="note" id="shopHow">过关就能拿金币：每关保底 10 + 本关收入的 2% + 每颗星 10；第一次拿到的星星每颗再 +20。</div>
+</div></div>
+
+<div id="orders" class="modal hidden"><div class="card wide ordCard">
+  <div class="shopHead"><h2>村民订单</h2><div class="coinPill"><i class="gc"></i><b id="ordCoins">0</b></div><button class="xclose" data-close aria-label="关闭">✕</button></div>
+  <div class="ordList" id="ordList"></div>
+  <div class="note" id="ordNote">每天 3 张新订单。在任何关卡里卖出 / 做出的东西都算数；每天可以换掉 1 张。</div>
+</div></div>
+
+<div id="crew" class="modal hidden"><div class="card wide ordCard">
+  <div class="shopHead"><h2>我的雇工</h2><button class="xclose" data-close aria-label="关闭">✕</button></div>
+  <div class="crewList" id="crewList"></div>
+  <div class="note">关卡里雇来的工人就是他们（每关轮流上岗）。送货越多经验越多，等级越高特长越强（1 级 +5% → 10 级 +30%）。</div>
 </div></div>
 
 <div id="win" class="modal hidden"><div class="card win">

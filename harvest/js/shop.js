@@ -53,9 +53,24 @@ export const DECOS = [
   { id: 'rainbow',   name: '彩虹桥',   price: 2800 },
 ];
 
-export const itemById = (id) => OUTFITS.find((o) => o.id === id) || DECOS.find((d) => d.id === id);
+// ---- 制服 (v3.6): one set at a time, worn by every hired worker in levels -----------------------
+// style overrides the worker's own look (gardener / carter / lumberjack / milker); beards stay.
+const U0 = { vest: null, overalls: null, apron: null, bowtie: false };
+export const UNIFORMS = [
+  { id: 'u_red',    uni: true, name: '红色工装', price: 120, style: { ...U0, shirt: '#E8452C', sleeve: '#E8452C', pants: '#2D3A5A', hat: 'cap', capColor: '#FFFFFF' }, sw: ['#E8452C', '#FFFFFF'] },
+  { id: 'u_green',  uni: true, name: '绿背带裤', price: 180, style: { ...U0, shirt: '#FFF6E0', sleeve: '#FFF6E0', overalls: '#3E9A4A', pants: '#3E9A4A', hat: 'straw' }, sw: ['#3E9A4A', '#F2CF6B'] },
+  { id: 'u_yellow', uni: true, name: '明黄雨衣', price: 240, style: { ...U0, shirt: '#FFC21A', sleeve: '#FFC21A', pants: '#3567C8', hat: 'beanie', capColor: '#FFC21A' }, sw: ['#FFC21A', '#3567C8'] },
+  { id: 'u_pink',   uni: true, name: '粉色围裙', price: 320, style: { ...U0, shirt: '#FFFFFF', sleeve: '#FFFFFF', apron: '#FF8FB0', apronDot: '#FFFFFF', pants: '#FF7FAE', hat: 'flower' }, sw: ['#FF8FB0', '#FFFFFF'] },
+  { id: 'u_navy',   uni: true, name: '海军条纹', price: 450, style: { ...U0, shirt: '#FFFFFF', sleeve: '#FFFFFF', vest: '#2A4C9A', pants: '#2A4C9A', scarf: '#E8283C', hat: 'cap', capColor: '#2A4C9A' }, sw: ['#2A4C9A', '#E8283C'] },
+  { id: 'u_gold',   uni: true, name: '金牌大师', price: 800, style: { ...U0, shirt: '#FFF6E0', sleeve: '#FFF6E0', vest: '#E8B21E', bowtie: true, bowColor: '#C8352A', pants: '#5A3414', hat: 'cowboy' }, sw: ['#E8B21E', '#C8352A'] },
+];
+// the default hired-hand look (the gardener) used for the 制服 preview
+export const WORKER_BASE = { shirt: '#F7F5EE', overalls: '#3567C8', pants: '#3567C8', hair: '#5A3414', hat: 'straw', sleeve: '#F7F5EE' };
+export const uniformStyle = (id) => { const u = UNIFORMS.find((x) => x.id === id); return u ? u.style : null; };
 
-export function shopDefaults() { return { owned: [], eq: { hat: null, top: null, neck: null, feet: null }, deco: [] }; }
+export const itemById = (id) => OUTFITS.find((o) => o.id === id) || DECOS.find((d) => d.id === id) || UNIFORMS.find((u) => u.id === id);
+
+export function shopDefaults() { return { owned: [], eq: { hat: null, top: null, neck: null, feet: null }, deco: [], uni: null }; }
 
 // normalise whatever is in the save (old saves have nothing; drop unknown ids)
 export function normShop(s) {
@@ -64,6 +79,7 @@ export function normShop(s) {
   d.owned = Array.isArray(s.owned) ? s.owned.filter((id) => itemById(id)) : [];
   for (const [k] of SLOTS) { const id = s.eq && s.eq[k]; const it = OUTFITS.find((o) => o.id === id); d.eq[k] = it && it.slot === k && d.owned.includes(id) ? id : null; }
   d.deco = Array.isArray(s.deco) ? s.deco.filter((id) => DECOS.some((x) => x.id === id) && d.owned.includes(id)) : [];
+  d.uni = UNIFORMS.some((u) => u.id === s.uni) && d.owned.includes(s.uni) ? s.uni : null;
   return d;
 }
 
@@ -81,15 +97,16 @@ export function buy(data, id) {
   if (data.shop.owned.includes(id)) return 'owned';
   if ((data.coins || 0) < it.price) return 'poor';
   data.coins -= it.price; data.shop.owned.push(id);
-  if (it.slot) data.shop.eq[it.slot] = id; else if (!data.shop.deco.includes(id)) data.shop.deco.push(id);   // new things go straight on
+  if (it.uni) data.shop.uni = id; else if (it.slot) data.shop.eq[it.slot] = id; else if (!data.shop.deco.includes(id)) data.shop.deco.push(id);   // new things go straight on
   return 'ok';
 }
 export function toggle(data, id) {
   const it = itemById(id); if (!it || !data.shop.owned.includes(id)) return 'locked';
+  if (it.uni) { data.shop.uni = data.shop.uni === id ? null : id; return data.shop.uni ? 'on' : 'off'; }
   if (it.slot) { data.shop.eq[it.slot] = data.shop.eq[it.slot] === id ? null : id; return data.shop.eq[it.slot] ? 'on' : 'off'; }
   const i = data.shop.deco.indexOf(id);
   if (i >= 0) { data.shop.deco.splice(i, 1); return 'off'; }
   data.shop.deco.push(id); return 'on';
 }
-export const isOn = (data, id) => { const it = itemById(id); return !!it && (it.slot ? data.shop.eq[it.slot] === id : data.shop.deco.includes(id)); };
+export const isOn = (data, id) => { const it = itemById(id); return !!it && (it.uni ? data.shop.uni === id : it.slot ? data.shop.eq[it.slot] === id : data.shop.deco.includes(id)); };
 export const levelsTotal = () => CFG.levels.length;

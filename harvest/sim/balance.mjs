@@ -6,10 +6,15 @@
 //   node sim/balance.mjs --verbose  # every unlock
 import { CFG, goalText } from '../js/config.js';
 import { World } from '../js/world.js';
+import { levelCrew, crewDefaults } from '../js/crew.js';
 
 const verbose = process.argv.includes('--verbose');
 const only = process.argv.find((a) => a.startsWith('--level='));
 const DT = 1 / 30, LIMIT = 900;
+// v3.6 雇工: default = no roster bonus (same as a fresh Lv1 crew minus its +5%); --crew=1 / --crew=10 runs with the roster at that level
+const crewArg = process.argv.find((a) => a.startsWith('--crew='));
+const crewLv = crewArg ? +crewArg.split('=')[1] : 0;
+const crewFor = (li) => crewLv ? levelCrew(crewDefaults().map((m) => ({ ...m, lv: crewLv })), li) : null;
 
 const PROFILES = {
   sharp:  { stick: 1.0, think: 0.1, label: '熟练（跟着箭头，满速）' },
@@ -17,7 +22,7 @@ const PROFILES = {
 };
 
 export function playLevel(li, prof, seed) {
-  const w = new World(li, { quiet: true, seed });
+  const w = new World(li, { quiet: true, seed, crew: crewFor(li) });
   const p = w.player;
   let target = null, think = 0, ix = 0, iy = 0;
   const unlocks = [];

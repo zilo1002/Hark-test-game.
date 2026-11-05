@@ -272,6 +272,9 @@ export class Renderer {
   // nearest the camera), then along the west side. Purely scenery: no collision, no gameplay.
   setDecos(ids) { this.decoIds = (ids || []).slice(); }
   setOutfit(style) { this.heroStyle = style; }
+  // v3.6 制服: one set worn by every hired worker (null = each role's own look)
+  setUniform(style) { this.uniform = style || null; }
+  wLook(base) { return this.uniform ? { ...base, ...this.uniform } : base; }
   planDecos(w) {
     const ids = this.decoIds || [], out = [];
     if (!ids.length) return out;
@@ -492,13 +495,13 @@ export class Renderer {
       mow.root.add(pp.root); this.levelRoot.add(mow.root);
       o = { c, pp, mow, ang: 0.8, root: mow.root };
     } else if (c.kind === 'worker' && c.loader) {
-      const pp = M.makePerson(c.lumber ? LUMBERJACK : GARDENER), ld = M.makeLoader(c.lumber ? 'log' : '');
+      const pp = M.makePerson(this.wLook(c.lumber ? LUMBERJACK : GARDENER)), ld = M.makeLoader(c.lumber ? 'log' : '');
       pp.root.position.set(0, 13, -1.5); pp.blob.visible = false; ld.root.add(pp.root);
       const root = new THREE.Group(); root.add(ld.root); this.levelRoot.add(root);
       const blob = new THREE.Mesh(M.BLOB_GEO, M.BLOB_MAT); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.3; blob.scale.set(17, 21, 1); root.add(blob);
       o = { c, pp, ld, loader: true, ang: 0.8, root };
     } else if (c.kind === 'worker') {
-      const pp = M.makePerson(c.cart ? (c.from && this.world.objs[c.from[0]] && this.world.objs[c.from[0]].producer === 'cow' ? MILKER : CARTER) : c.lumber ? LUMBERJACK : GARDENER);
+      const pp = M.makePerson(this.wLook(c.cart ? (c.from && this.world.objs[c.from[0]] && this.world.objs[c.from[0]].producer === 'cow' ? MILKER : CARTER) : c.lumber ? LUMBERJACK : GARDENER));
       const root = new THREE.Group(); root.add(pp.root);
       let cart = null; if (c.cart) { cart = M.makeCart(); cart.root.position.set(0, 0, -20); root.add(cart.root); }
       this.levelRoot.add(root);
@@ -588,7 +591,7 @@ export class Renderer {
     if (n > 0 && isPlayer) labels.push({ k: 'stack', x: b.x, y: b.y, z: top.z + 6, n, full, big: true });
     if (isPlayer && n === 0) this.comboScreen = null;
     if (isPlayer) this.comboAnchor = n > 0 ? { x: top.x, y: top.y, z: top.z + 6, stack: true } : { x: c.x, y: c.y, z: 54, stack: false };
-    else if (c.lv) labels.push({ k: 'lv', x: c.x, y: c.y, z: o.loader ? 50 : 50, lv: c.lv, pop: this.wt - c.lvT });
+    else if (c.lv) labels.push({ k: 'lv', x: c.x, y: c.y, z: o.loader ? 50 : 50, lv: c.lv, pop: this.wt - c.lvT, name: c.crewName });
   }
   flyItem(f) {
     const p = Math.min(1, f.t / f.dur), e = p * p * (3 - 2 * p);
@@ -772,7 +775,7 @@ export class Renderer {
         this.comboScreen = { x: sx, y: sy + px * 0.72 };
       } else if (L.k === 'lv') {   // 园丁成长 badge
         const [sx0, sy] = this.proj(L.x, L.y, L.z), sx = sx0 - 26 * Math.max(1, z * 0.8), pop = L.pop < 0.5 ? 1 + Math.sin(L.pop / 0.5 * Math.PI) * 0.6 : 1, px = Math.max(8, 7.5 * z) * pop;
-        const txt = `Lv${L.lv}`; g.font = FONT(px); const tw = g.measureText(txt).width;
+        const txt = L.name || `Lv${L.lv}`; g.font = FONT(px); const tw = g.measureText(txt).width;
         g.fillStyle = L.lv >= 5 ? '#FF8A1E' : L.lv >= 3 ? '#FFC21A' : '#6FC3FF';
         g.beginPath(); g.roundRect(sx - tw / 2 - 5, sy - px * 0.7, tw + 10, px * 1.4, px * 0.7); g.fill();
         this.label(txt, sx, sy, px, '#FFFFFF', '#5A3A10');

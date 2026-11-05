@@ -3,7 +3,7 @@
 // the item thumbnails once (cached data URLs) with the same 3D models the game uses.
 import * as THREE from '../vendor/three.module.min.js';
 import * as M from './models.js';
-import { heroStyle } from './shop.js';
+import { heroStyle, WORKER_BASE } from './shop.js';
 
 export class Preview {
   constructor(canvas) {
@@ -29,7 +29,7 @@ export class Preview {
     const key = JSON.stringify(what);
     if (key === this.key) return; this.key = key; this._clear();
     if (what.kind === 'person') {
-      const pp = M.makePerson(heroStyle(what.eq)); pp.blob.visible = false; this.pp = pp; this.obj = pp.root;
+      const pp = M.makePerson(what.uni !== undefined ? { ...WORKER_BASE, ...(what.style || {}) } : heroStyle(what.eq)); pp.blob.visible = false; this.pp = pp; this.obj = pp.root;
       this.view = { y: 20, dist: 112, look: 19 };
     } else {
       const g = new THREE.Group(); g.add(new THREE.Mesh(M.decoGeo(what.id), M.vcMat()));
@@ -54,7 +54,12 @@ export class Preview {
     if (this.thumbs[item.id]) return this.thumbs[item.id];
     const ow = this.w, oh = this.h; this.size(96, 96);
     const keep = this.key; this.key = '';
-    if (item.slot) {
+    if (item.uni) {
+      this.show({ kind: 'person', uni: item.id, style: item.style });
+      M.posePerson(this.pp, { t: 0, walk: 0, moving: false, carry: false, seed: 1 });
+      this.stage.rotation.y = 0.45; this.disc.visible = true;
+      this.cam.position.set(0, 17 + 78 * 0.22, 78); this.cam.lookAt(0, 17, 0);
+    } else if (item.slot) {
       this.show({ kind: 'person', eq: { [item.slot]: item.id } });
       M.posePerson(this.pp, { t: 0, walk: 0, moving: false, carry: false, seed: 1 });
       const close = item.slot !== 'top', look = { hat: 31, neck: 24, feet: 5, top: 17 }[item.slot], dist = { hat: 62, neck: 54, feet: 50, top: 78 }[item.slot];

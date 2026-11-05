@@ -163,6 +163,7 @@ export class World {
     this.W = this.L.W; this.H = this.L.H;
     this.rnd = rng32(opts.seed ?? (levelIndex + 1) * 7919);
     this.quiet = !!opts.quiet;      // sim: skip render-only events
+    this.crew = Array.isArray(opts.crew) ? opts.crew : null;   // v3.6 雇工: [{ id, name, trait, lv, mul }] by hire slot
     this.t = 0; this.money = 0; this.won = false; this.winT = 0;
     this.events = [];
     this.stats = { collected: {}, sold: {}, produced: {}, earned: 0, unlocks: 0 };
@@ -355,6 +356,8 @@ export class World {
       w.speed = (Wk.speed + u.wspeed) * (1 + Lv.speed * k); w.cap = Math.round((Wk.cap + u.wcap) * (1 + Lv.cap * k));
       w.pickR = Wk.pickR; w.harvestR = Wk.harvestR;
       w.cutRate = Wk.cutRate || 0; w.pickRate = Wk.pickRate; w.dropRate = Wk.dropRate;
+      const cm = w.crewMul;   // 雇工特长 (persistent roster level), at most +30%
+      if (cm) { w.speed *= cm.speed; w.cap = Math.round(w.cap * cm.cap); w.pickRate *= cm.rate; w.dropRate *= cm.rate; w.cutRate *= cm.rate; w.pickR *= cm.reach; w.harvestR *= cm.reach; }
     }
   }
 
@@ -418,6 +421,8 @@ export class World {
       w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = t.icon === 'cart' || t.icon === 'milker';
       w.lumber = w.from.some((id) => this.objs[id] && this.objs[id].item === 'log');
       w.lv = 1; w.trips = 0; w.lvT = -9; w.loader = this.loaders && !w.cart;
+      w.done = 0; const cm = this.crew && this.crew[this.workers.length];
+      if (cm) { w.crewId = cm.id; w.crewName = cm.name; w.crewMul = cm.mul; }
       this.workers.push(w); this.refreshStats();
     }
     if (e.upgradeWorkers === 'loader') {
@@ -690,6 +695,7 @@ export class World {
           if (idx < 0) break;
           const item = c.stack[idx];
           c.stack.splice(idx, 1); c.dropAcc--;
+          if (!isPlayer) c.done = (c.done || 0) + 1;   // 雇工 XP
           const z = 44 + idx * CFG.items[item].step;
           if (sink.kind === 'counter') { sink.incoming++; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop); }
           else { sink.inc++; this.launch(item, 'procIn', c.x, c.y, z, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop); }

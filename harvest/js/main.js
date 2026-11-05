@@ -10,10 +10,14 @@ import { drawHome } from './home.js';
 import { UI } from './ui.js';
 import * as Shop from './shop.js';
 import { Preview } from './preview3d.js';
+import * as Crew from './crew.js';
+import * as Orders from './orders.js';
 
 const cv = document.getElementById('cv'), gl = document.getElementById('gl');
 const R = new Renderer(cv, gl), fx = new FX(), input = new Input(cv), snd = new Sound(), hap = new Haptics();
 let data = Save.load();
+Orders.ensureOrders(data);
+let ordBase = null, ordItems = new Set(), ordHudT = 0;
 snd.on = data.settings.sound; hap.on = data.settings.vib;
 
 let mode = 'home', world = null, guide = null, guideT = 0, saveT = 0, hudT = 0, time = 0, last = performance.now();
@@ -47,13 +51,21 @@ const ui = new UI({
     else { snd.play('full'); hap.tick(30, 0); }
     return r;
   },
+  // 订单板 / 雇工
+  orders: () => { snd.unlock(); snd.play('tap'); if (Orders.ensureOrders(data)) Save.save(data); },
+  claim: (i) => {
+    const r = Orders.claimOrder(data, i, Shop.itemById);
+    if (r) { Save.save(data); applyLook(); snd.play('restore'); hap.pattern([30, 40, 30], [200, 255]); fx.confetti(R.W, R.H, 80); ui.renderHome(data); }
+    return r;
+  },
+  swap: (i) => { const ok = Orders.swapOrder(data, i); if (ok) { Save.save(data); snd.play('appear'); } else snd.play('full'); return ok; },
   shopToggle: (id) => { const r = Shop.toggle(data, id); Save.save(data); applyLook(); snd.play(r === 'on' ? 'appear' : 'tap'); hap.tick(14, 0); return r; },
 });
 
 // 商店 look: the farmer's outfit (3D in levels) and the decorations (estate + level scenery)
 let preview = null;
 function ensurePreview() { if (!preview) { preview = new Preview(document.getElementById('shopPrev')); } return preview; }
-function applyLook() { R.setOutfit(Shop.heroStyle(data.shop.eq)); R.setDecos(data.shop.deco); }
+function applyLook() { R.setOutfit(Shop.heroStyle(data.shop.eq)); R.setDecos(data.shop.deco); R.setUniform(Shop.uniformStyle(data.shop.uni)); }
 applyLook();
 
 input.onFirst = () => snd.unlock();
@@ -67,9 +79,11 @@ resize();
 
 function start(li) {
   const resume = data.cur && data.cur.li === li;
-  world = new World(li);
-  if (resume) { try { world.restore(data.cur); } catch (_) { world = new World(li); } }
+  const crew = Crew.levelCrew(data.crew, li);   // 雇工: who works this level, with their 特长
+  world = new World(li, { crew });
+  if (resume) { try { world.restore(data.cur); } catch (_) { world = new World(li, { crew }); } }
   else data.cur = world.snapshot();
+  Orders.ensureOrders(data); ordBase = Orders.cloneStats(world.stats); ordItems = Orders.levelItems(li);
   data.played = true; Save.save(data);
   R.setWorld(world); R.setMode('play'); R.follow(0, true); fx.clear();
   mode = 'play'; winDone = false; guide = null; guideT = 0;
@@ -77,10 +91,24 @@ function start(li) {
   modalOpen = false; input.enabled = true; input.everMoved = resume || li > 0 ? input.everMoved : false;
 }
 
-function snapshot() { if (world && !world.won) { data.cur = world.snapshot(); Save.save(data); } }
+function snapshot() { if (world && !world.won) { credit(); data.cur = world.snapshot(); Save.save(data); } }
+
+// v3.6: what happened in the level since the last call goes to the 订单 and the 雇工 XP
+function credit() {
+  if (!world || !ordBase) return;
+  Orders.trackOrders(data, world.stats, ordBase); ordBase = Orders.cloneStats(world.stats);
+  for (const w of world.workers) {
+    if (!w.crewId) continue;
+    const d = (w.done || 0) - (w.xpPaid || 0); if (d <= 0) continue;
+    w.xpPaid = w.done;
+    const up = Crew.addXp(data.crew, w.crewId, d);
+    if (up > 0 && mode === 'play') { const m = data.crew.find((x) => x.id === w.crewId); fx.text(w.x, w.y, 80, `${w.crewName} 升到 ${m.lv} 级！`, '#9BFF6A', true); snd.play('appear'); }
+  }
+}
 
 function goHome(fromWin) {
-  if (world && !world.won) snapshot();
+  if (world && !world.won) snapshot(); else if (world) { credit(); Save.save(data); }
+  Orders.ensureOrders(data);
   mode = 'home'; R.setMode('home'); ui.hideAll(); ui.el.banner.classList.add('hidden'); ui.showHome(data); fx.clear();
   input.enabled = true; modalOpen = false;
   if (fromWin) { /* stars freshly earned: nudge the cheapest affordable item */ }
@@ -104,6 +132,7 @@ function win() {
   data.stars[li] = Math.max(prev, stars);
   data.unlocked = Math.max(data.unlocked, li + 1);
   // 金币: every clear pays (more for a bigger farm and more stars); new stars pay a bonus
+  credit();
   const coins = Shop.levelCoins(world.stats.earned, stars, Math.max(0, stars - prev));
   data.coins = (data.coins || 0) + coins;
   data.cur = null; Save.save(data);
@@ -208,6 +237,7 @@ function frame(now) {
     R.draw(world, fx, world.won ? null : guide, time, { hand: showHand });
     input.draw(R.g, R.W, R.H, !modalOpen && !world.won);
     hudT -= dt; if (hudT <= 0) { ui.updateHUD(world); ui.tip(tutorialTip()); hudT = 0.1; }
+    if ((ordHudT -= dt) <= 0) { ordHudT = 0.5; credit(); ui.orderHUD(Orders.hudOrder(data, ordItems)); }
     saveT += dt; if (saveT > 5) { saveT = 0; snapshot(); }
   } else {
     fx.update(dt);
@@ -236,7 +266,7 @@ if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
     quality: (q) => { if (q !== undefined) { R.q = q; R.drops = 9; R.applyQuality(); } return ['low', 'mid', 'high'][R.q]; },
     start: (li) => { data.cur = null; start(li); },
     home: () => goHome(), restore: (id) => restore(id),
-    shop: () => ui.openShop(), Shop, applyLook, save: () => Save.save(data),
+    shop: () => ui.openShop(), Shop, Crew, Orders, credit, orders: () => ui.openOrders(), crew: () => ui.openCrew(), applyLook, save: () => Save.save(data),
     // walk the bot into a field until the stack is tall (for screenshots of a cutting run)
     tallStack(n, extraCap = 0) {
       if (extraCap) { world.upg.cap += extraCap; world.refreshStats(); }

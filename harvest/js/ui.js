@@ -1,7 +1,9 @@
 // DOM layer: HUD, banners, pause menu, home panel, level select, settings, win card.
 import { CFG, goalText } from './config.js';
 import { starsLeft, storageAvailable } from './save.js';
-import { OUTFITS, DECOS, SLOTS, itemById, isOn } from './shop.js';
+import { OUTFITS, DECOS, UNIFORMS, SLOTS, itemById, isOn } from './shop.js';
+import { ROSTER, TRAITS, traitBonus, xpNeed, CREW } from './crew.js';
+import { orderText, orderDone, TIER_NAME } from './orders.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -33,9 +35,13 @@ export class UI {
       else h.shopToggle(it.id);
       this.renderShop();
     };
+    // 订单板 / 雇工
+    this.el.orders = $('orders'); this.el.crew = $('crew');
+    $('btnOrders').onclick = () => this.openOrders();
+    $('btnCrew').onclick = () => this.openCrew();
     this.el.play.onclick = () => h.play();
     $('btnNext').onclick = () => { this.el.win.classList.add('hidden'); h.next(); };
-    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop]) {
+    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop, this.el.orders, this.el.crew]) {
       m.addEventListener('click', (e) => { if (e.target === m || e.target.hasAttribute('data-close')) this.closeModal(m); });
     }
     $('optSound').onchange = (e) => h.setting('sound', e.target.checked);
@@ -71,6 +77,14 @@ export class UI {
     const p = world.progress();
     const s = `${Math.floor(p.v)}/${p.n}`;
     if (s !== this.lastGoal) { this.el.bar.style.width = `${(p.f * 100).toFixed(1)}%`; this.el.num.textContent = s; this.lastGoal = s; }
+  }
+  // small, unobtrusive line under the goal bar: the order this level can advance
+  orderHUD(o) {
+    const e = $('ordHud');
+    if (!o) { if (this._oh !== '') { e.classList.add('hidden'); this._oh = ''; } return; }
+    const done = o.prog >= o.n, txt = done ? `订单完成 ✓ 回庄园领取` : `订单 · ${orderText(o)}  ${Math.floor(o.prog)}/${o.n}`;
+    if (txt === this._oh) return;
+    this._oh = txt; e.textContent = txt; e.classList.toggle('done', done); e.classList.remove('hidden');
   }
   banner(world) {
     const b = this.el.banner;
@@ -115,6 +129,7 @@ export class UI {
     $('restoreHead').textContent = page === 1 ? '用星星修复庄园' : '用星星建林场牧场';
     const cheapest = metas.filter((m) => !restored.has(m.id)).reduce((a, m) => Math.min(a, m.cost), 99);
     this.el.hint.textContent = metas.every((m) => restored.has(m.id)) ? (page === 1 ? '· 庄园修好啦！' : '· 牧场建好啦！') : left >= cheapest ? '· 点一下就能修' : page === 2 && data.unlocked < 15 ? '· 第 16 关起拿星星' : '· 过关拿星星';
+    const O = data.orders; $('ordDot').classList.toggle('hidden', !(O && O.list.some((o) => !o.claimed && orderDone(o))));
     this.el.list.innerHTML = '';
     for (const m of metas) {
       const b = document.createElement('button');
@@ -128,12 +143,12 @@ export class UI {
   // ---------------------------------------------------------------- 商店
   openShop() {
     const d = this.h.data();
-    if (!this.shopSel) { const eq = d.shop.eq; this.shopSel = this.shopTab === 'outfit' ? (eq.hat || eq.top || OUTFITS[0].id) : (d.shop.deco[0] || DECOS[0].id); }
+    if (!this.shopSel) { const eq = d.shop.eq; this.shopSel = this.shopTab === 'outfit' ? (eq.hat || eq.top || OUTFITS[0].id) : this.shopTab === 'uni' ? (d.shop.uni || UNIFORMS[0].id) : (d.shop.deco[0] || DECOS[0].id); }
     this.openModal(this.el.shop);
     this.h.shopOpen();
     this.renderShop();
   }
-  shopList() { return this.shopTab === 'outfit' ? OUTFITS : DECOS; }
+  shopList() { return this.shopTab === 'outfit' ? OUTFITS : this.shopTab === 'uni' ? UNIFORMS : DECOS; }
   renderShop() {
     const d = this.h.data(), list = this.shopList();
     for (const b of $('shopTabs').children) b.classList.toggle('on', b.dataset.t === this.shopTab);
@@ -145,23 +160,63 @@ export class UI {
       b.className = 'sitem' + (own ? ' owned' : d.coins >= it.price ? ' can' : ' poor') + (on ? ' on' : '') + (it.id === this.shopSel ? ' sel' : '');
       b.dataset.id = it.id;
       const slot = it.slot ? SLOTS.find((x) => x[0] === it.slot)[1] : '';
-      b.innerHTML = `<img alt="" src="${this.h.thumb(it) || ''}"><span>${it.name}</span><small>${own ? (on ? (it.slot ? '穿着中' : '已摆放') : '已拥有') : `<i class="gc"></i>${it.price}`}</small>`;
+      b.innerHTML = `<img alt="" src="${this.h.thumb(it) || ''}"><span>${it.name}</span><small>${own ? (on ? (it.slot || it.uni ? '穿着中' : '已摆放') : '已拥有') : `<i class="gc"></i>${it.price}`}</small>`;
       b.title = slot ? `${slot} · ${it.name}` : it.name;
       b.onclick = () => { this.shopSel = it.id; this.h.tap(); this.renderShop(); };
       g.appendChild(b);
     }
     const it = itemById(this.shopSel), own = d.shop.owned.includes(it.id), on = isOn(d, it.id), a = $('shopAct');
     $('shopName').textContent = it.name;
-    $('shopSub').textContent = it.slot ? `${SLOTS.find((x) => x[0] === it.slot)[1]}${own ? '' : ' · 买了自动穿上'}` : own ? (on ? '庄园和关卡里都看得到' : '收在仓库里') : '摆在庄园，关卡围栏外也有';
+    $('shopSub').textContent = it.uni ? (own ? (on ? '所有雇工都穿着' : '一次只能穿一套') : '买了雇工们马上换上') : it.slot ? `${SLOTS.find((x) => x[0] === it.slot)[1]}${own ? '' : ' · 买了自动穿上'}` : own ? (on ? '庄园和关卡里都看得到' : '收在仓库里') : '摆在庄园，关卡围栏外也有';
     a.className = 'small ' + (own ? (on ? 'off' : 'warm') : d.coins >= it.price ? 'warm' : 'poor');
-    a.innerHTML = own ? (it.slot ? (on ? '脱下' : '穿上') : (on ? '收起来' : '摆出来')) : `购买 <i class="gc"></i>${it.price}`;
+    a.innerHTML = own ? (it.slot || it.uni ? (on ? '脱下' : '穿上') : (on ? '收起来' : '摆出来')) : `购买 <i class="gc"></i>${it.price}`;
   }
   // what the preview shows: the farmer trying the selected piece on, or the selected decoration
   shopView() {
     const d = this.h.data(), it = itemById(this.shopSel || '');
-    if (this.shopTab === 'deco') return { kind: 'deco', id: it && !it.slot ? it.id : DECOS[0].id };
+    if (this.shopTab === 'deco') return { kind: 'deco', id: it && !it.slot && !it.uni ? it.id : DECOS[0].id };
+    if (this.shopTab === 'uni') { const u = it && it.uni ? it : UNIFORMS[0]; return { kind: 'person', uni: u.id, style: u.style }; }
     const eq = { ...d.shop.eq }; if (it && it.slot) eq[it.slot] = it.id;
     return { kind: 'person', eq };
+  }
+  // ---------------------------------------------------------------- 订单板
+  openOrders() { this.h.orders(); this.openModal(this.el.orders); this.renderOrders(); }
+  renderOrders() {
+    const d = this.h.data(), O = d.orders, box = $('ordList'); box.innerHTML = '';
+    $('ordCoins').textContent = (d.coins || 0).toLocaleString('en-US');
+    O.list.forEach((o, i) => {
+      const row = document.createElement('div'), done = orderDone(o);
+      row.className = 'ord' + (o.claimed ? ' claimed' : done ? ' done' : '');
+      const tk = o.ticket && itemById(o.ticket);
+      row.innerHTML = `<div class="oi"><div class="ow">${o.who} 想要</div><div class="ot"><span class="tier t${o.tier}">${TIER_NAME[o.tier]}</span>${orderText(o)}</div>`
+        + `<div class="ob"><i style="width:${Math.min(100, o.prog / o.n * 100).toFixed(1)}%"></i></div><div class="op">${Math.floor(o.prog).toLocaleString('en-US')} / ${o.n.toLocaleString('en-US')}</div></div>`
+        + `<div class="or"><i class="gc"></i>${o.coins}${tk ? `<small>+ 兑换券：${tk.name}</small>` : ''}</div><div class="oa"></div>`;
+      const act = row.querySelector('.oa');
+      if (o.claimed) act.innerHTML = '<button class="small off" disabled>已领取</button>';
+      else {
+        const c = document.createElement('button'); c.className = 'small ' + (done ? 'warm claim' : 'poor'); c.textContent = done ? '领取' : '进行中';
+        c.onclick = () => { if (!done) return; const r = this.h.claim(i); if (r) this.renderOrders(); };
+        act.appendChild(c);
+        if (!done && !O.swapped) { const sw = document.createElement('button'); sw.className = 'small swap'; sw.textContent = '换一张'; sw.onclick = () => { this.h.swap(i); this.renderOrders(); }; act.appendChild(sw); }
+      }
+      box.appendChild(row);
+    });
+    $('ordNote').textContent = `每天 3 张新订单，在任何关卡里卖出 / 做出的东西都算数。${O.swapped ? '今天已经换过 1 张了。' : '每天可以换掉 1 张。'}`;
+  }
+  // ---------------------------------------------------------------- 雇工
+  openCrew() { this.h.tap(); this.openModal(this.el.crew); this.renderCrew(); }
+  renderCrew() {
+    const d = this.h.data(), box = $('crewList'); box.innerHTML = '';
+    const cols = ['#3B8FE0', '#E8452C', '#4CB24E', '#F29C0E', '#B07ACC', '#FF6F92'];
+    ROSTER.forEach((r, k) => {
+      const m = d.crew.find((x) => x.id === r.id) || { lv: 1, xp: 0, done: 0 }, T = TRAITS[r.trait], max = m.lv >= CREW.maxLv;
+      const row = document.createElement('div'); row.className = 'cw'; row.dataset.id = r.id;
+      row.innerHTML = `<div class="ca" style="background:${cols[k % cols.length]}">${r.name[0]}</div><div class="ci"><div class="cn">${r.name}<b>${m.lv} 级</b></div>`
+        + `<div class="ct">特长「${T.name}」 ${T.desc} +${Math.round(traitBonus(m.lv) * 100)}%</div>`
+        + `<div class="cb"><i style="width:${max ? 100 : Math.min(100, m.xp / xpNeed(m.lv) * 100).toFixed(1)}%"></i></div>`
+        + `<div class="cx">${max ? '满级！' : `经验 ${m.xp} / ${xpNeed(m.lv)}`} · 共送货 ${m.done.toLocaleString('en-US')} 件</div></div>`;
+      box.appendChild(row);
+    });
   }
   shopOpenNow() { return !this.el.shop.classList.contains('hidden'); }
   openLevels() {

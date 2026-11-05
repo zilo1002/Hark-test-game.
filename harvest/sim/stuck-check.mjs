@@ -5,6 +5,9 @@
 import { CFG } from '../js/config.js';
 import { World } from '../js/world.js';
 import { playLevel } from './balance.mjs';
+import { levelCrew, crewDefaults } from '../js/crew.js';
+// v3.6: seed 3 runs with a max-level (Lv10) 雇工 roster: faster / bigger workers must not get stuck either
+const maxCrew = (li) => levelCrew(crewDefaults().map((m) => ({ ...m, lv: 10 })), li);
 
 const only = process.argv.find((a) => a.startsWith('--level='));
 const SECS = +((process.argv.find((a) => a.startsWith('--secs=')) || '--secs=600').split('=')[1]);
@@ -44,11 +47,11 @@ for (let li = 0; li < CFG.levels.length; li++) {
   let n = 0;
   for (const seed of [1, 2, 3]) {
     // A: everything unlocked at t=0, player idle in place
-    const w = new World(li, { quiet: true, seed: seed * 97 + li });
+    const w = new World(li, { quiet: true, seed: seed * 97 + li, crew: seed === 3 ? maxCrew(li) : null });
     let more = true; while (more) { more = false; for (const t of w.tiles) if (t.visible && !t.done) { w.completeTile(t, true); more = true; } }
     n += watch(w, SECS, `all-unlocked s${seed}`);
     // B: realistic order — bot plays, unlocks as it goes, keeps playing after the goal
-    const w2 = new World(li, { quiet: true, seed: seed * 131 + li });
+    const w2 = new World(li, { quiet: true, seed: seed * 131 + li, crew: seed === 3 ? maxCrew(li) : null });
     const p = w2.player; let tg = null, th = 0;
     n += watch(w2, SECS, `bot s${seed}`, () => {
       th -= DT; if (th <= 0) { tg = w2.guide(); th = 0.1; }
