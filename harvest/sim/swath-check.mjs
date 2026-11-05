@@ -14,7 +14,7 @@ const segDist2 = (px, py, ax, ay, bx, by) => {
 };
 CFG.fever.perItem = 0;   // fever would widen the swath mid-run
 let fails = 0, runs = 0;
-for (const li of [0, 1, 4, 7, 13, 15, 19, 20, 21, 32, 34, 36]) {   // + v3.3: trees, corn, strawberries, pumpkins; + v3.7: fish pond, grape rows (gapY), greenhouse tomatoes
+for (const li of [0, 1, 4, 7, 13, 15, 19, 20, 21, 32, 34, 36, 43, 44]) {   // + v3.3: trees, corn, strawberries, pumpkins; + v3.7: fish pond, grape rows (gapY), greenhouse tomatoes; + v3.7b: lakeside market & estate mixes
   const L = CFG.levels[li];
   for (const f0 of L.objects.filter((o) => o.type === 'field' && !o.hidden && !CFG.crops[o.crop].spill)) {
     for (const [dir, label] of [[[1, 0], 'east'], [[0, 1], 'south'], [[0.7071, 0.7071], 'diagonal']]) {

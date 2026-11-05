@@ -262,6 +262,11 @@ const ITEM_PARTS = {
     P(sph(2, 7, 5), '#FFD84A', [1.6, 0.4, 1.4]), P(sph(2, 7, 5), '#F2AE0E', [-1.6, 0.2, -1.2]),
     P(cone(1.8, 1.2, 6), '#3E9B2A', [0, 3.4, 0], [Math.PI, 0, 0]), P(cyl(0.5, 0.6, 2.2, 5), '#2F7A1E', [0, 4.6, 0]),
   ],
+  wine: () => [   // a dark green bottle standing up, cream label, red foil cap
+    P(cyl(2.8, 2.8, 7, 9), '#2E6B3A', [0, -1.6, 0]), P(sph(2.8, 9, 5), '#2E6B3A', [0, 1.9, 0], [0, 0, 0], [1, 0.6, 1]),
+    P(cyl(1.1, 1.2, 3.4, 7), '#2E6B3A', [0, 4.2, 0]), P(cyl(1.25, 1.25, 1.6, 7), '#C8283C', [0, 6.1, 0]),
+    P(cyl(2.9, 2.9, 3.2, 9), '#FFF3DC', [0, -1.8, 0]), P(sph(0.9, 5, 4), '#7A3EA8', [0, -1.8, 2.8]),
+  ],
   bill: () => [P(box(11, 0.9, 6), '#57C35A'), P(box(3, 1.1, 3), '#E9FFE0', [0, 0.05, 0])],
   cash: () => [P(box(12, 2.6, 7), '#57C35A'), P(box(12.3, 2.8, 2), '#2F8F3A'), P(box(2.6, 2.9, 2.2), '#E9FFE0')],
 };
@@ -271,7 +276,7 @@ export const ITEM_TYPES = Object.keys(ITEM_PARTS);
 // half height of each item, so stacks and piles rest items on their bottom face
 export const ITEM_HALF = { wheat: 2.6, tulip: 2.2, gold: 1.7, rose: 2.2, egg: 2.2, potato: 2.4, tomato: 2.8, crate: 3.3, ketchup: 4.4, bouquet: 3.4, basket: 3.4, perfume: 4.0, bill: 0.45, cash: 1.4,
   log: 2.8, plank: 1.3, chair: 5.9, milk: 4.6, cheese: 2.7, icecream: 6, corn: 2.2, popcorn: 4.4, pumpkin: 3.7, pie: 1.9, berry: 3.4, jam: 3.8, wool: 3.6, yarn: 4, honey: 3.8, apple: 3.3, juice: 4.9,
-  flour: 2.9, bread: 2.4, fish: 2.4, smoked: 2.4, grape: 1.6, gjuice: 4.9, pepper: 3.4 };
+  flour: 2.9, bread: 2.4, fish: 2.4, smoked: 2.4, grape: 1.6, gjuice: 4.9, pepper: 3.4, wine: 5.1 };
 
 // ------------------------------------------------------------------ crops (field plants)
 // Plants stand on y=0 and are ~11-14 units tall; scaled by growth. Stubble is what stays after a cut.
@@ -824,7 +829,7 @@ export const Env = {
     out.push(P(box(18, 12, 1), '#FFFFFF', [cx, H0 * 0.55, b.y + b.h + 0.6]));
   },
 };
-export const PROC_COL = { flour: ['#FFF3DC', '#D9A05A'], bread: ['#F2C08A', '#B8552E'], smoked: ['#A0703A', '#5A3A22'], gjuice: ['#C89AF0', '#7A3EA8'], plank: ['#C8874A', '#8E5627'], chair: ['#F2C08A', '#C98A4B'], cheese: ['#FFE16B', '#E8B21E'], icecream: ['#FFC2DA', '#8DB6FF'], popcorn: ['#FF8A6E', '#E8452C'], pie: ['#F2C08A', '#E8871E'], jam: ['#FF8FB0', '#C8102E'], yarn: ['#FFB3D8', '#B07ACC'], juice: ['#9BE460', '#4CB24E'], bouquet: ['#FFE16B', '#E8B21E'], basket: ['#F2C08A', '#C98A4B'], perfume: ['#FFB8D8', '#E86AA6'], crate: ['#8DB6FF', '#5B8FE8'], ketchup: ['#FF8A6E', '#E8452C'] };
+export const PROC_COL = { flour: ['#FFF3DC', '#D9A05A'], bread: ['#F2C08A', '#B8552E'], smoked: ['#A0703A', '#5A3A22'], gjuice: ['#C89AF0', '#7A3EA8'], wine: ['#E8C8A0', '#7A2A3A'], plank: ['#C8874A', '#8E5627'], chair: ['#F2C08A', '#C98A4B'], cheese: ['#FFE16B', '#E8B21E'], icecream: ['#FFC2DA', '#8DB6FF'], popcorn: ['#FF8A6E', '#E8452C'], pie: ['#F2C08A', '#E8871E'], jam: ['#FF8FB0', '#C8102E'], yarn: ['#FFB3D8', '#B07ACC'], juice: ['#9BE460', '#4CB24E'], bouquet: ['#FFE16B', '#E8B21E'], basket: ['#F2C08A', '#C98A4B'], perfume: ['#FFB8D8', '#E86AA6'], crate: ['#8DB6FF', '#5B8FE8'], ketchup: ['#FF8A6E', '#E8452C'] };
 
 // ------------------------------------------------------------------ 商店 decorations (v3.4)
 // Each sits on its origin, ~person-sized to a little bigger; used outside the fence in levels.

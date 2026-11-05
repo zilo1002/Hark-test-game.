@@ -506,13 +506,36 @@ export class Renderer {
         const ov = new THREE.Mesh(M.merge([M.P(M.sph(11, 10, 8), '#C8553A', [0, 0, 0], [0, 0, 0], [1, 0.8, 1]), M.P(M.sph(9, 9, 6), '#D9714E', [0, 2, 0], [0, 0, 0], [0.9, 0.8, 0.9]),
           M.P(M.box(9, 6, 3), '#3A1A10', [0, 1.5, 9.6]), M.P(M.box(7, 4, 3.2), '#FFB040', [0, 1, 9.8]), M.P(M.cyl(2, 2.4, 9, 7), '#8E3A26', [5, 9, -4])]), M.vcMat());
         ov.position.set(-p.body.w / 2 + 16, CFG.proc.bodyH, 2); ov.castShadow = true; grp.add(ov);
-      } else if (p.outItem === 'smoked') {   // 熏鱼房: a dark plank shed roof with a hanging fish row
-        const roof = new THREE.CylinderGeometry(1, 1, 1, 3, 1);
-        const sh = new THREE.Mesh(M.merge([M.P(roof, '#5A3A22', [-p.body.w / 2 + 18, CFG.proc.bodyH + 7, 0], [0, 0, Math.PI / 2], [10, 30, p.body.h * 0.55]),
-          M.P(M.box(1, 1, 30), '#3A2A1E', [-p.body.w / 2 + 6, CFG.proc.bodyH + 3, 0]), ...[-9, -3, 3, 9].map((z) => M.P(M.sph(1, 6, 4), '#C8702A', [-p.body.w / 2 + 6, CFG.proc.bodyH - 1, z], [0, 0, H2], [3.6, 1.4, 1.4]))]), M.vcMat());
-        sh.castShadow = true; grp.add(sh);
+      } else if (p.outItem === 'smoked') {   // 熏鱼房 (v3.7b: bigger and clearly readable): a plank smoke shed with a tall red gable roof,
+        // a fat stone chimney and a row of fish hanging under the front eave
+        const X = -p.body.w / 2 + 22, Y = CFG.proc.bodyH, D = p.body.h - 4, SW = 34, WH = 14, half = SW / 2 + 5, pitch = 0.62, rise = Math.tan(pitch) * half;
+        const slab = half / Math.cos(pitch) + 1.5, parts = [
+          M.P(M.box(SW, WH, D - 6), '#7A4A2A', [X, Y + WH / 2, 0]),
+          ...[-12, -6, 0, 6, 12].map((dx) => M.P(M.box(1.2, WH, D - 5.4), '#5A3418', [X + dx, Y + WH / 2, 0])),
+          M.P(M.box(10, 9, 0.8), '#2A1A10', [X, Y + 4.5, (D - 6) / 2 + 0.2]),
+          M.P(M.box(slab, 2.6, D + 6), '#D2452E', [X - half / 2, Y + WH + rise / 2, 0], [0, 0, pitch]),
+          M.P(M.box(slab, 2.6, D + 6), '#B8361F', [X + half / 2, Y + WH + rise / 2, 0], [0, 0, -pitch]),
+          M.P(M.box(2.4, 2.4, D + 7), '#FFE0A8', [X, Y + WH + rise + 0.6, 0]),
+          M.P(M.cyl(1, 1, 1, 3), '#8E5A34', [X, Y + WH + rise * 0.34, (D - 6) / 2 + 0.1], [-H2, 0, 0], [half * 0.98, 0.6, rise * 0.68]),
+          M.P(M.box(8, 22, 8), '#9AA0AA', [X + 10, Y + WH + rise + 2, -D / 2 + 9]), M.P(M.box(10, 2.4, 10), '#5A5E68', [X + 10, Y + WH + rise + 13, -D / 2 + 9]),
+          M.P(M.box(SW + 8, 0.8, 0.8), '#3A2A1E', [X, Y + WH - 1, D / 2 + 1.8]),
+          ...[-15, -9, -3, 3, 9, 15].map((dx) => M.P(M.sph(1, 6, 4), dx % 2 ? '#E0882E' : '#C8702A', [X + dx, Y + WH - 6, D / 2 + 1.8], [0, 0, H2], [4.4, 1.7, 1.6])),
+        ];
+        const sh = new THREE.Mesh(M.merge(parts), M.vcMat()); sh.castShadow = true; grp.add(sh);
+        grp.userData.chimney = [X + 10, Y + WH + rise + 15, -D / 2 + 9];
+      } else if (p.outItem === 'wine') {   // 酿酒坊 (v3.7b): two big oak barrels with iron hoops lying in a cradle, and a tap
+        const Y = CFG.proc.bodyH, parts = [];
+        for (const [x, z, r] of [[-p.body.w / 2 + 14, -8, 9], [-p.body.w / 2 + 14, 10, 9], [-p.body.w / 2 + 14, 1, 7.5]]) {
+          const y = Y + r + (z === 1 ? 14 : 1);
+          parts.push(M.P(M.cyl(r, r, 18, 12), '#B8743E', [x + 6, y, z], [0, 0, H2]), M.P(M.cyl(r * 0.86, r * 0.86, 18.4, 12), '#8E5627', [x + 6, y, z], [0, 0, H2]));
+          parts.push(M.P(M.cyl(r, r, 18.2, 12), '#C8874A', [x + 6, y, z], [0, 0, H2], [0.92, 1, 0.92]));
+          for (const dx of [-6.5, 6.5]) parts.push(M.P(M.cyl(r + 0.5, r + 0.5, 1.4, 12), '#3A3A44', [x + 6 + dx, y, z], [0, 0, H2]));
+          parts.push(M.P(M.cyl(1, 1, 3, 6), '#D8B060', [x + 15.6, y - r * 0.4, z], [0, 0, H2]));
+        }
+        parts.push(M.P(M.box(22, 2, 26), '#6E4524', [-p.body.w / 2 + 20, Y + 1, 1]));
+        const br = new THREE.Mesh(M.merge(parts), M.vcMat()); br.castShadow = true; grp.add(br);
       }
-      const sign = new THREE.Mesh(M.itemGeo(p.outItem), M.vcMat()); sign.position.set(4, CFG.proc.bodyH + 10, 0); sign.scale.setScalar(1.3); sign.castShadow = true; grp.add(sign);
+      const sign = new THREE.Mesh(M.itemGeo(p.outItem), M.vcMat()); sign.position.set(p.outItem === 'smoked' ? 19 : 4, CFG.proc.bodyH + 10, 0); sign.scale.setScalar(1.3); sign.castShadow = true; grp.add(sign);
       const puffs = [0, 1, 2].map(() => { const s = new THREE.Mesh(M.sph(1, 7, 5), new THREE.MeshLambertMaterial({ color: p.outItem === 'smoked' ? 0x9A9AA4 : 0xFFFFFF, transparent: true, opacity: 0.8, depthWrite: false })); s.userData.ownMat = true; grp.add(s); return s; });
       const zone = this.decal(p.inZone.w, p.inZone.h, (g, W, H) => this.paintZone(g, W, H, null, p.inItem));
       zone.position.set(p.inZone.cx, 0.3, p.inZone.cy); this.levelRoot.add(zone);
@@ -725,10 +748,12 @@ export class Renderer {
       if (p.work) o.gear.rotation.x += dt * 5;
       if (o.grp.userData.blade) o.grp.userData.blade.rotation.z -= dt * (p.work ? 14 : 1.2);
       if (o.grp.userData.sails) o.grp.userData.sails.rotation.z -= dt * (p.work ? 4 : 0.6);
-      o.sign.rotation.y = time * 0.8; o.sign.position.y = CFG.proc.bodyH + 10 + Math.sin(time * 2) * 1.2;
+      o.sign.rotation.y = time * 0.8; if (p.outItem === 'smoked') o.sign.position.x = 19; o.sign.position.y = CFG.proc.bodyH + 10 + Math.sin(time * 2) * 1.2;
       o.puffs.forEach((s, i) => {
         const u = (time * 0.8 + i / 3) % 1; s.visible = p.work > 0;
-        s.position.set(p.body.w / 2 - 11 + u * 6, CFG.proc.bodyH + 21 + u * 22, -p.body.h / 2 + 10); s.scale.setScalar(2.6 + u * 4); s.material.opacity = 0.75 * (1 - u);
+        const ch = o.grp.userData.chimney;
+        if (ch) s.position.set(ch[0] + u * 5, ch[1] + 2 + u * 22, ch[2]); else s.position.set(p.body.w / 2 - 11 + u * 6, CFG.proc.bodyH + 21 + u * 22, -p.body.h / 2 + 10);
+        s.scale.setScalar(2.6 + u * 4); s.material.opacity = 0.75 * (1 - u);
       });
       if (p.buf > 0) labels.push({ k: 'buf', x: p.body.x, y: p.y, z: CFG.proc.bodyH + 30, n: p.buf });
     }

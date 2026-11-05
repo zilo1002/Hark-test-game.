@@ -287,13 +287,20 @@ function pepper(g) {
   g.fillStyle = 'rgba(255,255,255,0.6)'; E(g, -2.6, -0.6, 0.9, 2, 0.2); g.fill();
   g.fillStyle = '#3E9B2A'; g.beginPath(); g.ellipse(0, -4, 3, 1.2, 0, 0, TAU); g.fill(); g.strokeStyle = '#2F7A1E'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -4.4); g.lineTo(0.8, -7); g.stroke();
 }
+function wine(g) {   // a dark green wine bottle, cream label with a grape, red foil cap
+  ol(g, '#2E6B3A', '#173A20', 0.8); g.beginPath(); g.moveTo(-3.6, 8); g.lineTo(-3.6, -1); g.quadraticCurveTo(-3.6, -3.4, -1.4, -4.4); g.lineTo(-1.4, -8); g.lineTo(1.4, -8); g.lineTo(1.4, -4.4); g.quadraticCurveTo(3.6, -3.4, 3.6, -1); g.lineTo(3.6, 8); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#C8283C'; g.fillRect(-1.6, -9, 3.2, 3);
+  g.fillStyle = '#FFF3DC'; g.fillRect(-3.6, 1, 7.2, 4.6);
+  g.fillStyle = '#7A3EA8'; for (const [x, y] of [[-0.9, 2.6], [0.9, 2.6], [0, 4]]) { g.beginPath(); g.arc(x, y, 0.9, 0, TAU); g.fill(); }
+  g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(-2.6, -1.6, 1, 8);
+}
 export const ITEM_DRAW = { egg, potato, tomato, wheat, crate, ketchup, bill, cash, tulip, rose, gold, bouquet, basket, perfume,
   log, plank, chair, milk, cheese, icecream, corn, popcorn, pumpkin, pie, berry, jam, wool, yarn, honey, apple, juice,
-  flour, bread, fish, smoked, grape, gjuice, pepper };
+  flour, bread, fish, smoked, grape, gjuice, pepper, wine };
 const ITEM_SIZE = { egg: [12, 13], potato: [14, 12], tomato: [13, 13], wheat: [18, 12], crate: [18, 15], ketchup: [11, 20], bill: [16, 10], cash: [18, 13],
                     tulip: [18, 12], rose: [18, 12], gold: [14, 10], bouquet: [16, 15], basket: [15, 16], perfume: [12, 16],
                     log: [18, 12], plank: [18, 12], chair: [14, 18], milk: [10, 18], cheese: [16, 12], icecream: [11, 19], corn: [18, 12], popcorn: [13, 17], pumpkin: [16, 14], pie: [17, 11], berry: [12, 14], jam: [12, 16], wool: [16, 15], yarn: [15, 15], honey: [12, 16], apple: [13, 14], juice: [10, 18],
-                    flour: [15, 17], bread: [17, 11], fish: [19, 12], smoked: [19, 12], grape: [12, 17], gjuice: [10, 18], pepper: [14, 15] };
+                    flour: [15, 17], bread: [17, 11], fish: [19, 12], smoked: [19, 12], grape: [12, 17], gjuice: [10, 18], pepper: [14, 15], wine: [9, 19] };
 
 // ---- field plants: (0,0) is the ground point, -y up. stage 0 stubble … 4 in bloom ----------------
 const TULIP_C = [['#F2486E', '#B5183E'], ['#FF6F9C', '#C9356A'], ['#E8243C', '#9E0E22'], ['#FF8FB0', '#D0507A']];

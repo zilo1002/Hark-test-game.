@@ -119,6 +119,7 @@ function restore(id) {
   const m = CFG.meta.find((x) => x.id === id);
   if (!m || data.restored.includes(id)) return;
   snd.unlock();
+  if (m.page === 3 && data.unlocked < 38) { snd.play('full'); hap.tick(30, 0); return; }   // 湖畔酒庄 opens after level 38
   if (Save.starsLeft(data) < m.cost) { snd.play('full'); hap.tick(30, 0); return; }
   data.spent += m.cost; data.restored.push(id); restoredAt[id] = time;
   Save.save(data);

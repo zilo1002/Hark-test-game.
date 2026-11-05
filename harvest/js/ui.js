@@ -6,6 +6,7 @@ import { ROSTER, TRAITS, traitBonus, xpNeed, CREW } from './crew.js';
 import { orderText, orderDone, TIER_NAME } from './orders.js';
 
 const $ = (id) => document.getElementById(id);
+const TABS = { 1: '花园庄园', 2: '林场牧场', 3: '湖畔酒庄' };
 
 export class UI {
   constructor(h) {
@@ -50,7 +51,7 @@ export class UI {
     reset.onclick = () => {
       if (!reset.dataset.armed) { reset.dataset.armed = '1'; reset.textContent = '再点一次：确定清空所有进度'; setTimeout(() => { delete reset.dataset.armed; reset.textContent = '重置全部进度'; }, 3000); return; }
       delete reset.dataset.armed; reset.textContent = '重置全部进度';
-      this.closeAll(); this.page = 0; this._auto2 = false; h.reset();
+      this.closeAll(); this.page = 0; this._auto2 = this._auto3 = false; h.reset();
     };
   }
   // modals stack: settings opened from pause returns to pause
@@ -137,22 +138,25 @@ export class UI {
     const restored = new Set(data.restored);
     if (!this.page) this.page = 1;
     if (data.unlocked >= 15 && !this._auto2) { this._auto2 = true; this.page = 2; }   // once past level 15, open on the new farm
+    if (data.unlocked >= 38 && !this._auto3) { this._auto2 = this._auto3 = true; this.page = 3; }   // once past level 38, open on the lakeside winery
     const page = this.page, metas = CFG.meta.filter((m) => (m.page || 1) === page);
     for (const b of $('homeTabs').children) {
       const p = +b.dataset.p, todo = CFG.meta.filter((m) => (m.page || 1) === p && !restored.has(m.id)).length;
       b.classList.toggle('on', p === page);
-      b.innerHTML = `${p === 1 ? '花园庄园' : '林场牧场'}${todo ? '' : '<em>✓</em>'}`;
+      b.innerHTML = `${TABS[p]}${todo ? '' : '<em>✓</em>'}`;
     }
-    $('restoreHead').textContent = page === 1 ? '用星星修复庄园' : '用星星建林场牧场';
+    const locked3 = page === 3 && data.unlocked < 38;
+    $('restoreHead').textContent = page === 1 ? '用星星修复庄园' : page === 2 ? '用星星建林场牧场' : '用星星建湖畔酒庄';
     const cheapest = metas.filter((m) => !restored.has(m.id)).reduce((a, m) => Math.min(a, m.cost), 99);
-    this.el.hint.textContent = metas.every((m) => restored.has(m.id)) ? (page === 1 ? '· 庄园修好啦！' : '· 牧场建好啦！') : left >= cheapest ? '· 点一下就能修' : page === 2 && data.unlocked < 15 ? '· 第 16 关起拿星星' : '· 过关拿星星';
+    this.el.hint.textContent = metas.every((m) => restored.has(m.id)) ? (page === 1 ? '· 庄园修好啦！' : page === 2 ? '· 牧场建好啦！' : '· 酒庄建好啦！')
+      : locked3 ? '· 过第 38 关开放' : left >= cheapest ? '· 点一下就能修' : page === 2 && data.unlocked < 15 ? '· 第 16 关起拿星星' : '· 过关拿星星';
     const O = data.orders; $('ordDot').classList.toggle('hidden', !(O && O.list.some((o) => !o.claimed && orderDone(o))));
     this.el.list.innerHTML = '';
     for (const m of metas) {
       const b = document.createElement('button');
-      const done = restored.has(m.id), can = !done && left >= m.cost;
+      const done = restored.has(m.id), can = !done && !locked3 && left >= m.cost;
       b.className = 'rbtn' + (done ? ' done' : can ? ' can' : ' poor');
-      b.innerHTML = `<span>${m.name}</span><small>${done ? '✓ 已修好' : '★ ' + m.cost}</small>`;
+      b.innerHTML = `<span>${m.name}</span><small>${done ? '✓ 已修好' : (locked3 ? '未开放 ★ ' : '★ ') + m.cost}</small>`;
       b.onclick = () => this.h.restore(m.id);
       this.el.list.appendChild(b);
     }
