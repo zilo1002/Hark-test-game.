@@ -1,6 +1,6 @@
 // Juice: pooled particles (world space), number popups, bills flying to the HUD,
 // screen shake and confetti. No allocation per frame once the pools are warm.
-const MAXP = 900, MAXT = 48, MAXB = 70, MAXC = 220;
+const MAXP = 900, MAXT = 24, TXT_LIVE = 10, MERGE = 0.3, MAXB = 70, MAXC = 220;
 
 export class FX {
   constructor() {
@@ -24,9 +24,26 @@ export class FX {
     }
   }
   ring(x, y, color = '#FFFFFF', size = 40) { const o = this._get(this.p); o.on = true; o.x = x; o.y = y; o.z = 0; o.vx = o.vy = o.vz = 0; o.life = o.max = 0.5; o.size = size; o.color = color; o.type = 'ring'; }
+  // Floating text. v3.4: popups never recycle a slot that is still animating (that made an
+  // old "+N" teleport to the new spot mid-flight), at most TXT_LIVE normal ones are alive at
+  // once, and number popups with the same key merge for MERGE seconds (one "+57" instead of
+  // a burst of "+3 +3 +3"). They rise a fixed number of screen pixels, not world units.
   text(x, y, z, str, color = '#FFFFFF', big = false) {
-    let o = null; for (const t of this.txt) if (!t.on) { o = t; break; } if (!o) o = this.txt[0];
-    o.on = true; o.x = x; o.y = y; o.z = z; o.s = str; o.color = color; o.life = o.max = big ? 1.4 : 0.9; o.big = big;
+    let live = 0, o = null, oldest = null;
+    for (const t of this.txt) { if (t.on) { live++; if (!t.big && (!oldest || t.life < oldest.life)) oldest = t; } else if (!o) o = t; }
+    if (!big && live >= TXT_LIVE) return null;
+    if (!o) { if (!big || !oldest) return null; o = oldest; }
+    o.on = true; o.x = x; o.y = y; o.z = z; o.s = str; o.color = color; o.life = o.max = big ? 1.3 : 0.95; o.big = big; o.key = null; o.v = 0; o.age = 0;
+    return o;
+  }
+  num(key, x, y, z, amount, color = '#FFFFFF', big = false, prefix = '+') {
+    for (const t of this.txt) if (t.on && t.key === key && t.age < MERGE) {
+      t.v += amount; t.s = `${prefix}${Math.round(t.v)}`; t.life = t.max; t.bumpT = 0.12; if (big) t.big = true;
+      return t;
+    }
+    const o = this.text(x, y, z, `${prefix}${Math.round(amount)}`, color, big);
+    if (o) { o.key = key; o.v = amount; o.bumpT = 0; }
+    return o;
   }
   bill(sx, sy, tx, ty, delay = 0) {
     let o = null; for (const b of this.bills) if (!b.on) { o = b; break; } if (!o) return;
@@ -54,7 +71,7 @@ export class FX {
       o.x += o.vx * dt; o.y += o.vy * dt; o.z += o.vz * dt; o.vz -= 260 * dt; o.rot += o.vr * dt;
       if (o.z < 0) { o.z = 0; o.vz *= -0.35; o.vx *= 0.6; o.vy *= 0.6; }
     }
-    for (const o of this.txt) if (o.on) { o.life -= dt; o.z += dt * (o.big ? 24 : 36); if (o.life <= 0) o.on = false; }
+    for (const o of this.txt) if (o.on) { o.life -= dt; o.age += dt; if (o.bumpT > 0) o.bumpT -= dt; if (o.life <= 0) o.on = false; }
     for (const o of this.bills) if (o.on) { o.t += dt; if (o.t >= o.dur) o.on = false; }
     for (const o of this.wbills) if (o.on) { o.t += dt; if (o.t >= o.dur) o.on = false; }
     for (const o of this.conf) if (o.on) { o.life -= dt; o.vy += 900 * dt; o.vx *= 1 - dt * 1.2; o.vy = Math.min(o.vy, 160 + Math.sin(o.life * 6) * 40); o.x += o.vx * dt; o.y += o.vy * dt; o.rot += o.vr * dt; if (o.life <= 0) o.on = false; }

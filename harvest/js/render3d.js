@@ -128,7 +128,8 @@ export class Renderer {
     const e = this.vp.elements, X = x, Y = h, Z = y;
     const w = e[3] * X + e[7] * Y + e[11] * Z + e[15];
     const cx = (e[0] * X + e[4] * Y + e[8] * Z + e[12]) / w, cy = (e[1] * X + e[5] * Y + e[9] * Z + e[13]) / w;
-    this._pw = w;
+    this._pw = w;            // ≤ 0: the point is behind the camera (its projection is garbage)
+    if (w <= 1e-3) return [-1e5, -1e5];
     return [(cx * 0.5 + 0.5) * this.W, (0.5 - cy * 0.5) * this.H];
   }
   X(x, y, h = 0) { return this.proj(x, y, h)[0]; }
@@ -143,12 +144,14 @@ export class Renderer {
 
   // ---------------------------------------------------------------- level build
   setWorld(w) {
-    this.world = w; this.wt = w.t;
+    this.world = w; this.wt = w.t; this.stackLbl = null; this.comboScreen = null; this.fullAt = undefined;
     if (this.levelRoot) { this.scene.remove(this.levelRoot); this.levelRoot.traverse((o) => { if (o.isInstancedMesh) o.dispose(); else if (o.isMesh && o.userData.own) o.geometry.dispose(); if (o.material && o.userData.ownMat) { o.material.map?.dispose(); o.material.dispose(); } }); }
     const root = this.levelRoot = new THREE.Group(); this.scene.add(root);
     this.chars = new Map(); this.custPool = {}; this.tileObjs = new Map();
     this.buildGround(w);
+    this.decoSlots = this.planDecos(w);
     this.buildEnv(w);
+    this.buildDecos(w);
     this.buildFields(w);
     this.buildPiles(w);
     this.buildCoops(w);
@@ -248,6 +251,7 @@ export class Renderer {
       let x, yy;
       if (side === 0) { x = u * w.W; yy = -95 - R(i + 9) * 60 - far; } else if (side === 1) { x = -95 - R(i + 9) * 60 - far; yy = u * w.H; }
       else if (side === 2) { x = u * w.W; yy = w.H + 90 + R(i + 9) * 50 + far; } else { x = w.W + 90 + R(i + 9) * 50 + far; yy = u * w.H; if (gates.some(([a, b]) => yy > a - 70 && yy < b + 70)) continue; }
+      if (this.decoSlots.some((d) => Math.hypot(d.x - x, d.y - yy) < 52)) continue;   // keep the 商店 decorations clear
       M.Env.tree(out, x, yy, R(i + 77) > 0.6 ? 'cone' : 'round', 0.9 + R(i + 3) * 0.5);
     }
     const dc = w.deco;
@@ -263,6 +267,29 @@ export class Renderer {
     }
     const mesh = new THREE.Mesh(M.merge(out), M.vcMat()); mesh.castShadow = true; mesh.receiveShadow = true; mesh.userData.own = true;
     this.levelRoot.add(mesh);
+  }
+  // 商店 decorations: outside the fence, along the south side either side of the gate (the side
+  // nearest the camera), then along the west side. Purely scenery: no collision, no gameplay.
+  setDecos(ids) { this.decoIds = (ids || []).slice(); }
+  setOutfit(style) { this.heroStyle = style; }
+  planDecos(w) {
+    const ids = this.decoIds || [], out = [];
+    if (!ids.length) return out;
+    const gx = Math.round(w.W * 0.42 / 10) * 10 + 25, slots = [];
+    for (let k = 1; k < 20; k++) for (const sgn of [-1, 1]) { const x = gx + sgn * (k * 74 - 6); if (x > 30 && x < w.W - 30) slots.push({ x, y: w.H + 72 }); }
+    for (let y = w.H - 50; y > 40; y -= 80) slots.push({ x: -80, y });
+    ids.forEach((id, i) => { if (slots[i]) out.push({ id, ...slots[i] }); });
+    return out;
+  }
+  buildDecos(w) {
+    this.decoObjs = [];
+    for (const d of this.decoSlots) {
+      const g = new THREE.Group(); g.position.set(d.x, 0, d.y); g.rotation.y = d.x < 0 ? Math.PI / 2 : 0.5;
+      const m = new THREE.Mesh(M.decoGeo(d.id), M.vcMat()); m.castShadow = true; m.receiveShadow = true; g.add(m);
+      let spin = null;
+      if (d.id === 'windmill') { spin = new THREE.Mesh(M.windmillSails(), M.vcMat()); spin.position.set(0, 30, 9.6); spin.userData.own = true; g.add(spin); }
+      g.scale.setScalar(1.15); this.levelRoot.add(g); this.decoObjs.push({ d, g, spin });
+    }
   }
   buildFields(w) {
     this.fieldObjs = [];
@@ -461,7 +488,7 @@ export class Renderer {
   makeChar(c) {
     let o;
     if (c.kind === 'player') {
-      const pp = M.makePerson(HERO), mow = M.makeMower();
+      const pp = M.makePerson(this.heroStyle || HERO), mow = M.makeMower();
       mow.root.add(pp.root); this.levelRoot.add(mow.root);
       o = { c, pp, mow, ang: 0.8, root: mow.root };
     } else if (c.kind === 'worker' && c.loader) {
@@ -556,7 +583,10 @@ export class Renderer {
     }
     o.top = top;
     const full = c.stack.length + c.incoming >= c.cap;
-    if (n > 0 && (isPlayer || n >= 5)) labels.push({ k: 'stack', x: top.x, y: top.y, z: top.z + 6, n, full, big: isPlayer });
+    // v3.4: only the player's stack gets a count / MAX pill (worker counts all over the field read as
+    // numbers flying around); it is anchored on the stack's base column, not the swaying top item
+    if (n > 0 && isPlayer) labels.push({ k: 'stack', x: b.x, y: b.y, z: top.z + 6, n, full, big: true });
+    if (isPlayer && n === 0) this.comboScreen = null;
     if (isPlayer) this.comboAnchor = n > 0 ? { x: top.x, y: top.y, z: top.z + 6, stack: true } : { x: c.x, y: c.y, z: 54, stack: false };
     else if (c.lv) labels.push({ k: 'lv', x: c.x, y: c.y, z: o.loader ? 50 : 50, lv: c.lv, pop: this.wt - c.lvT });
   }
@@ -573,7 +603,7 @@ export class Renderer {
 
   // ---------------------------------------------------------------- frame
   draw(world, fx, guide, time, extra = {}) {
-    const dt = Math.min(0.05, Math.max(0, time - this.time)); this.time = time; this.wt = world.t;
+    const dt = Math.min(0.05, Math.max(0, time - this.time)); this.time = time; this.wt = world.t; this.frameDt = dt;
     if (this.world !== world) this.setWorld(world);
     if (this.groundDirty) { this.paintGround(world); this.groundDirty = false; }
     [this.ox, this.oy] = fx ? fx.shakeOffset() : [0, 0];
@@ -629,6 +659,7 @@ export class Renderer {
       });
       if (p.buf > 0) labels.push({ k: 'buf', x: p.body.x, y: p.y, z: CFG.proc.bodyH + 30, n: p.buf });
     }
+    for (const o of this.decoObjs || []) { if (o.spin) o.spin.rotation.z = time * 1.4; if (o.d.id === 'balloon') o.g.position.y = 2 + Math.sin(time * 1.2) * 2; }
     // unlock tiles
     for (const [t, o] of this.tileObjs) {
       const a = t.visible ? elastic((this.wt - t.appearT) / 0.6) : 0;
@@ -717,13 +748,28 @@ export class Renderer {
           this.label(t.buy ? `${t.label} +${t.buy}` : t.label, lx, ly, Math.max(11, 11 * z) * L.a, '#FFFFFF', '#1E3A44');
         }
       } else if (L.k === 'stack') {
-        const [sx, sy0] = this.proj(L.x, L.y, L.z); const sy = Math.max(L.big ? 96 : 70, sy0);
-        const pulse = L.full && L.big ? 1.7 + Math.sin(this.time * 9) * 0.12 : 1;   // big pulsing MAX on the player's stack
-        const txt = L.full ? 'MAX' : `${L.n}`, px = Math.max(L.big ? 13 : 10, (L.big ? 12 : 9) * z) * pulse;
+        // ONE pill for the player's load: count, or MAX when full. Its screen position is smoothed
+        // (no jitter from walk bob / camera lag / shake) and kept on screen; MAX pops in once when
+        // the load fills and then stays steady (only a soft glow breathes), with a 去出售 line under it.
+        const [tx0, ty0] = this.proj(L.x, L.y, L.z);
+        const top = Math.min(this.H * 0.28, 104), tx = Math.min(this.W - 50, Math.max(50, tx0)), ty = Math.min(this.H - 60, Math.max(top, ty0));
+        const S = this.stackLbl || (this.stackLbl = { x: tx, y: ty, full: false, fullT: -9, init: false });
+        if (!S.init || Math.hypot(tx - S.x, ty - S.y) > this.H * 0.5) { S.x = tx; S.y = ty; S.init = true; }
+        const kk = 1 - Math.exp(-(this.frameDt || 1 / 60) * 12); S.x += (tx - S.x) * kk; S.y += (ty - S.y) * kk;
+        if (L.full && !S.full) S.fullT = this.time; S.full = L.full;
+        const sx = Math.round(S.x), sy = Math.round(S.y), age = this.time - S.fullT;
+        const pop = L.full && age < 0.35 ? 1 + Math.sin(age / 0.35 * Math.PI) * 0.35 : 1;
+        const txt = L.full ? 'MAX' : `${L.n}`, px = Math.round(Math.max(14, 12.5 * z) * (L.full ? 1.25 : 1)) * pop;
         g.font = FONT(px); const tw = g.measureText(txt).width;
+        if (L.full) { g.fillStyle = `rgba(255,90,60,${0.25 + 0.15 * Math.sin(this.time * 4)})`; g.beginPath(); g.roundRect(sx - tw / 2 - 12, sy - px * 0.95, tw + 24, px * 1.9, px * 0.95); g.fill(); }
         g.fillStyle = L.full ? '#FF4D3A' : 'rgba(30,30,30,0.55)';
         g.beginPath(); g.roundRect(sx - tw / 2 - 7, sy - px * 0.72, tw + 14, px * 1.44, px * 0.72); g.fill();
         this.label(txt, sx, sy, px, '#FFFFFF', L.full ? '#9E1B10' : '#1A1A1A');
+        if (L.full && this.fullAt !== undefined && this.time - this.fullAt < 2.2) {
+          g.globalAlpha = Math.min(1, (2.2 - (this.time - this.fullAt)) * 2);
+          this.label('满了！去出售', sx, sy + px * 1.25, Math.max(11, 10 * z), '#FFE2DA', '#9E1B10'); g.globalAlpha = 1;
+        }
+        this.comboScreen = { x: sx, y: sy + px * 0.72 };
       } else if (L.k === 'lv') {   // 园丁成长 badge
         const [sx0, sy] = this.proj(L.x, L.y, L.z), sx = sx0 - 26 * Math.max(1, z * 0.8), pop = L.pop < 0.5 ? 1 + Math.sin(L.pop / 0.5 * Math.PI) * 0.6 : 1, px = Math.max(8, 7.5 * z) * pop;
         const txt = `Lv${L.lv}`; g.font = FONT(px); const tw = g.measureText(txt).width;
@@ -775,7 +821,8 @@ export class Renderer {
     // 丰收狂热 meter under the stack count (or over the head with empty hands)
     const A = this.comboAnchor, fever = world.feverT > 0;
     if (A && (world.combo > 0.01 || fever)) {
-      const [sx, sy0] = this.proj(A.x, A.y, A.z), sy = (A.stack ? Math.max(96, sy0) + 20 * Math.max(1, z * 0.9) : sy0 - 6);
+      let [sx, sy0] = this.proj(A.x, A.y, A.z), sy = sy0 - 6;
+      if (A.stack && this.comboScreen) { sx = this.comboScreen.x; sy = this.comboScreen.y + 12 * Math.max(1, z * 0.9) + (world.player.stack.length + world.player.incoming >= world.player.cap && this.time - (this.fullAt ?? -9) < 2.2 ? 14 * Math.max(1, z) : 0); }
       const w = 64 * Math.max(1, z * 0.8), h = 8 * Math.max(1, z * 0.8), f = fever ? world.feverT / CFG.fever.dur : world.combo;
       g.fillStyle = 'rgba(30,30,30,0.6)'; g.beginPath(); g.roundRect(sx - w / 2 - 2, sy - h / 2 - 2, w + 4, h + 4, h); g.fill();
       const gr = g.createLinearGradient(sx - w / 2, 0, sx + w / 2, 0);
@@ -801,11 +848,16 @@ export class Renderer {
       else { g.beginPath(); g.arc(sx, sy, o.size * z, 0, TAU); g.fill(); }
       g.globalAlpha = 1;
     }
+    // number popups: anchored where they spawned, rise a fixed 40–50 screen px with ease-out,
+    // pop in, fade out; skipped (never clamped/thrown) when behind the camera or off screen
     for (const o of fx.txt) if (o.on) {
-      const k = o.life / o.max, [sx, sy] = this.proj(o.x, o.y, o.z);
-      const pop = k > 0.85 ? 1 + (k - 0.85) * 3 : 1;
+      const [sx, sy0] = this.proj(o.x, o.y, o.z);
+      if (this._pw <= 1e-3 || sx < -60 || sx > this.W + 60 || sy0 < -60 || sy0 > this.H + 60) continue;
+      const u = Math.min(1, o.age / 0.9), rise = (o.big ? 34 : 46) * (1 - (1 - u) * (1 - u)), k = o.life / o.max;
+      const pop = o.age < 0.12 ? 0.7 + o.age / 0.12 * 0.45 : o.age < 0.22 ? 1.15 - (o.age - 0.12) / 0.1 * 0.15 : 1;
+      const bump = o.bumpT > 0 ? 1 + o.bumpT * 1.2 : 1;
       g.globalAlpha = Math.min(1, k * 3);
-      this.label(o.s, sx, sy, Math.max(o.big ? 20 : 13, (o.big ? 20 : 13) * z) * pop, o.color, '#2A2210');
+      this.label(o.s, Math.round(sx), Math.round(sy0 - rise), Math.max(o.big ? 20 : 14, (o.big ? 19 : 13) * z) * pop * bump, o.color, '#2A2210');
       g.globalAlpha = 1;
     }
   }

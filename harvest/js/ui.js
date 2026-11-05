@@ -1,6 +1,7 @@
 // DOM layer: HUD, banners, pause menu, home panel, level select, settings, win card.
 import { CFG, goalText } from './config.js';
 import { starsLeft, storageAvailable } from './save.js';
+import { OUTFITS, DECOS, SLOTS, itemById, isOn } from './shop.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,9 +21,21 @@ export class UI {
     $('btnPLevels').onclick = () => this.openLevels();
     $('hGear').onclick = () => this.openSettings();
     $('btnLevels').onclick = () => this.openLevels();
+    // 商店
+    this.el.shop = $('shop'); this.shopTab = 'outfit'; this.shopSel = null;
+    $('btnShop').onclick = () => this.openShop();
+    $('coinPill').onclick = () => this.openShop();
+    for (const b of $('shopTabs').children) b.onclick = () => { this.shopTab = b.dataset.t; this.shopSel = null; this.renderShop(); h.tap(); };
+    $('shopAct').onclick = () => {
+      const it = this.shopSel && itemById(this.shopSel); if (!it) return;
+      const d = h.data();
+      if (!d.shop.owned.includes(it.id)) { const r = h.shopBuy(it.id); if (r !== 'ok') { const a = $('shopAct'); a.classList.remove('shake'); void a.offsetWidth; a.classList.add('shake'); } }
+      else h.shopToggle(it.id);
+      this.renderShop();
+    };
     this.el.play.onclick = () => h.play();
     $('btnNext').onclick = () => { this.el.win.classList.add('hidden'); h.next(); };
-    for (const m of [this.el.levels, this.el.settings, this.el.pause]) {
+    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop]) {
       m.addEventListener('click', (e) => { if (e.target === m || e.target.hasAttribute('data-close')) this.closeModal(m); });
     }
     $('optSound').onchange = (e) => h.setting('sound', e.target.checked);
@@ -84,6 +97,7 @@ export class UI {
   renderHome(data) {
     const left = starsLeft(data);
     this.el.stars.textContent = left;
+    $('coinCount').textContent = (data.coins || 0).toLocaleString('en-US');
     const L = CFG.levels.length;
     const next = data.cur ? data.cur.li : Math.min(data.unlocked, L - 1);
     const allDone = data.unlocked >= L && !data.cur;
@@ -111,6 +125,45 @@ export class UI {
       this.el.list.appendChild(b);
     }
   }
+  // ---------------------------------------------------------------- 商店
+  openShop() {
+    const d = this.h.data();
+    if (!this.shopSel) { const eq = d.shop.eq; this.shopSel = this.shopTab === 'outfit' ? (eq.hat || eq.top || OUTFITS[0].id) : (d.shop.deco[0] || DECOS[0].id); }
+    this.openModal(this.el.shop);
+    this.h.shopOpen();
+    this.renderShop();
+  }
+  shopList() { return this.shopTab === 'outfit' ? OUTFITS : DECOS; }
+  renderShop() {
+    const d = this.h.data(), list = this.shopList();
+    for (const b of $('shopTabs').children) b.classList.toggle('on', b.dataset.t === this.shopTab);
+    if (!this.shopSel || !list.some((x) => x.id === this.shopSel)) this.shopSel = list[0].id;
+    $('shopCoins').textContent = d.coins.toLocaleString('en-US'); $('coinCount').textContent = d.coins.toLocaleString('en-US');
+    const g = $('shopGrid'); g.innerHTML = '';
+    for (const it of list) {
+      const b = document.createElement('button'), own = d.shop.owned.includes(it.id), on = isOn(d, it.id);
+      b.className = 'sitem' + (own ? ' owned' : d.coins >= it.price ? ' can' : ' poor') + (on ? ' on' : '') + (it.id === this.shopSel ? ' sel' : '');
+      b.dataset.id = it.id;
+      const slot = it.slot ? SLOTS.find((x) => x[0] === it.slot)[1] : '';
+      b.innerHTML = `<img alt="" src="${this.h.thumb(it) || ''}"><span>${it.name}</span><small>${own ? (on ? (it.slot ? '穿着中' : '已摆放') : '已拥有') : `<i class="gc"></i>${it.price}`}</small>`;
+      b.title = slot ? `${slot} · ${it.name}` : it.name;
+      b.onclick = () => { this.shopSel = it.id; this.h.tap(); this.renderShop(); };
+      g.appendChild(b);
+    }
+    const it = itemById(this.shopSel), own = d.shop.owned.includes(it.id), on = isOn(d, it.id), a = $('shopAct');
+    $('shopName').textContent = it.name;
+    $('shopSub').textContent = it.slot ? `${SLOTS.find((x) => x[0] === it.slot)[1]}${own ? '' : ' · 买了自动穿上'}` : own ? (on ? '庄园和关卡里都看得到' : '收在仓库里') : '摆在庄园，关卡围栏外也有';
+    a.className = 'small ' + (own ? (on ? 'off' : 'warm') : d.coins >= it.price ? 'warm' : 'poor');
+    a.innerHTML = own ? (it.slot ? (on ? '脱下' : '穿上') : (on ? '收起来' : '摆出来')) : `购买 <i class="gc"></i>${it.price}`;
+  }
+  // what the preview shows: the farmer trying the selected piece on, or the selected decoration
+  shopView() {
+    const d = this.h.data(), it = itemById(this.shopSel || '');
+    if (this.shopTab === 'deco') return { kind: 'deco', id: it && !it.slot ? it.id : DECOS[0].id };
+    const eq = { ...d.shop.eq }; if (it && it.slot) eq[it.slot] = it.id;
+    return { kind: 'person', eq };
+  }
+  shopOpenNow() { return !this.el.shop.classList.contains('hidden'); }
   openLevels() {
     const d = this.h.data(); const g = this.el.grid; g.innerHTML = '';
     CFG.levels.forEach((L, i) => {
@@ -135,12 +188,12 @@ export class UI {
     $('storeNote').textContent = (storageAvailable() ? '进度自动保存在本机浏览器。' : '这个浏览器不能保存进度，关掉页面后会从头开始。') + (vibOk ? '' : ' 这台设备不支持震动。');
     this.openModal(this.el.settings);
   }
-  showWin(li, stars, t, earned) {
+  showWin(li, stars, t, earned, coins = 0) {
     $('winTitle').textContent = `第 ${li + 1} 关 完成！`;
     const is = $('winStars').children;
     for (let i = 0; i < 3; i++) { is[i].classList.remove('on'); setTimeout(() => { if (i < stars) { is[i].classList.add('on'); this.h.starSfx(i); } }, 350 + i * 320); }
     const mm = Math.floor(t / 60), ss = String(Math.floor(t % 60)).padStart(2, '0');
-    $('winStat').innerHTML = `用时 <b>${mm}:${ss}</b>${earned > 0 ? ` · 新得 <b>★${earned}</b>` : ''}<br>拿星星回庄园修花园吧`;
+    $('winStat').innerHTML = `用时 <b>${mm}:${ss}</b>${earned > 0 ? ` · 新得 <b>★${earned}</b>` : ''}<br>${coins > 0 ? `<span class="wcoin"><i class="gc"></i><b>+${coins}</b> 金币</span> · ` : ''}去商店换新衣服、新装饰吧`;
     this.el.win.classList.remove('hidden');
   }
   hideAll() { this.closeAll(); this.el.win.classList.add('hidden'); }

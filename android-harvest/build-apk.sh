@@ -4,8 +4,8 @@
 #   ./build-apk.sh            → build/banmu-harvest-debug.apk (+ copy to /workspace/work/out/)
 # In CI (GitHub Actions) set SDK=$ANDROID_HOME and keep the runner's JAVA_HOME; OUT_DIR picks where the copy goes.
 set -euo pipefail
-VERSION_CODE=6
-VERSION_NAME=3.3
+VERSION_CODE=7
+VERSION_NAME=3.4
 TC=${TC:-/workspace/work/tc}
 if [ -z "${SDK:-}" ]; then
   export JAVA_HOME=$TC/jdk-17.0.21+9

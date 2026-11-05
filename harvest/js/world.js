@@ -247,6 +247,92 @@ export class World {
     for (const t of this.deco.trees || []) s.push(rectAt(t[0], t[1], 18, 18));
     if (this.deco.barn) s.push(rectAt(this.deco.barn[0], this.deco.barn[1], 76, 56));
     this.solids = s;
+    this.nav = {};          // grid pathfinding caches (per body radius), rebuilt lazily
+  }
+
+  // ---- grid pathfinding (workers) -------------------------------------------------
+  // The old corner-steer only looks at the first obstacle on the straight line, so two
+  // fences meeting in an L (a coop's north + west fence) with a barn behind them made it
+  // pick the corner it was already standing on, forever (L30's lumberjack). Workers now
+  // plan an A* path on a 10-unit grid with obstacles inflated by their body radius, and
+  // walk it with line-of-sight shortcuts.
+  navGrid(r) {
+    const key = Math.round(r);
+    if (this.nav[key]) return this.nav[key];
+    const S = 10, C = Math.ceil(this.W / S), R = Math.ceil(this.H / S), blk = new Uint8Array(C * R), rr = r + 1;
+    for (let j = 0; j < R; j++) for (let i = 0; i < C; i++) {
+      const x = (i + 0.5) * S, y = (j + 0.5) * S;
+      let b = x < 18 || y < 18 || x > this.W - 18 || y > this.H - 18;
+      if (!b) for (const o of this.solids) if (x > o.x - rr && x < o.x + o.w + rr && y > o.y - rr && y < o.y + o.h + rr) { b = true; break; }
+      blk[j * C + i] = b ? 1 : 0;
+    }
+    return (this.nav[key] = { S, C, R, blk, r });
+  }
+  // line of sight for a body of radius r (solids the body already touches are ignored, like steer)
+  clearLine(ax, ay, bx, by, r) {
+    for (const o of this.solids) {
+      if (ax > o.x - r && ax < o.x + o.w + r && ay > o.y - r && ay < o.y + o.h + r) continue;
+      if (this.segHits(ax, ay, bx, by, o, r) >= 0) return false;
+    }
+    return true;
+  }
+  findPath(sx, sy, tx, ty, r) {
+    const N = this.navGrid(r), { S, C, R, blk } = N;
+    const cell = (x, y) => Math.min(R - 1, Math.max(0, Math.floor(y / S))) * C + Math.min(C - 1, Math.max(0, Math.floor(x / S)));
+    const free = (k) => {   // nearest free cell (ring search)
+      if (!blk[k]) return k;
+      const ci = k % C, cj = (k / C) | 0;
+      for (let d = 1; d < 30; d++) for (let dj = -d; dj <= d; dj++) for (let di = -d; di <= d; di++) {
+        if (Math.max(Math.abs(di), Math.abs(dj)) !== d) continue;
+        const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= C || j >= R) continue;
+        if (!blk[j * C + i]) return j * C + i;
+      }
+      return -1;
+    };
+    const s = free(cell(sx, sy)), g = free(cell(tx, ty));
+    if (s < 0 || g < 0) return null;
+    if (s === g) return [{ x: tx, y: ty }];
+    const n = C * R;
+    if (!N.gs || N.gs.length !== n) { N.gs = new Float32Array(n); N.from = new Int32Array(n); N.seen = new Uint32Array(n); N.closed = new Uint32Array(n); N.stamp = 0; }
+    const gs = N.gs, from = N.from, seen = N.seen, closed = N.closed, st = ++N.stamp;
+    const gi = g % C, gj = (g / C) | 0, hh = (k) => { const dx = Math.abs(k % C - gi), dy = Math.abs(((k / C) | 0) - gj); return (dx + dy) + (Math.SQRT2 - 2) * Math.min(dx, dy); };
+    const heap = [], push = (k, f) => { heap.push([f, k]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = i * 2 + 1, rr = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (rr < heap.length && heap[rr][0] < heap[m][0]) m = rr; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+    gs[s] = 0; from[s] = -1; seen[s] = st; push(s, hh(s));
+    let found = false, it = 0;
+    while (heap.length && it++ < n * 2) {
+      const [, k] = pop(); if (closed[k] === st) continue; closed[k] = st;
+      if (k === g) { found = true; break; }
+      const ci = k % C, cj = (k / C) | 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        if (!di && !dj) continue;
+        const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= C || j >= R) continue;
+        const q = j * C + i; if (blk[q] || closed[q] === st) continue;
+        if (di && dj && (blk[cj * C + i] || blk[j * C + ci])) continue;   // no corner cutting
+        const ng = gs[k] + (di && dj ? Math.SQRT2 : 1);
+        if (seen[q] !== st || ng < gs[q]) { seen[q] = st; gs[q] = ng; from[q] = k; push(q, ng + hh(q)); }
+      }
+    }
+    if (!found) return null;
+    const pts = [];
+    for (let k = g; k !== s && k >= 0; k = from[k]) pts.push({ x: (k % C + 0.5) * S, y: (((k / C) | 0) + 0.5) * S });
+    pts.reverse();
+    pts.push({ x: tx, y: ty });
+    return pts;
+  }
+  // next point to walk toward for a worker: straight if clear, else along a cached A* path
+  navigate(w, tx, ty, r, force) {
+    if (!force && this.clearLine(w.x, w.y, tx, ty, r)) { w.path = null; return { x: tx, y: ty }; }
+    const goalMoved = !w.path || Math.hypot(w.pathGoal.x - tx, w.pathGoal.y - ty) > 30;
+    if (force || goalMoved || this.t - w.pathT > 2) {
+      w.path = this.findPath(w.x, w.y, tx, ty, r); w.pathI = 0; w.pathT = this.t; w.pathGoal = { x: tx, y: ty };
+      if (!w.path) { w.path = null; return this.steer(w, tx, ty, r); }
+    }
+    const P = w.path;
+    // skip waypoints already reached or visible further on (string pulling)
+    while (w.pathI < P.length - 1 && Math.hypot(P[w.pathI].x - w.x, P[w.pathI].y - w.y) < 7) w.pathI++;
+    for (let k = Math.min(P.length - 1, w.pathI + 8); k > w.pathI; k--) if (this.clearLine(w.x, w.y, P[k].x, P[k].y, r)) { w.pathI = k; break; }
+    return P[w.pathI];
   }
 
   refreshStats() {
@@ -755,18 +841,28 @@ export class World {
         if (!ok) continue;
         const z = s.kind === 'counter' ? s.zone : s.inZone; const dd = d2(z.cx, z.cy, w.x, w.y); if (dd < bd) { bd = dd; bs = z; }
       }
-      if (bs) { tx = bs.cx + ((w.seed % 3) - 1) * 8; ty = bs.cy + ((w.seed % 2) ? 6 : -6); }
+      if (bs) { const k = (w.seed + (w.sinkRot || 0)) | 0; tx = bs.cx + ((k % 3) - 1) * 8; ty = bs.cy + ((k % 2) ? 6 : -6); }
       else if (w.stack.length) w.stack.length = 0;   // nothing takes these any more
     }
-    const goal = Math.hypot(tx - w.x, ty - w.y);
-    const wp = this.steer(w, tx, ty);
+    const goal = Math.hypot(tx - w.x, ty - w.y), body = w.loader ? CFG.loader.body : 9;
+    // stuck detection: no real progress for a while while trying to move → force a fresh
+    // path; still nothing → give up on this target (pick another plant/pile cell / sink spot)
+    const wantMove = goal > 3;
+    if (!w.prog) w.prog = { x: w.x, y: w.y, n: w.stack.length + w.incoming, t: T };
+    const pg = w.prog, load = w.stack.length + w.incoming;
+    if (!wantMove || Math.hypot(w.x - pg.x, w.y - pg.y) > 16 || load !== pg.n) { pg.x = w.x; pg.y = w.y; pg.n = load; pg.t = T; w.unstick = 0; }
+    let force = false;
+    if (wantMove && T - pg.t > 1.2 && w.unstick === 0) { w.unstick = 1; force = true; }
+    else if (wantMove && T - pg.t > 2.5 && w.unstick === 1) {
+      w.unstick = 2; w.tgt = null; w.retarget = 0; w.path = null;
+      w.dodge = { x: w.x + (this.rnd() - 0.5) * 80, y: w.y + (this.rnd() - 0.5) * 80, t: T + 0.8 };
+      if (w.state === 'deliver' && w.stack.length) w.sinkRot = (w.sinkRot || 0) + 1;
+    } else if (wantMove && T - pg.t > 5) { pg.t = T; w.unstick = 0; }
+    if (w.dodge && T < w.dodge.t) { tx = w.dodge.x; ty = w.dodge.y; } else w.dodge = null;
+    const wp = this.navigate(w, tx, ty, body, force);
     const dx = wp.x - w.x, dy = wp.y - w.y, dd = Math.hypot(dx, dy);
-    const sp = goal > 3 ? w.speed : 0;
-    let vx = dd > 0 ? dx / dd * sp : 0, vy = dd > 0 ? dy / dd * sp : 0;
-    if (sp > 0) {
-      w.stuck = Math.hypot(w.x - w.lastX, w.y - w.lastY) < w.speed * dt * 0.2 ? w.stuck + dt : Math.max(0, w.stuck - dt);
-      if (w.stuck > 0.4) { const s = (Math.floor(T) % 2 ? 1 : -1); const ox = vx; vx = -vy * s; vy = ox * s; }
-    }
+    const sp = wantMove || w.dodge ? w.speed : 0;
+    const vx = dd > 0 ? dx / dd * sp : 0, vy = dd > 0 ? dy / dd * sp : 0;
     w.lastX = w.x; w.lastY = w.y;
     const k = Math.min(1, dt * 10);
     w.vx += (vx - w.vx) * k; w.vy += (vy - w.vy) * k;

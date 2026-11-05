@@ -1,5 +1,6 @@
 // localStorage save with a graceful in-memory fallback (private mode, blocked storage, file://).
 import { CFG } from './config.js';
+import { shopDefaults, normShop, migrateCoins } from './shop.js';
 
 let memory = null;
 let storage = null;
@@ -11,7 +12,7 @@ try {
 export const storageAvailable = () => !!storage;
 
 export function defaults() {
-  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true }, cur: null, played: false };
+  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true }, cur: null, played: false, coins: 0, shop: shopDefaults() };
 }
 
 export function load() {
@@ -22,7 +23,13 @@ export function load() {
     const d = JSON.parse(raw);
     const base = defaults();
     if (!d || typeof d !== 'object') return base;
-    return { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) }, stars: d.stars || {}, restored: Array.isArray(d.restored) ? d.restored : [] };
+    const out = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) }, stars: d.stars || {}, restored: Array.isArray(d.restored) ? d.restored : [] };
+    // v3.4 商店: saves from before the shop get 金币 for the stars and levels they already have;
+    // everything else in the save is kept as it was
+    if (typeof d.coins !== 'number' || !isFinite(d.coins)) out.coins = migrateCoins(totalStars(out), Math.min(out.unlocked || 0, CFG.levels.length));
+    out.coins = Math.max(0, Math.floor(out.coins));
+    out.shop = normShop(d.shop);
+    return out;
   } catch (_) { return defaults(); }
 }
 

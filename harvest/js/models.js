@@ -344,7 +344,10 @@ export function makePerson(o = {}) {
   for (const s of [-1, 1]) {
     const hip = new THREE.Group(); hip.position.set(s * 3.1, 12.5, 0);
     hip.add(mesh(cap(2.5, 6, 2, 7), o.pants || '#3A4A78', 0, -5.2, 0));
-    hip.add(mesh(box(4.6, 2.6, 6.4), o.shoes || '#5A3414', 0, -10.6, 1.0));
+    if (o.boots) {   // 商店 boots: taller, rolled cuff (gold ones get a shiny band)
+      hip.add(mesh(box(5.2, 6.2, 5.6), o.boots, 0, -8.6, 0.2)); hip.add(mesh(box(5.4, 2.8, 7.2), o.boots, 0, -10.6, 1.2));
+      hip.add(mesh(box(5.8, 1.2, 6.0), o.bootGold ? '#FFF2A0' : '#FFFFFF', 0, -5.6, 0.2));
+    } else hip.add(mesh(box(4.6, 2.6, 6.4), o.shoes || '#5A3414', 0, -10.6, 1.0));
     body.add(hip); legs.push(hip);
   }
   // torso
@@ -353,7 +356,16 @@ export function makePerson(o = {}) {
   else torso.add(mesh(cap(6.4, 5.4, 3, 9), o.shirt || '#FFFFFF', 0, 6.4, 0, 1, 1, 0.86));
   if (o.vest) torso.add(mesh(cyl(6.2, 6.6, 7.5, 9, 1), o.vest, 0, 6.4, 0, 1.04, 1, 0.92));
   if (o.overalls) { torso.add(mesh(cyl(6.3, 6.8, 6.5, 9), o.overalls, 0, 3.6, 0, 1.03, 1, 0.92)); torso.add(mesh(box(6.2, 5, 1.2), o.overalls, 0, 8.4, 5.5)); }
-  if (o.bowtie) torso.add(mesh(box(4.2, 1.8, 1.2), '#C8352A', 0, 11.2, 5.4));
+  if (o.apron) {   // 碎花围裙: a white bib apron with pink dots
+    torso.add(mesh(box(8.4, 9.6, 1.0), o.apron, 0, 4.4, 5.4)); torso.add(mesh(box(5.6, 3.4, 1.0), o.apron, 0, 10.2, 5.0));
+    for (const [x, y] of [[-2.4, 7.6], [2.2, 5.4], [-1.2, 2.4], [2.6, 1.2], [0.4, 10.4], [-3, 0.8]]) torso.add(mesh(sph(0.75, 5, 4), o.apronDot || '#FF6F92', x, y, 6.0));
+  }
+  if (o.bowtie) torso.add(mesh(box(4.2, 1.8, 1.2), o.bowColor || '#C8352A', 0, 11.2, 5.4));
+  if (o.scarf) {   // 围巾: a chunky knit ring at the neck with a tail hanging in front
+    const cols = o.scarf === 'rainbow' ? ['#FF4D4D', '#FFD23F', '#3BA7FF'] : [o.scarf, o.scarf, o.scarf];
+    cols.forEach((c, i) => { const r = new THREE.Mesh(tor(5.4 - i * 0.2, 1.25, 5, 12), M(c)); r.rotation.x = H; r.position.set(0, 12.2 + i * 1.5, 0.3); r.castShadow = true; torso.add(r); });
+    torso.add(mesh(box(2.8, 7, 1.4), cols[0], 2.6, 7.6, 6.2)); torso.add(mesh(box(2.8, 2.2, 1.5), cols[2], 2.6, 4.2, 6.3));
+  }
   // arms: pivot at the shoulder
   const arms = [];
   for (const s of [-1, 1]) {
@@ -385,6 +397,28 @@ export function makePerson(o = {}) {
   } else if (o.hat === 'cap') {
     head.add(mesh(sph(7.9, 10, 6, 0), o.capColor || '#3B7FE0', 0, 2.4, 0, 1, 0.75, 1));
     head.add(mesh(box(8, 0.9, 6), o.capColor || '#3B7FE0', 0, 2.6, 7.4));
+  }
+  else if (o.hat === 'cowboy') {
+    head.add(mesh(cyl(12.5, 12.5, 0.9, 14), '#A0622D', 0, 5.0, 0, 1, 1, 0.82));
+    for (const s of [-1, 1]) head.add(mesh(box(3, 0.9, 16), '#A0622D', s * 11.2, 6.3, 0, 1, 1, 0.8));
+    head.add(mesh(cyl(5.4, 6.8, 6.4, 10), '#B87436', 0, 8.6, 0));
+    head.add(mesh(cyl(6.9, 6.9, 1.4, 10), '#5A3414', 0, 6.4, 0));
+    head.add(mesh(box(6, 1.2, 9), '#9A5A28', 0, 11.6, 0));
+  } else if (o.hat === 'chef') {
+    head.add(mesh(cyl(6.8, 6.8, 3.4, 12), '#FFFFFF', 0, 5.6, 0));
+    head.add(mesh(sph(7.2, 10, 7), '#FFFFFF', 0, 11.6, 0, 1.15, 0.8, 1.1));
+    for (const [x, z] of [[-4, 2], [4, 2], [0, -4]]) head.add(mesh(sph(4.2, 8, 6), '#F4F4F4', x, 13.6, z));
+  } else if (o.hat === 'flower') {
+    const ring = new THREE.Mesh(tor(7.2, 0.9, 4, 14), M('#4FAE32')); ring.rotation.x = H; ring.position.y = 4.4; head.add(ring);
+    const fc = ['#FF6F92', '#FFE16B', '#FFFFFF', '#B07ACC'];
+    for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2; head.add(mesh(sph(1.9, 7, 5), fc[k % 4], Math.sin(a) * 7.2, 5.0, Math.cos(a) * 7.2)); head.add(mesh(sph(0.8, 5, 4), '#FFB800', Math.sin(a) * 7.9, 5.3, Math.cos(a) * 7.9)); }
+  } else if (o.hat === 'bow') {
+    for (const s of [-1, 1]) head.add(mesh(sph(3.8, 8, 6), '#FF4D6D', s * 4.4, 8.2, -1, 1.25, 0.9, 0.6));
+    head.add(mesh(sph(2, 7, 5), '#E8283C', 0, 8.2, -0.6));
+  } else if (o.hat === 'crown') {
+    head.add(mesh(cyl(6.4, 6, 3.6, 12), '#FFC21A', 0, 7.6, 0));
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; head.add(mesh(cone(1.6, 4, 5), '#FFD23F', Math.sin(a) * 5.4, 11.2, Math.cos(a) * 5.4)); head.add(mesh(sph(0.9, 5, 4), '#FFF6B0', Math.sin(a) * 5.4, 13.4, Math.cos(a) * 5.4)); }
+    head.add(mesh(sph(1.4, 6, 5), '#E8283C', 0, 7.8, 6.4)); head.add(mesh(sph(1.1, 6, 5), '#3BA7FF', 4.6, 7.8, 4.4)); head.add(mesh(sph(1.1, 6, 5), '#4CD08A', -4.6, 7.8, 4.4));
   }
   if (o.pigtails) for (const s of [-1, 1]) head.add(mesh(sph(2.6, 7, 5), hair, s * 7.6, -0.8, -2.2));
   if (o.crown) {   // VIP: chunky gold crown with a red gem
@@ -668,3 +702,68 @@ export const Env = {
   },
 };
 export const PROC_COL = { plank: ['#C8874A', '#8E5627'], chair: ['#F2C08A', '#C98A4B'], cheese: ['#FFE16B', '#E8B21E'], icecream: ['#FFC2DA', '#8DB6FF'], popcorn: ['#FF8A6E', '#E8452C'], pie: ['#F2C08A', '#E8871E'], jam: ['#FF8FB0', '#C8102E'], yarn: ['#FFB3D8', '#B07ACC'], juice: ['#9BE460', '#4CB24E'], bouquet: ['#FFE16B', '#E8B21E'], basket: ['#F2C08A', '#C98A4B'], perfume: ['#FFB8D8', '#E86AA6'], crate: ['#8DB6FF', '#5B8FE8'], ketchup: ['#FF8A6E', '#E8452C'] };
+
+// ------------------------------------------------------------------ 商店 decorations (v3.4)
+// Each sits on its origin, ~person-sized to a little bigger; used outside the fence in levels.
+const DECO_PARTS = {
+  bench: () => [P(box(30, 2, 9), '#C8874A', [0, 7, 0]), P(box(30, 8, 2), '#B87436', [0, 12, -4]), ...[-12, 12].flatMap((x) => [P(box(2, 7, 2), '#5A3414', [x, 3.5, 3]), P(box(2, 7, 2), '#5A3414', [x, 3.5, -3])])],
+  lanterns: () => {
+    const out = [P(cyl(0.9, 0.9, 30, 6), '#5A3414', [-18, 15, 0]), P(cyl(0.9, 0.9, 30, 6), '#5A3414', [18, 15, 0]), P(box(38, 0.8, 0.8), '#3A2210', [0, 28, 0])];
+    for (const x of [-10, 0, 10]) out.push(P(sph(3.8, 8, 6), '#E8283C', [x, 22, 0], [0, 0, 0], [1, 1.15, 1]), P(cyl(2, 2, 1.2, 8), '#FFC21A', [x, 26.2, 0]), P(cyl(2, 2, 1.2, 8), '#FFC21A', [x, 17.8, 0]));
+    return out;
+  },
+  scarecrow: () => [P(cyl(1, 1, 30, 6), '#8E5627', [0, 15, 0]), P(cyl(0.9, 0.9, 24, 6), '#8E5627', [0, 21, 0], [0, 0, H]), P(box(12, 11, 6), '#3B7FE0', [0, 19, 0]),
+    P(sph(5.4, 9, 7), '#F2CF8A', [0, 30, 0]), P(cyl(9, 9, 0.8, 10), '#E8BE4E', [0, 33.5, 0]), P(cyl(4.8, 5.6, 4, 10), '#E8BE4E', [0, 36, 0]), P(box(3, 3, 1), '#E8452C', [-4, 19, 3.2]), P(box(3, 3, 1), '#FFD23F', [3, 16, 3.2]),
+    ...[-1, 1].map((s) => P(cone(2, 5, 5), '#F2CF6B', [s * 13, 21, 0], [0, 0, -s * H]))],
+  flowerbed: () => {
+    const out = [P(cyl(14, 15, 5, 12), '#C9A27A', [0, 2.5, 0]), P(cyl(12.6, 12.6, 1, 12), '#7A4A22', [0, 5.2, 0])];
+    const fc = ['#FF6F92', '#FFE16B', '#FFFFFF', '#B07ACC', '#FF8A3D'];
+    for (let k = 0; k < 14; k++) { const a = k * 2.4, r = 3 + (k % 3) * 3.4; out.push(P(cyl(0.4, 0.4, 5, 4), '#4FAE32', [Math.cos(a) * r, 7.5, Math.sin(a) * r]), P(sph(2.1, 6, 5), fc[k % 5], [Math.cos(a) * r, 10.4, Math.sin(a) * r])); }
+    return out;
+  },
+  pond: () => {
+    const out = [P(cyl(20, 21, 1.4, 14), '#9AA4AE', [0, 0.7, 0], [0, 0, 0], [1, 1, 0.7]), P(cyl(17.5, 17.5, 1.6, 14), '#4FB8F0', [0, 1, 0], [0, 0, 0], [1, 1, 0.7])];
+    for (const [x, z] of [[-7, 2], [6, -4], [2, 6]]) out.push(P(cyl(3, 3, 0.4, 8), '#4FAE32', [x, 1.9, z]), P(sph(1.2, 6, 4), '#FF8FB0', [x + 0.6, 2.6, z]));
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; out.push(P(ico(2.4, 0), k % 2 ? '#B9B2A4' : '#D6D0C2', [Math.cos(a) * 20, 1.2, Math.sin(a) * 14])); }
+    return out;
+  },
+  swing: () => [P(cyl(1, 1.2, 32, 6), '#8E5627', [-14, 16, 0], [0, 0, 0.12]), P(cyl(1, 1.2, 32, 6), '#8E5627', [14, 16, 0], [0, 0, -0.12]), P(cyl(1.1, 1.1, 32, 6), '#A0622D', [0, 31.5, 0], [0, 0, H]),
+    P(cyl(0.35, 0.35, 22, 4), '#E8E0C8', [-5, 20.5, 0]), P(cyl(0.35, 0.35, 22, 4), '#E8E0C8', [5, 20.5, 0]), P(box(13, 1.4, 5), '#E8452C', [0, 9.4, 0])],
+  arch: () => {
+    const out = [];
+    for (let k = 0; k <= 12; k++) { const a = Math.PI * k / 12, x = Math.cos(a) * 15, y = 4 + Math.sin(a) * 28; out.push(P(ico(3.2, 0), '#3E9A2A', [x, y, 0]), P(sph(1.7, 6, 5), k % 2 ? '#FF6F92' : '#FFFFFF', [x + 1, y + 1.5, 2.4])); }
+    out.push(P(box(3, 6, 3), '#FFFFFF', [-15, 3, 0]), P(box(3, 6, 3), '#FFFFFF', [15, 3, 0]));
+    return out;
+  },
+  windmill: () => [P(cyl(5.5, 9, 34, 8), '#FFF3DC', [0, 17, 0]), P(cone(7.4, 10, 8), '#E8452C', [0, 39, 0]), P(box(5, 8, 1), '#8E5627', [0, 4, 8.6])],
+  fountain: () => {
+    const out = [P(cyl(20, 21, 5, 16), '#E9E0CC', [0, 2.5, 0]), P(cyl(17.5, 17.5, 1, 16), '#5DB8F0', [0, 5.2, 0]), P(cyl(2.6, 3.2, 14, 8), '#EFE7D4', [0, 11, 0]),
+      P(cyl(9, 7, 2.4, 12), '#E9E0CC', [0, 17.5, 0]), P(cyl(7.4, 7.4, 0.8, 12), '#5DB8F0', [0, 18.8, 0]), P(sph(2.4, 8, 6), '#BDE8FF', [0, 23, 0]), P(cone(1.8, 6, 6), '#E4F6FF', [0, 27, 0])];
+    return out;
+  },
+  balloon: () => {
+    const out = [P(box(10, 7, 10), '#A0622D', [0, 3.5, 0]), P(box(10.6, 1.2, 10.6), '#5A3414', [0, 7.4, 0])];
+    for (const [x, z] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) out.push(P(cyl(0.3, 0.3, 16, 4), '#5A3414', [x * 1.3, 15, z * 1.3]));
+    const sc = ['#E8283C', '#FFD23F', '#3BA7FF', '#4CD08A', '#FF7FAE', '#FFFFFF'];
+    for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; out.push(P(sph(5.5, 6, 6), sc[k % 6], [Math.cos(a) * 10, 34, Math.sin(a) * 10], [0, -a, 0], [0.75, 2.2, 1])); }
+    out.push(P(sph(12, 12, 10), '#FFE16B', [0, 34, 0], [0, 0, 0], [1, 1.1, 1]), P(cone(8, 8, 12), '#FF8A3D', [0, 23, 0], [Math.PI, 0, 0]));
+    return out;
+  },
+  statue: () => [P(box(16, 8, 16), '#EFE7D4', [0, 4, 0]), P(box(18, 2, 18), '#D6CCB4', [0, 9, 0]), P(cap(5, 9, 3, 8), '#FFC21A', [0, 20, 0]), P(sph(5.2, 10, 8), '#FFD23F', [0, 33, 0]),
+    P(cyl(4.4, 4, 3, 10), '#FFC21A', [0, 38.5, 0]), ...Array.from({ length: 5 }, (_, k) => { const a = k / 5 * Math.PI * 2; return P(cone(1.2, 3, 4), '#FFE16B', [Math.sin(a) * 3.8, 41.5, Math.cos(a) * 3.8]); }),
+    P(cyl(0.8, 0.8, 14, 5), '#FFC21A', [7, 26, 0], [0, 0, -0.5]), P(ico(2.2, 0), '#FFE16B', [11, 33, 0])],
+  rainbow: () => {
+    const out = [], rc = ['#FF4D4D', '#FF9F43', '#FFD23F', '#4CD08A', '#3BA7FF', '#A77BFF'];
+    rc.forEach((c, i) => { for (let k = 0; k <= 14; k++) { const a = Math.PI * k / 14, R = 30 - i * 2.6; out.push(P(box(3.4, 2.6, 6), c, [Math.cos(a) * R, Math.sin(a) * R * 0.9, 0], [0, 0, a - H])); } });
+    for (const x of [-30, 30]) out.push(P(sph(6, 8, 6), '#FFFFFF', [x, 2, 0], [0, 0, 0], [1.4, 0.8, 1]), P(sph(4.4, 8, 6), '#FFFFFF', [x + (x > 0 ? -5 : 5), 4, 2]));
+    return out;
+  },
+};
+const DECO_GEO = {};
+export function decoGeo(id) { return DECO_GEO[id] || (DECO_GEO[id] = merge((DECO_PARTS[id] || DECO_PARTS.bench)())); }
+// the windmill's sails are a separate mesh so they can turn
+export function windmillSails() {
+  const parts = [P(cyl(1.6, 1.6, 3, 8), '#5A3414', [0, 0, 0], [H, 0, 0])];
+  for (let k = 0; k < 4; k++) { const a = k * H; parts.push(P(box(3.2, 16, 0.6), '#FFFFFF', [Math.cos(a) * 9, Math.sin(a) * 9, 1], [0, 0, a - H]), P(box(1, 16, 0.7), '#7FB0FF', [Math.cos(a) * 9, Math.sin(a) * 9, 1.2], [0, 0, a - H])); }
+  return merge(parts);
+}

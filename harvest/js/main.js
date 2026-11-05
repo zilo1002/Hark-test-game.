@@ -8,6 +8,8 @@ import { Sound, Haptics } from './audio.js';
 import * as Save from './save.js';
 import { drawHome } from './home.js';
 import { UI } from './ui.js';
+import * as Shop from './shop.js';
+import { Preview } from './preview3d.js';
 
 const cv = document.getElementById('cv'), gl = document.getElementById('gl');
 const R = new Renderer(cv, gl), fx = new FX(), input = new Input(cv), snd = new Sound(), hap = new Haptics();
@@ -15,7 +17,7 @@ let data = Save.load();
 snd.on = data.settings.sound; hap.on = data.settings.vib;
 
 let mode = 'home', world = null, guide = null, guideT = 0, saveT = 0, hudT = 0, time = 0, last = performance.now();
-let feverFxT = 0;
+let feverFxT = 0, fullFxT = -9, goldFxT = -9;
 let modalOpen = false, cashFxT = 0, winDone = false, harvestFxT = 0, saleHapT = 0;
 const restoredAt = {};            // session-only animation stamps for the home screen
 
@@ -32,10 +34,27 @@ const ui = new UI({
   modal: (on) => { modalOpen = on; input.enabled = !on; if (on) snapshot(); },
   world: () => world,
   setting: (k, v) => { data.settings[k] = v; if (k === 'sound') { snd.on = v; if (v) snd.unlock(); } if (k === 'vib') { hap.on = v; if (v) hap.buzz(60, 255); } Save.save(data); },
-  reset: () => { Save.wipe(); data = Save.load(); world = null; for (const k in restoredAt) delete restoredAt[k]; goHome(); },
+  reset: () => { Save.wipe(); data = Save.load(); data.coins = 0; Save.save(data); applyLook(); world = null; for (const k in restoredAt) delete restoredAt[k]; goHome(); },
   data: () => data,
   starSfx: (i) => { snd.blip(880 + i * 220, 0.18, 'triangle', 0.16); hap.tick(18, 0); },
+  tap: () => { snd.unlock(); snd.play('tap'); },
+  // 商店
+  shopOpen: () => { snd.unlock(); snd.play('tap'); ensurePreview(); },
+  thumb: (it) => { try { return ensurePreview().thumb(it); } catch (_) { return ''; } },
+  shopBuy: (id) => {
+    const r = Shop.buy(data, id);
+    if (r === 'ok') { Save.save(data); applyLook(); snd.play('restore'); hap.pattern([30, 40, 30], [200, 255]); fx.confetti(R.W, R.H, 60); }
+    else { snd.play('full'); hap.tick(30, 0); }
+    return r;
+  },
+  shopToggle: (id) => { const r = Shop.toggle(data, id); Save.save(data); applyLook(); snd.play(r === 'on' ? 'appear' : 'tap'); hap.tick(14, 0); return r; },
 });
+
+// 商店 look: the farmer's outfit (3D in levels) and the decorations (estate + level scenery)
+let preview = null;
+function ensurePreview() { if (!preview) { preview = new Preview(document.getElementById('shopPrev')); } return preview; }
+function applyLook() { R.setOutfit(Shop.heroStyle(data.shop.eq)); R.setDecos(data.shop.deco); }
+applyLook();
 
 input.onFirst = () => snd.unlock();
 
@@ -84,10 +103,13 @@ function win() {
   const prev = data.stars[li] || 0;
   data.stars[li] = Math.max(prev, stars);
   data.unlocked = Math.max(data.unlocked, li + 1);
+  // 金币: every clear pays (more for a bigger farm and more stars); new stars pay a bonus
+  const coins = Shop.levelCoins(world.stats.earned, stars, Math.max(0, stars - prev));
+  data.coins = (data.coins || 0) + coins;
   data.cur = null; Save.save(data);
   snd.play('win'); hap.pattern([70, 70, 70, 70, 260], [255, 255, 255]);
   fx.confetti(R.W, R.H, 200);
-  setTimeout(() => ui.showWin(li, stars, world.winT, Math.max(0, stars - prev)), 650);
+  setTimeout(() => ui.showWin(li, stars, world.winT, Math.max(0, stars - prev), coins), 650);
 }
 
 // ---------------------------------------------------------------- tutorial tips
@@ -116,7 +138,7 @@ function handleEvents() {
         if (e.who === 'player') { snd.play('harvest'); if (world.feverT > 0) hap.tick(18, 38, 255); else hap.tick(16, 70, 235); }   // continuous strong rumble while cutting (faster in fever)
         break;
       case 'drop': snd.play('drop'); break;
-      case 'sale': fx.text(e.x, e.y, 50, `+${Math.round(e.amount)}`, '#B9FF7A'); snd.play('sale'); if (time - saleHapT > 0.18) { saleHapT = time; hap.buzz(34, 255); } break;
+      case 'sale': fx.num(`sale:${e.x | 0}:${e.y | 0}`, e.x, e.y, 50, e.amount, '#B9FF7A'); snd.play('sale'); if (time - saleHapT > 0.18) { saleHapT = time; hap.buzz(34, 255); } break;
       case 'pay': for (let i = 0; i < Math.min(4, 1 + Math.floor(e.amount / 6)); i++) fx.wbill(e.x, e.y, e.tx + (Math.random() - 0.5) * 20, e.ty + (Math.random() - 0.5) * 8, i * 0.06); break;
       case 'cashierPay': for (let i = 0; i < 3; i++) fx.bill(R.X(e.x, e.y), R.Y(e.x, e.y, 30), coin.x, coin.y, i * 0.07); setTimeout(() => ui.bumpCoin(), 450); snd.play('coin'); break;
       case 'cash':
@@ -130,14 +152,17 @@ function handleEvents() {
         fx.text(e.x, e.y, 50, '解锁！', '#FFF27A', true);
         snd.play('unlock'); hap.pattern([50, 45, 90], [255, 255]); break;
       case 'tileAppear': snd.play('appear'); fx.ring(e.x, e.y, '#FFF27A', 36); break;
-      case 'full':   // stack at max: cutting stops, one strong buzz, the arrow swings to the counter
-        fx.text(world.player.x, world.player.y, 80, '满了！去出售', '#FF6A4D', true); fx.ring(world.player.x, world.player.y, '#FF6A4D', 50);
-        snd.play('full'); hap.buzz(170, 255); guideT = 0; break;
+      case 'full':   // stack at max: cutting stops, the arrow swings to the counter. The MAX pill on the
+        // stack says it (with a short 去出售 line); no floating text, and the ring/buzz at most every 3 s
+        // so a load that hovers at the cap (drop one, pick one) can't spam it.
+        guideT = 0; R.fullAt = time;
+        if (time - fullFxT > 3) { fullFxT = time; fx.ring(world.player.x, world.player.y, '#FF6A4D', 50); snd.play('full'); hap.buzz(170, 255); }
+        break;
       case 'golden':   // 金色作物
         fx.burst(e.x, e.y, 14, 26, ['#FFD23F', '#FFF27A', '#FFFFFF', '#F29C0E'], 110, 160, 3.2, 'star', 1.0);
         fx.ring(e.x, e.y, '#FFE55A', 46);
-        if (e.who === 'player') { fx.text(e.x, e.y, 60, `+${Math.round(e.amount)}`, '#FFE55A', true); for (let i = 0; i < 4; i++) fx.bill(R.X(e.x, e.y), R.Y(e.x, e.y, 30), coin.x, coin.y, i * 0.05); setTimeout(() => ui.bumpCoin(), 450); snd.play('coin'); hap.pattern([60, 30, 110], [255, 255]); }
-        else fx.text(e.x, e.y, 50, `+${Math.round(e.amount)}`, '#FFE55A');
+        if (e.who === 'player') { fx.num('gold', world.player.x, world.player.y, 64, e.amount, '#FFE55A');
+          if (time - goldFxT > 0.25) { goldFxT = time; for (let i = 0; i < 4; i++) fx.bill(R.X(e.x, e.y), R.Y(e.x, e.y, 30), coin.x, coin.y, i * 0.05); setTimeout(() => ui.bumpCoin(), 450); snd.play('coin'); hap.pattern([60, 30, 110], [255, 255]); } }
         break;
       case 'fever':
         fx.text(e.x, e.y, 90, '丰收狂热！', '#FFE55A', true); fx.ring(e.x, e.y, '#FFD23F', 90); fx.flash = 0.6; fx.shake(6, 0.25);
@@ -146,7 +171,7 @@ function handleEvents() {
       case 'workerLevel': fx.text(e.x, e.y, 64, `升级! Lv${e.lv}`, '#9BFF6A', true); fx.burst(e.x, e.y, 40, 12, ['#9BFF6A', '#FFFFFF', '#FFD23F'], 50, 90, 2.6, 'star', 0.8); snd.play('appear'); break;
       case 'loaderUp': fx.burst(e.x, e.y, 10, 30, ['#FFC21A', '#FFFFFF', '#3BA7FF'], 100, 140, 3, 'conf', 1.0); fx.text(e.x, e.y, 70, '铲车!', '#FFE55A', true); break;
       case 'vipPay':   // VIP pays double: coin shower
-        fx.text(e.x, e.y, 70, `VIP ×2  +${Math.round(e.amount)}`, '#FFE55A', true);
+        fx.num(`vip:${e.x | 0}`, e.x, e.y, 70, e.amount, '#FFE55A', true, 'VIP ×2 +');
         fx.burst(e.x, e.y, 40, 22, ['#FFD23F', '#FFF27A', '#FFFFFF'], 90, 150, 3, 'star', 1.0);
         if (e.cashier) { for (let i = 0; i < 10; i++) fx.bill(R.X(e.x, e.y), R.Y(e.x, e.y, 30), coin.x, coin.y, i * 0.05); setTimeout(() => ui.bumpCoin(), 500); }
         else for (let i = 0; i < 10; i++) fx.wbill(e.x + 30, e.y, e.tx + (Math.random() - 0.5) * 24, e.ty + (Math.random() - 0.5) * 10, i * 0.05);
@@ -188,6 +213,11 @@ function frame(now) {
     fx.update(dt);
     drawHome(R.g, R.W, R.H, { ...data, restoredAt }, time, R.dpr, R.W > R.H * 1.15, ui.page || 1);
     R.g.setTransform(R.dpr, 0, 0, R.dpr, 0, 0); R.fxScreen(fx);
+    if (preview && ui.shopOpenNow()) {   // turntable preview inside the shop
+      const c = preview.cv, w = c.clientWidth, h = c.clientHeight;
+      if (w && h && (w !== preview.w || h !== preview.h)) preview.size(w, h);
+      preview.show(ui.shopView()); preview.render(time);
+    }
   }
   requestAnimationFrame(frame);
 }
@@ -206,6 +236,7 @@ if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
     quality: (q) => { if (q !== undefined) { R.q = q; R.drops = 9; R.applyQuality(); } return ['low', 'mid', 'high'][R.q]; },
     start: (li) => { data.cur = null; start(li); },
     home: () => goHome(), restore: (id) => restore(id),
+    shop: () => ui.openShop(), Shop, applyLook, save: () => Save.save(data),
     // walk the bot into a field until the stack is tall (for screenshots of a cutting run)
     tallStack(n, extraCap = 0) {
       if (extraCap) { world.upg.cap += extraCap; world.refreshStats(); }
