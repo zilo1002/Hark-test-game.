@@ -4,7 +4,7 @@ import { CFG } from './config.js';
 import { COL } from './sprites.js';
 import { person, HERO } from './chars.js';
 import { elastic, FONT } from './util.js';
-import { heroStyle } from './shop.js';
+import { heroStyle, petById } from './shop.js';
 
 const TAU = Math.PI * 2;
 export const SPOTS = {
@@ -467,12 +467,81 @@ function manor(g, painted) {
   if (painted) for (const x of [-64, 64]) { g.save(); g.translate(x, 0); g.scale(0.5, 0.5); hedgeBlock(g, 30, 22); g.restore(); }
 }
 
+
+// ---- v4.0 B 节日 / 宠物 on the estate -------------------------------------------------------
+function jack(g, s = 1, t = 0) {
+  g.save(); g.scale(s, s); shadow(g, 0, 0, 10, 3);
+  g.fillStyle = 'rgba(255,200,80,0.25)'; g.beginPath(); g.arc(0, -7, 14 + Math.sin(t * 5) * 1, 0, TAU); g.fill();
+  for (const [x, c] of [[-5, '#E8761A'], [5, '#E8761A'], [0, '#F2871E']]) { g.fillStyle = c; g.strokeStyle = OL; g.lineWidth = 0.8; g.beginPath(); g.ellipse(x, -7, 6, 7, 0, 0, TAU); g.fill(); g.stroke(); }
+  g.fillStyle = '#5A8A2A'; g.fillRect(-1, -16, 2.2, 3.4);
+  g.fillStyle = '#FFE14D'; g.beginPath(); g.moveTo(-5, -10); g.lineTo(-2, -10); g.lineTo(-3.5, -7.6); g.closePath(); g.moveTo(2, -10); g.lineTo(5, -10); g.lineTo(3.5, -7.6); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(-5, -5); g.quadraticCurveTo(0, -1, 5, -5); g.lineTo(3, -4.6); g.lineTo(2, -3.4); g.lineTo(0, -4.4); g.lineTo(-2, -3.4); g.lineTo(-3, -4.6); g.closePath(); g.fill();
+  g.restore();
+}
+function xtree(g, t, s = 1) {
+  g.save(); g.scale(s, s); shadow(g, 0, 0, 22, 6);
+  g.fillStyle = '#7A4A22'; g.fillRect(-3, -10, 6, 10);
+  for (const [y, w] of [[-10, 24], [-24, 19], [-37, 14], [-49, 9]]) { g.fillStyle = '#2F8A3A'; g.strokeStyle = '#1E5A26'; g.lineWidth = 1; g.beginPath(); g.moveTo(-w, y); g.lineTo(0, y - 20); g.lineTo(w, y); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#FFFFFF'; g.beginPath(); g.ellipse(0, y, w * 0.9, 2.2, 0, 0, TAU); g.fill(); }
+  const bc = ['#E8283C', '#FFC21A', '#3BA7FF', '#FF7FAE'];
+  for (let k = 0; k < 14; k++) { const lvl = k % 4, y = [-14, -28, -40, -51][lvl], w = [18, 14, 10, 5][lvl], x = ((k * 37) % 21 - 10) / 10 * w, on = Math.sin(t * 4 + k) > -0.3; g.fillStyle = on ? bc[k % 4] : '#8E8E8E'; g.beginPath(); g.arc(x, y, 2, 0, TAU); g.fill(); }
+  g.fillStyle = '#FFE14D'; g.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 2.4 : 6, a = -Math.PI / 2 + i * Math.PI / 5; g.lineTo(Math.cos(a) * r, -70 + Math.sin(a) * r); } g.closePath(); g.fill();
+  for (const [x, c] of [[-14, '#E8283C'], [12, '#3BA7FF'], [2, '#4CD08A']]) { rr(g, x - 5, -8, 10, 8, 1, c, OL, 0.8); g.fillStyle = '#FFC21A'; g.fillRect(x - 0.8, -8, 1.6, 8); }
+  g.restore();
+}
+function lampString(g, t, len) {
+  g.fillStyle = '#8E3A26'; g.fillRect(-1.5, -40, 3, 40); g.fillRect(len - 1.5, -40, 3, 40);
+  g.strokeStyle = '#3A2210'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, -38); g.quadraticCurveTo(len / 2, -26, len, -38); g.stroke();
+  const n = Math.max(3, Math.round(len / 16));
+  for (let k = 1; k < n; k++) { const u = k / n, x = u * len, y = -38 + Math.sin(u * Math.PI) * 6 + 6 + Math.sin(t * 2 + k) * 0.6;
+    rr(g, x - 4, y - 5, 8, 10, 4, '#E8283C', OL, 0.8); g.fillStyle = '#FFC21A'; g.fillRect(x - 2.5, y - 6.4, 5, 1.6); g.fillRect(x - 2.5, y + 4.8, 5, 1.6); g.fillRect(x - 0.4, y + 6.4, 0.8, 3); }
+}
+// lounging cat (cosmetic): stretched out on its side, breathing, tail swish, the odd ear flick
+function cat2d(g, t, col) {
+  const B = col.body, W = col.belly || '#FFFFFF', br = 1 + Math.sin(t * 1.8) * 0.03;
+  shadow(g, 0, 0, 16, 4);
+  g.save(); g.translate(13, -4); g.rotate(Math.sin(t * 1.3) * 0.35 - 0.2); g.strokeStyle = B; g.lineWidth = 3.4; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(8, -2, 11, -9); g.stroke(); g.restore();
+  g.fillStyle = B; g.strokeStyle = OL; g.lineWidth = 1; g.beginPath(); g.ellipse(2, -5, 13 * br, 6 * br, 0, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = W; g.beginPath(); g.ellipse(1, -2.6, 9, 2.6, 0, 0, TAU); g.fill();
+  if (col.stripe) { g.strokeStyle = col.stripe; g.lineWidth = 1.6; for (const x of [-2, 3, 8]) { g.beginPath(); g.moveTo(x, -10.6); g.lineTo(x + 1, -7); g.stroke(); } }
+  g.fillStyle = B; for (const x of [-6, -1]) { g.beginPath(); g.ellipse(x, -0.6, 3, 1.6, 0, 0, TAU); g.fill(); }
+  const fl = Math.sin(t * 0.7) > 0.96 ? 0.4 : 0;
+  g.save(); g.translate(-11, -8); g.fillStyle = B; g.strokeStyle = OL; g.beginPath(); g.arc(0, 0, 5.6, 0, TAU); g.fill(); g.stroke();
+  for (const s of [-1, 1]) { g.save(); g.translate(s * 3.4, -4); g.rotate(s * 0.3 + (s < 0 ? -fl : 0)); g.fillStyle = col.ear || B; g.beginPath(); g.moveTo(-2.2, 1); g.lineTo(0, -4); g.lineTo(2.2, 1); g.closePath(); g.fill(); g.fillStyle = '#FFB3C0'; g.beginPath(); g.moveTo(-1, 0.6); g.lineTo(0, -2.2); g.lineTo(1, 0.6); g.closePath(); g.fill(); g.restore(); }
+  g.fillStyle = W; g.beginPath(); g.ellipse(0, 2, 3, 2, 0, 0, TAU); g.fill();
+  g.strokeStyle = '#1A1A22'; g.lineWidth = 1; for (const s of [-1, 1]) { g.beginPath(); g.arc(s * 2.2, -0.6, 1.3, 0.2, Math.PI - 0.2); g.stroke(); }   // sleepy closed eyes
+  g.fillStyle = col.nose || '#FF8FA0'; g.beginPath(); g.arc(0, 1.4, 0.8, 0, TAU); g.fill();
+  g.restore();
+  const z = (t * 0.6) % 1; g.globalAlpha = 1 - z; g.fillStyle = '#5A6A8A'; g.font = FONT(6 + z * 3); g.textAlign = 'center'; g.fillText('z', -14 + z * 6, -18 - z * 10); g.globalAlpha = 1;
+}
+// the dog sits by the farmer on the estate, tail wagging
+function dog2d(g, t, col) {
+  const B = col.body, W = col.belly || '#FFFFFF';
+  shadow(g, 0, 0, 10, 3);
+  g.save(); g.translate(7, -6); g.rotate(Math.sin(t * 9) * 0.5 - 0.6); g.fillStyle = B; g.beginPath(); g.ellipse(0, -4, 2, 5, 0, 0, TAU); g.fill(); g.restore();
+  g.fillStyle = B; g.strokeStyle = OL; g.lineWidth = 1; g.beginPath(); g.ellipse(1, -8, 7, 8, 0, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = W; g.beginPath(); g.ellipse(-1, -7, 4, 6, 0, 0, TAU); g.fill();
+  if (col.spot) { g.fillStyle = col.spot; g.beginPath(); g.arc(4, -11, 2.4, 0, TAU); g.fill(); }
+  g.fillStyle = B; for (const x of [-4, 1]) { g.beginPath(); g.ellipse(x, -1, 2.4, 1.6, 0, 0, TAU); g.fill(); }
+  const hb = Math.sin(t * 2) * 0.6;
+  g.save(); g.translate(-2, -19 + hb); g.fillStyle = B; g.strokeStyle = OL; g.beginPath(); g.arc(0, 0, 6, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = col.ear || B; for (const s of [-1, 1]) { g.save(); g.translate(s * 5, -1); g.rotate(s * 0.3); g.beginPath(); g.ellipse(0, 2, 2, 4, 0, 0, TAU); g.fill(); g.restore(); }
+  g.fillStyle = W; g.beginPath(); g.ellipse(0, 2.6, 3.6, 2.6, 0, 0, TAU); g.fill();
+  g.fillStyle = '#1A1A22'; for (const s of [-1, 1]) { g.beginPath(); g.arc(s * 2.2, -1, 0.9, 0, TAU); g.fill(); }
+  g.fillStyle = col.nose || '#2A1A10'; g.beginPath(); g.arc(0, 1.6, 1.1, 0, TAU); g.fill();
+  g.fillStyle = '#E8586A'; g.beginPath(); g.ellipse(0.4, 4.6, 1, 1.6, 0, 0, TAU); g.fill();
+  g.fillStyle = '#E8283C'; g.fillRect(-4, 5.4, 8, 1.6);
+  g.restore();
+}
+
 // 商店 decorations on the estate (both pages): free spots round the edge of the lawn
 export const DECO_SPOTS = {
   rainbow: [180, 80], statue: [22, 72], balloon: [352, 64], lanterns: [18, 196], scarecrow: [350, 178], arch: [130, 214],
   fountain: [116, 262], bench: [250, 266], windmill: [-2, 292], flowerbed: [350, 300], pond: [22, 408], swing: [334, 410],
 };
 const DECO2D = {
+  jackLamp(g, t) { jack(g, 1.1, t); g.save(); g.translate(13, 3); jack(g, 0.8, t + 1); g.restore(); },
+  xmasTree(g, t) { xtree(g, t, 0.9); },
+  redLamps(g, t) { g.save(); g.translate(-30, 0); lampString(g, t, 60); g.restore(); },
   bench(g) { shadow(g, 0, 0, 18, 4); rr(g, -16, -10, 32, 4, 1.5, '#C8874A', OL, 1); rr(g, -16, -18, 32, 5, 1.5, '#B87436', OL, 1); g.fillStyle = '#5A3414'; g.fillRect(-13, -6, 2.4, 6); g.fillRect(11, -6, 2.4, 6); },
   lanterns(g, t) {
     shadow(g, 0, 0, 20, 4); g.fillStyle = '#5A3414'; g.fillRect(-19, -36, 2.4, 36); g.fillRect(17, -36, 2.4, 36);
@@ -534,24 +603,29 @@ function decoHat(g, o) {   // the farmer's 商店 hat in the 2D estate view
   else if (h === 'bow') { g.fillStyle = '#FF4D6D'; g.beginPath(); g.ellipse(-4, -37, 4, 2.6, -0.3, 0, TAU); g.ellipse(4, -37, 4, 2.6, 0.3, 0, TAU); g.fill(); g.fillStyle = '#E8283C'; g.beginPath(); g.arc(0, -37, 1.6, 0, TAU); g.fill(); }
   else if (h === 'crown') { g.fillStyle = '#FFC21A'; g.strokeStyle = '#A8740A'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-6, -35); g.lineTo(-6, -41); g.lineTo(-3, -38); g.lineTo(0, -42); g.lineTo(3, -38); g.lineTo(6, -41); g.lineTo(6, -35); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#E8283C'; g.fillRect(-1, -37.5, 2, 2); }
   else if (h === 'beanie') { g.fillStyle = o.capColor || '#3BA7FF'; g.beginPath(); g.arc(0, -33, 7.6, Math.PI, 0); g.fill(); g.fillStyle = '#FFFFFF'; g.fillRect(-7.6, -34, 15.2, 2.4); g.beginPath(); g.arc(0, -41, 2.2, 0, TAU); g.fill(); }
+  else if (h === 'pumpkin') { g.save(); g.translate(0, -26); jack(g, 0.9, 0); g.restore(); }
+  else if (h === 'santa') { g.fillStyle = '#E8283C'; g.beginPath(); g.moveTo(-7, -35); g.quadraticCurveTo(0, -50, 9, -44); g.lineTo(7, -35); g.closePath(); g.fill(); rr(g, -8, -37, 16, 3.6, 1.8, '#FFFFFF', null); g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(9.5, -44, 2.4, 0, TAU); g.fill(); }
+  else if (h === 'lion') { g.fillStyle = '#E8283C'; g.strokeStyle = OL; g.lineWidth = 0.8; g.beginPath(); g.ellipse(0, -36, 10, 7, 0, Math.PI, 0); g.fill(); g.stroke(); for (let k = 0; k < 7; k++) { g.fillStyle = k % 2 ? '#FFFFFF' : '#FFE16B'; g.beginPath(); g.arc(-9 + k * 3, -35.5, 1.8, 0, TAU); g.fill(); } g.fillStyle = '#FFFFFF'; for (const s of [-1, 1]) { g.beginPath(); g.arc(s * 3.4, -39.5, 2, 0, TAU); g.fill(); } g.fillStyle = '#1A1A22'; for (const s of [-1, 1]) { g.beginPath(); g.arc(s * 3.4, -39.2, 1, 0, TAU); g.fill(); } g.fillStyle = '#FFC21A'; g.beginPath(); g.moveTo(-1.4, -42); g.lineTo(0, -47); g.lineTo(1.4, -42); g.closePath(); g.fill(); }
+  else if (h === 'scholar') { rr(g, -6, -38, 12, 4, 1, '#2A2A3A', null); g.fillStyle = '#2A2A3A'; g.beginPath(); g.moveTo(-11, -38); g.lineTo(0, -42); g.lineTo(11, -38); g.lineTo(0, -35); g.closePath(); g.fill(); g.strokeStyle = '#FFC21A'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, -39); g.lineTo(8, -37); g.lineTo(8, -32); g.stroke(); }
   if (o.scarf) { g.fillStyle = o.scarf === 'rainbow' ? '#FFD23F' : o.scarf; rr(g, -5.6, -23.4, 11.2, 3, 1.4, g.fillStyle, null); g.fillRect(1, -21, 2.6, 6); }
 }
 
-export function homeLayout(W, H, land) {
-  const top = 56, panelW = land ? Math.min(330, W * 0.42) : 0, bottom = land ? 8 : Math.min(250, H * 0.38);
+export function homeLayout(W, H, land, panelH = 0) {
+  // portrait: keep the estate above the bottom panel (its real height when known, v4.0 B)
+  const top = 56, panelW = land ? Math.min(330, W * 0.42) : 0, bottom = land ? 8 : Math.max(Math.min(250, H * 0.38), Math.min(panelH, H * 0.62));
   const aw = W - panelW, ah = H - top - bottom;
   const s = Math.min(aw / 380, ah / 450);
   return { s, ox: (aw - 360 * s) / 2, oy: top + Math.max(0, (ah - 450 * s) / 2) };
 }
 
-export function drawHome(g, W, H, save, t, dpr, land, page = 1) {
+export function drawHome(g, W, H, save, t, dpr, land, page = 1, panelH = 0) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   HSEASON = Number.isInteger(save.season) ? save.season : null;
   const bgc = (HSEASON !== null && HS.bg[HSEASON]) || ['#9BDB6A', '#6CBF45'];
   const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, bgc[0]); gr.addColorStop(1, bgc[1]);
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
   for (let i = 0; i < 40; i++) { g.fillStyle = i % 2 ? 'rgba(255,255,255,0.06)' : 'rgba(40,110,20,0.07)'; g.beginPath(); g.ellipse((i * 137) % W, (i * 89) % H, 40, 18, 0, 0, TAU); g.fill(); }
-  const { s, ox, oy } = homeLayout(W, H, land);
+  const { s, ox, oy } = homeLayout(W, H, land, panelH);
   g.save(); g.translate(ox, oy); g.scale(s, s);
   for (const [x, y, k] of [[-14, 70, 1], [378, 50, 0.9], [-24, 300, 0.9], [386, 270, 1.1], [10, 470, 0.8], [360, 470, 0.9], [110, 40, 0.7], [250, 34, 0.8]]) { g.save(); g.translate(x, y); g.scale(k, k); roundTree(g, t, false); g.restore(); }
   // the estate lawn with a gravel yard in front of the manor
@@ -585,6 +659,15 @@ export function drawHome(g, W, H, save, t, dpr, land, page = 1) {
     }
     g.restore();
   }
+  // v4.0 B 节日 scenery on the estate (every page)
+  const fest = save.fest || null;
+  if (fest === 'halloween') for (const [x, y, k] of [[44, 262, 1.2], [318, 270, 1.1], [92, 430, 1.0], [272, 432, 1.1], [150, 214, 0.9], [246, 214, 0.9]]) { g.save(); g.translate(x, y); jack(g, k, t + x); g.restore(); }
+  if (fest === 'xmas') { g.save(); g.translate(-6, 252); xtree(g, t, 1.0); g.restore(); }
+  if (fest === 'cny') for (const [x, y, L] of [[86, 184, 78], [196, 184, 78], [120, 476, 120]]) { g.save(); g.translate(x, y); lampString(g, t, L); g.restore(); }
+  // v4.0 B 宠物: the cat lounges in front of the house, the dog sits by the farmer
+  const pets = save.shop && save.shop.pet;
+  if (pets && pets.cat && petById(pets.cat)) { g.save(); g.translate(150, 238); cat2d(g, t, petById(pets.cat).col); g.restore(); }
+  if (pets && pets.dog && petById(pets.dog)) { g.save(); g.translate(240, 224); dog2d(g, t, petById(pets.dog).col); g.restore(); }
   const look = save.shop ? heroStyle(save.shop.eq) : HERO, hat = look.hat;
   g.save(); g.translate(214, 216); g.scale(1.05, 1.05);
   person(g, t, 0, false, { ...look, hat: hat === 'straw', sleeve: undefined, carry: Math.sin(t * 3) > 0.3 });
@@ -592,14 +675,15 @@ export function drawHome(g, W, H, save, t, dpr, land, page = 1) {
   g.restore();
   g.restore();
   // drifting petals / leaves / snow over the estate (screen space, a couple of dozen)
-  if (HSEASON === 0 || HSEASON === 2 || HSEASON === 3) {
-    const n = HSEASON === 3 ? 40 : 22, h = (k) => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+  const PSE = fest === 'xmas' ? 3 : HSEASON;   // 圣诞: it snows on the estate too
+  if (PSE === 0 || PSE === 2 || PSE === 3) {
+    const n = PSE === 3 ? 40 : 22, h = (k) => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
     for (let k = 0; k < n; k++) {
       const y = (t * (26 + h(k) * 26) + h(k + 50) * (H + 40)) % (H + 40) - 20, x = ((h(k + 90) * (W + 60) + Math.sin(t * 0.8 + k) * 20 + t * 10) % (W + 60)) - 30;
-      const sz = HSEASON === 3 ? 1.8 + h(k + 7) * 2 : 3.2 + h(k + 7) * 2.4;
+      const sz = PSE === 3 ? 1.8 + h(k + 7) * 2 : 3.2 + h(k + 7) * 2.4;
       g.globalAlpha = 0.88;
-      if (HSEASON === 3) { g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(x, y, sz, 0, TAU); g.fill(); continue; }
-      g.fillStyle = HSEASON === 0 ? (k % 3 ? '#FFB8D0' : '#FFFFFF') : ['#E8871E', '#C8551E', '#F6C343'][k % 3];
+      if (PSE === 3) { g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(x, y, sz, 0, TAU); g.fill(); continue; }
+      g.fillStyle = PSE === 0 ? (k % 3 ? '#FFB8D0' : '#FFFFFF') : ['#E8871E', '#C8551E', '#F6C343'][k % 3];
       g.save(); g.translate(x, y); g.rotate(t * (1 + h(k + 3)) + k); g.beginPath(); g.ellipse(0, 0, sz, sz * 0.5, 0, 0, TAU); g.fill(); g.restore();
     }
     g.globalAlpha = 1;

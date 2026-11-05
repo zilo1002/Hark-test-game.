@@ -162,6 +162,8 @@ export class Renderer {
     this.buildProcs(w);
     this.buildTiles(w);
     this.player = this.makeChar(w.player);
+    this.dogObj = null;
+    if (w.dog) { const pp = M.makePet('dog', this.petCol || { body: '#E89A44', belly: '#FFF3DC', ear: '#C8752A', nose: '#2A1A10' }); this.levelRoot.add(pp.root); this.dogObj = { pp, ang: 0.8 }; }
     const t = this.camTarget(w); this.cam.x = t.x; this.cam.y = t.y; this.clampCam();
     this.applyQuality();
     this.groundDirty = false;
@@ -203,7 +205,7 @@ export class Renderer {
     for (let x = 0; x < w.W; x += 36) { g.fillStyle = (x / 36) % 2 ? 'rgba(255,255,255,0.06)' : 'rgba(40,110,20,0.06)'; g.fillRect(x, 0, 36, w.H); }
     for (let i = 0; i < 160; i++) { g.fillStyle = i % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(40,100,20,0.07)'; g.beginPath(); g.ellipse(R(i) * w.W, R(i + 500) * w.H, 14 + R(i + 900) * 30, 8 + R(i + 1300) * 16, 0, 0, TAU); g.fill(); }
     // v4.0 四季 on the lawn: spring daisies, autumn leaf litter, winter snow drifts (painted once, under everything)
-    const se = this.season;
+    const se = this.fest === 'xmas' ? 3 : this.season;
     if (se === 0) for (let i = 0; i < w.W * w.H / 900; i++) { g.fillStyle = ['#FFFFFF', '#FFD9E8', '#FFE97A', '#FF8FB0'][i % 4]; g.beginPath(); g.arc(R(i + 9100) * (w.W + pad * 2) - pad, R(i + 9400) * (w.H + pad * 2) - pad, 1.6 + R(i + 9700) * 1.2, 0, TAU); g.fill(); }
     if (se === 2) for (let i = 0; i < w.W * w.H / 500; i++) { g.fillStyle = ['#E8871E', '#C8551E', '#F6C343', '#B8742A'][i % 4]; g.globalAlpha = 0.75; g.beginPath(); g.ellipse(R(i + 9100) * (w.W + pad * 2) - pad, R(i + 9400) * (w.H + pad * 2) - pad, 3 + R(i + 9700) * 2, 1.6 + R(i) * 1.2, R(i + 3) * 3, 0, TAU); g.fill(); }
     if (se === 3) { for (let i = 0; i < 90; i++) { g.fillStyle = i % 2 ? 'rgba(255,255,255,0.75)' : 'rgba(200,220,235,0.5)'; g.beginPath(); g.ellipse(R(i + 9100) * (w.W + pad * 2) - pad, R(i + 9400) * (w.H + pad * 2) - pad, 20 + R(i + 9700) * 40, 10 + R(i) * 16, 0, 0, TAU); g.fill(); } }
@@ -290,6 +292,7 @@ export class Renderer {
       if (side === 0) { x = u * w.W; yy = -95 - R(i + 9) * 60 - far; } else if (side === 1) { x = -95 - R(i + 9) * 60 - far; yy = u * w.H; }
       else if (side === 2) { x = u * w.W; yy = w.H + 90 + R(i + 9) * 50 + far; } else { x = w.W + 90 + R(i + 9) * 50 + far; yy = u * w.H; if (gates.some(([a, b]) => yy > a - 70 && yy < b + 70)) continue; }
       if (this.decoSlots.some((d) => Math.hypot(d.x - x, d.y - yy) < 52)) continue;   // keep the 商店 decorations clear
+      if (this.fest === 'xmas' && (Math.hypot(x - gx - 25, yy - w.H - 150) < 95 || Math.hypot(x + 120, yy - w.H * 0.35) < 70)) continue;   // and the 圣诞树
       M.Env.tree(out, x, yy, R(i + 77) > 0.6 ? 'cone' : 'round', 0.9 + R(i + 3) * 0.5);
     }
     const dc = w.deco;
@@ -313,6 +316,7 @@ export class Renderer {
     }
     for (const gh of dc.greenhouse || []) M.Env.greenhouseFrame(out, ...gh);
     for (const l of dc.lanterns || []) M.Env.lantern(out, l[0], l[1]);
+    this.buildFestival(out, w, gx, gates);
     const mesh = new THREE.Mesh(M.merge(out), M.vcMat()); mesh.castShadow = true; mesh.receiveShadow = true; mesh.userData.own = true;
     this.levelRoot.add(mesh);
     // v3.7 greenhouse glass: one see-through mesh (no depth write, so plants and people under it stay visible)
@@ -333,9 +337,49 @@ export class Renderer {
       }
     }
   }
+  // v4.0 B 节日: pumpkin lanterns (万圣节), a big tree + snow drifts (圣诞), strings of red lanterns (春节),
+  // all outside the fence (no gameplay), mostly on the south / west sides the camera looks across
+  buildFestival(out, w, gx, gates) {
+    const f = this.fest; if (!f) return;
+    const clear = (x, y, r = 40) => !this.decoSlots.some((d) => Math.hypot(d.x - x, d.y - y) < r);
+    const farm = (w.deco.theme || 'garden') === 'farm', top = farm ? 17 : 20.5;
+    // at every open sale desk (where the player keeps coming back): a lantern / tree / string of lanterns
+    for (const c of w.counters) {
+      if (c.hidden) continue;
+      if (f === 'halloween') { M.Fest.jackLantern(out, c.x - 4, c.y - 25, 0.7, 0.8, CFG.counter.deskH); M.Fest.jackLantern(out, c.x + 28, c.y - 46, 1.5, 0.8); }
+      else if (f === 'xmas') { M.Fest.xmasTree(out, c.x + 32, c.y - 54, 0.8); M.Fest.snowMound(out, c.x + 32, c.y - 54, 16); }
+      else if (f === 'cny') M.Fest.lanternString(out, c.x - 26, c.y - 50, 74, 0, 1.6);
+    }
+    // on top of the wall pillars (北 / 西 / 南 every 120): pumpkins (万圣节) or a red lantern (春节)
+    if (f === 'halloween' || f === 'cny') {
+      const put = (x, y) => { if (f === 'halloween') M.Fest.jackLantern(out, x, y, 0.75, 0.8, top); else { out.push(M.P(M.sph(3.6, 8, 6), '#E8283C', [x, top + 4, y], [0, 0, 0], [1, 1.15, 1]), M.P(M.cyl(2, 2, 1, 6), '#FFC21A', [x, top + 8.4, y]), M.P(M.cyl(2, 2, 1, 6), '#FFC21A', [x, top - 0.2, y])); } };
+      for (let x = 0; x <= w.W; x += 120) { put(x, -6); if (x < gx - 20 || x > gx + 70) put(x, w.H + 6); }
+      for (let y = 120; y < w.H; y += 120) put(-6, y);
+    }
+    if (f === 'halloween') {
+      let k = 0;
+      for (let x = 40; x < w.W - 20; x += 95) { if (x > gx - 30 && x < gx + 80) continue; if (clear(x, w.H + 34)) M.Fest.jackLantern(out, x, w.H + 34, 1.15 + (k % 2) * 0.25, 0.6); k++; }
+      for (let y = 50; y < w.H; y += 110) M.Fest.jackLantern(out, -34, y, 1.2, 1.3);
+      for (let x = 80; x < w.W; x += 160) M.Fest.jackLantern(out, x, -32, 1.1, 0.3);
+      M.Fest.jackLantern(out, gx - 16, w.H + 28, 1.6, 0.7); M.Fest.jackLantern(out, gx + 66, w.H + 28, 1.6, 0.4);
+    } else if (f === 'xmas') {
+      M.Fest.xmasTree(out, gx + 25, w.H + 150, 1.6);
+      M.Fest.xmasTree(out, -120, w.H * 0.35, 1.1);
+      for (let i = 0; i < 26; i++) { const u = hash(i * 31 + 7), side = i % 3; const x = side === 0 ? u * w.W : side === 1 ? -40 - hash(i) * 30 : u * w.W, y = side === 0 ? w.H + 40 + hash(i + 3) * 40 : side === 1 ? u * w.H : -40 - hash(i) * 20; if (clear(x, y, 34)) M.Fest.snowMound(out, x, y, 10 + hash(i + 9) * 12); }
+    } else if (f === 'cny') {
+      const xs = []; for (let x = 20; x < w.W; x += 130) { if (x > gx - 40 && x < gx + 90) continue; xs.push(x); }
+      for (let i = 0; i + 1 < xs.length; i++) if (xs[i + 1] - xs[i] < 200) M.Fest.lanternString(out, xs[i], w.H + 26, xs[i + 1] - xs[i], 0);
+      for (let x = 20; x + 130 < w.W; x += 260) M.Fest.lanternString(out, x, -26, 130, 0);
+      for (let y = 30; y + 120 < w.H; y += 240) M.Fest.lanternString(out, -26, y, 0, 120);
+      M.Fest.lanternString(out, gx - 14, w.H + 26, 78, 0);
+    }
+  }
   // 商店 decorations: outside the fence, along the south side either side of the gate (the side
   // nearest the camera), then along the west side. Purely scenery: no collision, no gameplay.
   setDecos(ids) { this.decoIds = (ids || []).slice(); }
+  // v4.0 B: the festival on now (scenery in every level) and the dog's colours (null = no dog)
+  setFestival(id) { this.fest = id || null; }
+  setPet(col) { this.petCol = col || null; }
   setOutfit(style) { this.heroStyle = style; }
   // v3.6 制服: one set worn by every hired worker (null = each role's own look)
   setUniform(style) { this.uniform = style || null; }
@@ -787,6 +831,14 @@ export class Renderer {
       this.updateChar(o, dt); this.drawStack(w, o, labels, false);
     }
     this.updateChar(this.player, dt); this.drawStack(world.player, this.player, labels, true);
+    if (this.dogObj && world.dog) {   // v4.0 B 宠物狗
+      const d = world.dog, o = this.dogObj, sp = Math.hypot(d.vx, d.vy);
+      if (sp > 6) o.ang = angLerp(o.ang, Math.atan2(d.vx, d.vy), Math.min(1, dt * 10));
+      else if (d.state === 'follow') { const p = world.player; o.ang = angLerp(o.ang, Math.atan2(p.x - d.x, p.y - d.y), Math.min(1, dt * 3)); }
+      o.pp.root.position.set(d.x, 0, d.y); o.pp.root.rotation.y = o.ang; o.pp.root.scale.setScalar(1.4);
+      M.posePet(o.pp, { t: time, walk: d.walk, moving: sp > 6, sit: sp <= 6 && !world.player.moving });
+      if (d.carry) { const fx = Math.sin(o.ang), fz = Math.cos(o.ang); this.item(d.carry, d.x + fx * 14.5, d.y + fz * 14.5, 15, o.ang, 0.85); }
+    }
     // customers (pooled figures)
     const pool = this.custPool, used = this._used || (this._used = {});
     for (const k in used) used[k] = 0;
@@ -906,7 +958,7 @@ export class Renderer {
   // v4.0 四季 / 雨: light screen-space particles over the scene (petals in spring, leaves in autumn, snow in
   // winter; rain streaks on rainy runs). Few, cheap, no allocation; fewer still at low quality.
   drawWeather(g, t) {
-    const W = this.W, H = this.H, lo = this.q === 0, se = this.season;
+    const W = this.W, H = this.H, lo = this.q === 0, se = this.fest === 'xmas' ? 3 : this.season;   // v4.0 B 圣诞: it snows
     if (se === 0 || se === 2 || se === 3) {
       const n = (se === 3 ? 46 : 26) >> (lo ? 1 : 0);
       for (let k = 0; k < n; k++) {

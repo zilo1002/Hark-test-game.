@@ -506,6 +506,26 @@ export function makePerson(o = {}) {
     head.add(mesh(cyl(6.4, 6, 3.6, 12), '#FFC21A', 0, 7.6, 0));
     for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; head.add(mesh(cone(1.6, 4, 5), '#FFD23F', Math.sin(a) * 5.4, 11.2, Math.cos(a) * 5.4)); head.add(mesh(sph(0.9, 5, 4), '#FFF6B0', Math.sin(a) * 5.4, 13.4, Math.cos(a) * 5.4)); }
     head.add(mesh(sph(1.4, 6, 5), '#E8283C', 0, 7.8, 6.4)); head.add(mesh(sph(1.1, 6, 5), '#3BA7FF', 4.6, 7.8, 4.4)); head.add(mesh(sph(1.1, 6, 5), '#4CD08A', -4.6, 7.8, 4.4));
+  } else if (o.hat === 'pumpkin') {   // v4.0 B 万圣节 南瓜头: a carved pumpkin worn over the head
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; head.add(mesh(sph(4.6, 8, 6), k % 2 ? '#F2871E' : '#E8761A', Math.sin(a) * 4.8, 2.2, Math.cos(a) * 4.8, 0.8, 1.15, 0.8)); }
+    head.add(mesh(sph(7.6, 10, 8), '#F2871E', 0, 2.2, 0, 1.08, 0.95, 1.08));
+    head.add(mesh(cyl(1.1, 1.5, 3.6, 6), '#5A8A2A', 0, 10.4, 0)); head.add(mesh(sph(1.8, 6, 4), '#4FAE32', 2.2, 9.4, 0.6, 1.4, 0.4, 0.9));
+    for (const sx of [-1, 1]) head.add(mesh(cone(1.6, 2.6, 3), '#3A2210', sx * 3, 3.6, 8.2, 1, 1, 0.4));
+    head.add(mesh(box(6.4, 1.6, 0.8), '#3A2210', 0, -1.2, 8.4)); for (const x of [-2, 2]) head.add(mesh(box(1.4, 1, 0.9), '#3A2210', x, -0.2, 8.5));
+  } else if (o.hat === 'santa') {   // v4.0 B 圣诞帽
+    head.add(mesh(cyl(8.2, 8.2, 2.6, 12), '#FFFFFF', 0, 5.0, 0));
+    const tip = new THREE.Mesh(cone(7.4, 12, 10), M('#E8283C')); tip.position.set(-1.4, 11.4, -0.6); tip.rotation.z = 0.35; tip.castShadow = true; head.add(tip);
+    head.add(mesh(sph(2.2, 7, 5), '#FFFFFF', -5.6, 16.0, -0.6));
+  } else if (o.hat === 'lion') {   // v4.0 B 春节 舞狮帽: big red-and-gold lion head, fluffy trim, horn, eyes
+    head.add(mesh(sph(8.6, 12, 8, 0), '#E8283C', 0, 3.4, -0.2, 1.1, 0.95, 1.1));
+    for (let k = 0; k < 10; k++) { const a = -1.4 + k / 9 * 2.8; head.add(mesh(sph(2.3, 6, 5), k % 2 ? '#FFFFFF' : '#FFE16B', Math.sin(a) * 9, 4.2 + Math.cos(a * 1.2) * 1.4, Math.cos(a) * 8.4)); }
+    head.add(mesh(cone(1.6, 4.4, 6), '#FFC21A', 0, 13, 1.4)); head.add(mesh(box(9, 2, 1.4), '#FFC21A', 0, 9.2, 7.6));
+    for (const sx of [-1, 1]) { head.add(mesh(sph(2.2, 7, 5), '#FFFFFF', sx * 3.4, 7.4, 7.6)); head.add(mesh(sph(1.1, 6, 4), '#1A1A22', sx * 3.4, 7.4, 9.4)); head.add(mesh(sph(2.4, 6, 4), '#FFC21A', sx * 9.4, 6.4, 1, 0.6, 1.2, 1)); }
+    head.add(mesh(sph(1.6, 6, 4), '#FFC21A', 0, 4.6, 9.2));
+  } else if (o.hat === 'scholar') {   // v4.0 B 图鉴大师帽: a mortarboard with a gold tassel
+    head.add(mesh(cyl(7.2, 7.4, 3.2, 12), '#2A2A3A', 0, 5.6, 0));
+    head.add(mesh(box(15, 1.2, 15), '#2A2A3A', 0, 7.8, 0, 1, 1, 1));
+    head.add(mesh(sph(1, 6, 4), '#FFC21A', 0, 8.8, 0)); head.add(mesh(box(0.8, 0.6, 7), '#FFC21A', 0, 8.6, 3.6)); head.add(mesh(cyl(0.9, 1.4, 4.4, 6), '#FFC21A', 0, 6.2, 7.2));
   }
   if (o.pigtails) for (const s of [-1, 1]) head.add(mesh(sph(2.6, 7, 5), hair, s * 7.6, -0.8, -2.2));
   if (o.crown) {   // VIP: chunky gold crown with a red gem
@@ -714,6 +734,87 @@ export function appleTreeGeo() {   // round orchard tree full of red apples
   return merge(parts);
 }
 
+
+// ------------------------------------------------------------------ v4.0 B 宠物 (low-poly dog / cat)
+// returns { root, body, head, legs[4], tail, kind }; posePet animates it (walk / idle / sit / lounge)
+export function makePet(kind, col) {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const mesh = (geo, c, x, y, z, sx = 1, sy = 1, sz = 1, par = body) => { const m = new THREE.Mesh(geo, colMat(c)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; par.add(m); return m; };
+  const dog = kind === 'dog', B = col.body, W = col.belly || '#FFFFFF';
+  const trunk = new THREE.Mesh(cap(dog ? 3.6 : 3.0, dog ? 7 : 6.4, 3, 8), colMat(B)); trunk.rotation.x = H; trunk.position.set(0, dog ? 8 : 6.6, 0); trunk.castShadow = true; body.add(trunk);
+  mesh(sph(dog ? 3.0 : 2.6, 8, 6), W, 0, dog ? 6.4 : 5.2, 2.6, 1, 0.8, 1.6);
+  if (col.spot) { mesh(sph(2.2, 6, 5), col.spot, 2.2, 10.4, -2, 1, 0.5, 1.2); mesh(sph(1.6, 6, 5), col.spot, -2.4, 9.8, 3, 1, 0.5, 1); }
+  if (col.stripe) for (const z of [-3, 0, 3]) mesh(box(6.6, 1, 1.1), col.stripe, 0, 10.6 + (dog ? 1 : 0) - (kind === 'cat' ? 0.8 : 0), z);
+  const legs = [];
+  for (const [x, z] of [[-2.2, 4.6], [2.2, 4.6], [-2.2, -4.6], [2.2, -4.6]]) {
+    const hip = new THREE.Group(); hip.position.set(x, dog ? 6.4 : 5.2, z);
+    mesh(cyl(1.1, 1.0, dog ? 6.2 : 5.0, 6), B, 0, dog ? -3.1 : -2.5, 0, 1, 1, 1, hip);
+    mesh(sph(1.3, 6, 4), W, 0, dog ? -6.2 : -5.0, 0.4, 1, 0.6, 1.3, hip);
+    body.add(hip); legs.push(hip);
+  }
+  const head = new THREE.Group(); head.position.set(0, dog ? 13 : 11, dog ? 7.4 : 6.6); body.add(head);
+  mesh(sph(dog ? 4.2 : 3.8, 10, 8), B, 0, 0, 0, 1, 0.95, 1, head);
+  if (dog) { mesh(box(3.6, 2.8, 4.2), W, 0, -1.4, 3.8, 1, 1, 1, head); mesh(sph(1.0, 6, 4), col.nose, 0, -0.4, 6.0, 1.2, 0.9, 0.8, head); mesh(box(1.6, 0.5, 1.6), '#E8586A', 0, -3.0, 4.6, 1, 1, 1, head); }
+  else { mesh(sph(2.0, 8, 6), W, 0, -1.2, 3.0, 1.3, 0.8, 0.8, head); mesh(sph(0.6, 5, 4), col.nose, 0, -0.4, 3.9, 1.2, 0.8, 0.8, head);
+    for (const sx of [-1, 1]) for (const k of [0, 1]) { const w = new THREE.Mesh(box(4, 0.25, 0.25), colMat('#FFFFFF')); w.position.set(sx * 3.2, -1.2 - k * 0.7, 3.2); w.rotation.z = sx * (0.1 - k * 0.2); head.add(w); } }
+  for (const sx of [-1, 1]) {
+    mesh(sph(0.75, 6, 4), '#1A1A22', sx * 1.7, 0.9, dog ? 3.7 : 3.3, 1, 1.2, 0.6, head);
+    if (dog) { const ear = new THREE.Mesh(box(2.2, 4.2, 1.2), colMat(col.ear)); ear.position.set(sx * 3.4, 1.4, -0.4); ear.rotation.z = sx * 0.5; ear.castShadow = true; head.add(ear); }
+    else { mesh(cone(1.5, 3.2, 4), col.ear, sx * 2.2, 3.8, 0, 1, 1, 0.6, head); mesh(cone(0.8, 1.8, 4), '#FFB3C0', sx * 2.2, 3.5, 0.5, 1, 1, 0.4, head); }
+  }
+  if (col.collar !== false && dog) mesh(tor(3.0, 0.6, 4, 12), '#E8283C', 0, -2.8, 0.6, 1, 1, 1, head).rotation.x = H;
+  const tail = new THREE.Group(); tail.position.set(0, dog ? 10 : 8, dog ? -6.6 : -6.0); body.add(tail);
+  if (dog) { const tm = new THREE.Mesh(cap(1.1, 3.6, 2, 6), colMat(B)); tm.position.set(0, 2.4, -0.6); tm.rotation.x = -0.5; tail.add(tm); mesh(sph(1.2, 6, 4), W, 0, 4.6, -1.8, 1, 1, 1, tail); }
+  else { const tm = new THREE.Mesh(cap(0.9, 8, 2, 6), colMat(B)); tm.position.set(0, 4.4, -1.6); tm.rotation.x = -0.35; tail.add(tm); }
+  const blob = new THREE.Mesh(BLOB_GEO, BLOB_MAT); blob.rotation.x = -H; blob.position.y = 0.3; blob.scale.set(7, 10, 1); root.add(blob);
+  return { root, body, head, legs, tail, kind, blob };
+}
+// s: { t, walk, moving, sit, lounge, carry (dog: an item in its mouth is drawn by the renderer) }
+export function posePet(pp, s) {
+  const { legs, body, head, tail } = pp, t = s.t, sw = s.moving ? Math.sin(s.walk * 1.4) : 0;
+  legs[0].rotation.x = sw * 0.7; legs[3].rotation.x = sw * 0.7; legs[1].rotation.x = -sw * 0.7; legs[2].rotation.x = -sw * 0.7;
+  body.position.y = s.moving ? Math.abs(Math.sin(s.walk * 1.4)) * 0.9 : 0; body.rotation.x = 0; body.rotation.z = 0;
+  head.rotation.set(s.moving ? -0.05 : Math.sin(t * 0.9) * 0.08, s.moving ? 0 : Math.sin(t * 0.5) * 0.35, 0);
+  tail.rotation.set(0, 0, 0); tail.rotation.y = Math.sin(t * (pp.kind === 'dog' ? (s.moving ? 16 : 9) : 1.6)) * (pp.kind === 'dog' ? 0.6 : 0.4);
+  if (s.sit) { legs[2].rotation.x = legs[3].rotation.x = -1.2; body.rotation.x = -0.35; body.position.y = -1.6; legs[0].rotation.x = legs[1].rotation.x = 0.25; }
+  if (s.lounge) {   // cat stretched out on its side, slow breathing, tail swish
+    for (const l of legs) l.rotation.x = 1.25; body.rotation.z = 1.25; body.position.y = 2.4 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, 0, -1.0 + Math.sin(t * 0.7) * 0.06);
+  }
+}
+
+// v4.0 B 节日 scenery pieces (merged into the static level mesh)
+export const Fest = {
+  jackLantern(out, x, y, s = 1, rot = 0, z = 0) {   // carved pumpkin with a glowing face (bright, unlit look)
+    const n0 = out.length;
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; out.push(P(sph(4.4 * s, 8, 6), k % 2 ? '#F2871E' : '#E8761A', [x + Math.sin(a) * 3.4 * s, 5 * s, y + Math.cos(a) * 3.4 * s], [0, 0, 0], [0.8, 1.05, 0.8])); }
+    out.push(P(sph(5.4 * s, 9, 7), '#F2871E', [x, 5 * s, y], [0, 0, 0], [1.1, 0.95, 1.1]));
+    out.push(P(cyl(0.9 * s, 1.2 * s, 3 * s, 5), '#5A8A2A', [x, 11 * s, y]));
+    const fx = Math.sin(rot), fz = Math.cos(rot);
+    for (const sx of [-1, 1]) out.push(P(cone(1.3 * s, 2.2 * s, 3), '#FFE14D', [x + fx * 5.6 * s + fz * sx * 2.2 * s, 6.6 * s, y + fz * 5.6 * s - fx * sx * 2.2 * s], [Math.PI, rot, 0], [1, 1, 0.5]));
+    out.push(P(box(5 * s, 1.4 * s, 1 * s), '#FFE14D', [x + fx * 5.7 * s, 3.4 * s, y + fz * 5.7 * s], [0, rot, 0]));
+    if (z) for (let k = n0; k < out.length; k++) out[k].pos[1] += z;
+  },
+  xmasTree(out, x, y, s = 1) {
+    out.push(P(cyl(2 * s, 2.6 * s, 8 * s, 6), '#7A4A22', [x, 4 * s, y]));
+    for (const [h, r, yy] of [[18, 16, 14], [15, 12.5, 24], [12, 9, 33], [9, 5.6, 41]]) out.push(P(cone(r * s, h * s, 9), '#2F8A3A', [x, yy * s, y]));
+    for (const [h, r, yy] of [[2, 15.4, 6.8], [2, 12, 17.4], [2, 8.6, 27.8]]) out.push(P(cyl(r * s * 0.82, r * s, h * s, 9), '#FFFFFF', [x, yy * s, y]));
+    const bc = ['#E8283C', '#FFC21A', '#3BA7FF', '#FF7FAE', '#FFFFFF'];
+    for (let k = 0; k < 22; k++) { const lvl = k % 4, a = k * 2.4, r = [13, 10, 7, 4.4][lvl] * s, yy = [12, 22, 31, 39][lvl] * s; out.push(P(sph(1.3 * s, 6, 4), bc[k % 5], [x + Math.cos(a) * r, yy, y + Math.sin(a) * r])); }
+    out.push(P(ico(3 * s, 0), '#FFE14D', [x, 47 * s, y]));
+    for (const [dx, dz, c] of [[9, 8, '#E8283C'], [-8, 9, '#3BA7FF'], [3, 12, '#4CD08A']]) { out.push(P(box(6 * s, 5 * s, 6 * s), c, [x + dx * s, 2.5 * s, y + dz * s])); out.push(P(box(6.4 * s, 1 * s, 1.4 * s), '#FFC21A', [x + dx * s, 5.2 * s, y + dz * s])); }
+  },
+  snowMound(out, x, y, r) { out.push(P(sph(r, 9, 5), '#FFFFFF', [x, 0, y], [0, 0, 0], [1, 0.32, 0.8])); },
+  // a pole with a sagging string of red lanterns toward the next pole (dx, dy away)
+  lanternString(out, x, y, dx, dy, s = 1) {
+    out.push(P(cyl(1.1 * s, 1.3 * s, 34 * s, 6), '#8E3A26', [x, 17 * s, y])); out.push(P(sph(1.8 * s, 6, 4), '#FFC21A', [x, 34.6 * s, y]));
+    const L = Math.hypot(dx, dy), n = Math.max(4, Math.round(L / (11 * s)));
+    for (let k = 1; k < n; k++) { const t = k / n, sag = Math.sin(t * Math.PI) * 7 * s, lx = x + dx * t, ly = y + dy * t, h = 31 * s - sag;
+      out.push(P(cyl(0.2 * s, 0.2 * s, 2.4 * s, 3), '#3A2210', [lx, h + 1.4 * s, ly]));
+      out.push(P(sph(2.8 * s, 8, 6), '#E8283C', [lx, h - 2 * s, ly], [0, 0, 0], [1, 1.15, 1])); out.push(P(cyl(1.6 * s, 1.6 * s, 0.9 * s, 6), '#FFC21A', [lx, h + 1.2 * s, ly])); out.push(P(cyl(1.6 * s, 1.6 * s, 0.9 * s, 6), '#FFC21A', [lx, h - 5.2 * s, ly]));
+      out.push(P(cyl(0.3 * s, 0.3 * s, 2.6 * s, 3), '#FFC21A', [lx, h - 7 * s, ly])); }
+  },
+};
+
 // ------------------------------------------------------------------ environment pieces (merged into static meshes)
 // v4.0 四季: env trees / hedges take the season's colours (null = the green default).
 // Set by the renderer before a level's scenery is built.
@@ -897,6 +998,9 @@ const DECO_PARTS = {
   statue: () => [P(box(16, 8, 16), '#EFE7D4', [0, 4, 0]), P(box(18, 2, 18), '#D6CCB4', [0, 9, 0]), P(cap(5, 9, 3, 8), '#FFC21A', [0, 20, 0]), P(sph(5.2, 10, 8), '#FFD23F', [0, 33, 0]),
     P(cyl(4.4, 4, 3, 10), '#FFC21A', [0, 38.5, 0]), ...Array.from({ length: 5 }, (_, k) => { const a = k / 5 * Math.PI * 2; return P(cone(1.2, 3, 4), '#FFE16B', [Math.sin(a) * 3.8, 41.5, Math.cos(a) * 3.8]); }),
     P(cyl(0.8, 0.8, 14, 5), '#FFC21A', [7, 26, 0], [0, 0, -0.5]), P(ico(2.2, 0), '#FFE16B', [11, 33, 0])],
+  jackLamp: () => { const out = []; Fest.jackLantern(out, -7, 0, 1.15, 0.4); Fest.jackLantern(out, 8, 4, 0.85, -0.3); Fest.jackLantern(out, 1, -8, 0.7, 0); out.push(P(box(3, 1, 3), '#5A3414', [0, 0.5, 0])); return out; },
+  xmasTree: () => { const out = []; Fest.xmasTree(out, 0, 0, 0.9); return out; },
+  redLamps: () => { const out = []; Fest.lanternString(out, -20, 0, 40, 0); out.push(P(cyl(1.1, 1.3, 34, 6), '#8E3A26', [20, 17, 0]), P(sph(1.8, 6, 4), '#FFC21A', [20, 34.6, 0])); return out; },
   rainbow: () => {
     const out = [], rc = ['#FF4D4D', '#FF9F43', '#FFD23F', '#4CD08A', '#3BA7FF', '#A77BFF'];
     rc.forEach((c, i) => { for (let k = 0; k <= 14; k++) { const a = Math.PI * k / 14, R = 30 - i * 2.6; out.push(P(box(3.4, 2.6, 6), c, [Math.cos(a) * R, Math.sin(a) * R * 0.9, 0], [0, 0, a - H])); } });

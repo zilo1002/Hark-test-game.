@@ -14,12 +14,14 @@ import * as Crew from './crew.js';
 import * as Orders from './orders.js';
 import * as Seasons from './seasons.js';
 import * as Daily from './daily.js';
+import * as Book from './book.js';
+import * as Fest from './festival.js';
 
 const cv = document.getElementById('cv'), gl = document.getElementById('gl');
 const R = new Renderer(cv, gl), fx = new FX(), input = new Input(cv), snd = new Sound(), hap = new Haptics();
 let data = Save.load();
 Orders.ensureOrders(data);
-let ordBase = null, ordItems = new Set(), ordHudT = 0;
+let ordBase = null, ordItems = new Set(), ordHudT = 0, bookBase = null;
 snd.on = data.settings.sound; hap.on = data.settings.vib;
 
 let mode = 'home', world = null, guide = null, guideT = 0, saveT = 0, hudT = 0, time = 0, last = performance.now();
@@ -62,6 +64,14 @@ const ui = new UI({
     return r;
   },
   swap: (i) => { const ok = Orders.swapOrder(data, i); if (ok) { Save.save(data); snd.play('appear'); } else snd.play('full'); return ok; },
+  // v4.0 B 图鉴
+  bookOpen: () => { snd.unlock(); snd.play('tap'); ensurePreview(); },
+  bookThumb: (kind, id) => { try { return ensurePreview().bookThumb(kind, id); } catch (_) { return ''; } },
+  bookClaim: (page) => {
+    const r = Book.claimPage(data, page, Shop.itemById);
+    if (r) { Save.save(data); applyLook(); snd.play('restore'); hap.pattern([30, 40, 30], [200, 255]); fx.confetti(R.W, R.H, 90); ui.renderHome(data); }
+    return r;
+  },
   // 每日挑战
   dailyStart: () => { snd.unlock(); snd.play('tap'); startDaily(); },
   locked: () => { snd.play('full'); hap.tick(30, 0); },
@@ -72,11 +82,17 @@ const ui = new UI({
 // 商店 look: the farmer's outfit (3D in levels) and the decorations (estate + level scenery)
 let preview = null;
 function ensurePreview() { if (!preview) { preview = new Preview(document.getElementById('shopPrev')); } return preview; }
-function applyLook() { R.setOutfit(Shop.heroStyle(data.shop.eq)); R.setDecos(data.shop.deco); R.setUniform(Shop.uniformStyle(data.shop.uni)); }
+function applyLook() {
+  R.setOutfit(Shop.heroStyle(data.shop.eq)); R.setDecos(data.shop.deco); R.setUniform(Shop.uniformStyle(data.shop.uni));
+  const dog = Shop.petById(data.shop.pet.dog); R.setPet(dog ? dog.col : null); R.setFestival(Fest.currentFestival());
+}
+const petOpt = () => (data.shop.pet.dog ? 'dog' : null);
 applyLook();
 
 input.onFirst = () => snd.unlock();
 
+let _hp = null;
+function homePanelH() { if (!_hp) _hp = document.querySelector('#home .panel'); return _hp ? _hp.offsetHeight : 0; }
 function resize() {
   R.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1);
   if (world) R.follow(0, true);
@@ -93,10 +109,11 @@ function start(li) {
     ? { season: Seasons.currentSeason(), rain: !!data.cur.env.rain }
     : { season: Seasons.currentSeason(), rain: forceRain !== null ? forceRain && li > 0 : Seasons.rollRain(li) };
   forceRain = null;
-  world = new World(li, { crew, ...env });
-  if (resume) { try { world.restore(data.cur); } catch (_) { world = new World(li, { crew, ...env }); } }
+  R.setFestival(Fest.currentFestival());
+  world = new World(li, { crew, pet: petOpt(), ...env });
+  if (resume) { try { world.restore(data.cur); } catch (_) { world = new World(li, { crew, pet: petOpt(), ...env }); } }
   else data.cur = world.snapshot();
-  Orders.ensureOrders(data); ordBase = Orders.cloneStats(world.stats); ordItems = Orders.levelItems(li);
+  Orders.ensureOrders(data); ordBase = Orders.cloneStats(world.stats); ordItems = Orders.levelItems(li); bookBase = Book.cloneBookStats(world.stats);
   data.played = true; Save.save(data);
   R.setWorld(world); R.setMode('play'); R.follow(0, true); fx.clear();
   mode = 'play'; winDone = false; guide = null; guideT = 0;
@@ -112,8 +129,9 @@ function startDaily() {
   const dc = dailyDc = Daily.dailyFor(data);
   if (Daily.ensureDay(data, dc.day, dc)) Save.save(data);
   const crew = Crew.levelCrew(data.crew, dc.li);
-  world = new World(dc.li, { crew, seed: dc.seed, level: dc.L, daily: dc, timeLimit: CFG.daily.time, season: Seasons.currentSeason(), ...dc.opts });
-  Orders.ensureOrders(data); ordBase = Orders.cloneStats(world.stats); ordItems = Orders.levelItems(dc.li);
+  R.setFestival(Fest.currentFestival());
+  world = new World(dc.li, { crew, seed: dc.seed, level: dc.L, daily: dc, timeLimit: CFG.daily.time, season: Seasons.currentSeason(), pet: petOpt(), ...dc.opts });
+  Orders.ensureOrders(data); ordBase = Orders.cloneStats(world.stats); ordItems = Orders.levelItems(dc.li); bookBase = Book.cloneBookStats(world.stats);
   R.setWorld(world); R.setMode('play'); R.follow(0, true); fx.clear();
   mode = 'play'; winDone = false; guide = null; guideT = 0;
   ui.hideAll(); ui.showHUD(world); ui.banner(world);
@@ -136,6 +154,10 @@ function snapshot() { if (world && world.daily) { credit(); Save.save(data); ret
 function credit() {
   if (!world || !ordBase) return;
   Orders.trackOrders(data, world.stats, ordBase); ordBase = Orders.cloneStats(world.stats);
+  if (bookBase) {   // v4.0 B 图鉴: a first-ever catch shows a short fixed note (no popup)
+    const fresh = Book.trackBook(data, world.stats, bookBase); bookBase = Book.cloneBookStats(world.stats);
+    if (fresh.length && mode === 'play') { const k = fresh[0], g = k.startsWith('gold:'); const nm = CFG.items[g ? k.slice(5) : k].name; ui.note(`图鉴新收录：${g ? '金' : ''}${nm}`, performance.now() / 1000); }
+  }
   for (const w of world.workers) {
     if (!w.crewId) continue;
     const d = (w.done || 0) - (w.xpPaid || 0); if (d <= 0) continue;
@@ -248,6 +270,7 @@ function handleEvents() {
         snd.play('coin'); hap.pattern([40, 30, 60], [230, 255]); break;
       case 'produce': fx.burst(e.x, e.y, 40, 4, ['#FFFFFF', '#FFE16B', '#FF8FB0'], 30, 60, 2.6, 'star', 0.7); break;
       case 'lay': break;
+      case 'petFetch': snd.play('pick'); fx.burst(e.x, e.y, 12, 6, ['#FFFFFF', '#FFE16B'], 30, 60, 2.4, 'star', 0.6); break;
       case 'ground': R.groundDirty = true; break;
       case 'win': if (!winDone) { winDone = true; if (world.daily) dailyWin(); else win(); } break;
     }
@@ -283,7 +306,7 @@ function frame(now) {
     saveT += dt; if (saveT > 5) { saveT = 0; snapshot(); }
   } else {
     fx.update(dt);
-    drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: Seasons.currentSeason() }, time, R.dpr, R.W > R.H * 1.15, ui.page || 1);
+    drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: Seasons.currentSeason(), fest: Fest.currentFestival() }, time, R.dpr, R.W > R.H * 1.15, ui.page || 1, homePanelH());
     R.g.setTransform(R.dpr, 0, 0, R.dpr, 0, 0); R.fxScreen(fx);
     if (preview && ui.shopOpenNow()) {   // turntable preview inside the shop
       const c = preview.cv, w = c.clientWidth, h = c.clientHeight;
@@ -311,7 +334,10 @@ if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
     // v4.0: force the season (0–3 春夏秋冬, null = calendar), the next run's rain, start / finish the daily challenge
     season: (s) => { Seasons.forceSeason(s); if (mode === 'home') ui.renderHome(data); return Seasons.seasonInfo(); },
     rain: (on) => { forceRain = on === undefined ? true : !!on; return forceRain; },
-    daily: () => startDaily(), Daily, Seasons,
+    daily: () => startDaily(), Daily, Seasons, Book, Fest,
+    // v4.0 B: force a festival ('halloween' | 'xmas' | 'cny' | null = calendar), open the 图鉴
+    festival: (id) => { Fest.forceFestival(id); applyLook(); if (mode === 'home') ui.renderHome(data); return Fest.festivalInfo(); },
+    book: (p) => ui.openBook(p),
     dailyFinish: () => { if (!world || !world.daily) return null; while (!world.won) { world.events.length = 0; world.update(1 / 30, 0, 0); } return world.score; },
     shop: () => ui.openShop(), Shop, Crew, Orders, credit, orders: () => ui.openOrders(), crew: () => ui.openCrew(), applyLook, save: () => Save.save(data),
     // walk the bot into a field until the stack is tall (for screenshots of a cutting run)

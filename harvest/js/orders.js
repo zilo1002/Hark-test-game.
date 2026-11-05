@@ -45,7 +45,7 @@ function makeOrder(tier, r, pool, taken, data) {
   }
   if (tier === 2 && r() < ORD.ticketChance) {
     const owned = new Set((data.shop && data.shop.owned) || []);
-    const cand = [...OUTFITS, ...DECOS, ...UNIFORMS].filter((x) => x.price >= ORD.ticketMin && !owned.has(x.id));
+    const cand = [...OUTFITS, ...DECOS, ...UNIFORMS].filter((x) => x.price >= ORD.ticketMin && !x.fest && !x.book && !owned.has(x.id));
     if (cand.length) o.ticket = cand[Math.floor(r() * cand.length)].id;
   }
   return o;

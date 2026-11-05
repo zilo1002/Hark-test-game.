@@ -245,3 +245,31 @@ button { font: inherit; cursor: pointer; border: 0; }
 @media (orientation: landscape) and (max-height: 420px) { .dailyCard .note { display: none; } .medal { width: 56px; height: 56px; margin-top: 22px; font-size: 15px; } }
 .lvBadge.timer { font-variant-numeric: tabular-nums; background: rgba(214,112,20,.88); min-width: 74px; text-align: center; }
 .lvBadge.timer.hurry { background: rgba(214,48,40,.92); }
+
+/* v4.0 B 图鉴 / 节日 / 宠物 */
+.bookBtn { background: linear-gradient(#D9A8FF, #9A5AD9); box-shadow: 0 4px 0 #6A3AA8; text-shadow: 0 2px 0 #6A3AA8; position: relative; }
+.bookBtn .dot { position: absolute; right: 8px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #FF3B30; border: 2px solid #fff; }
+.fest { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 900; color: #fff; margin-bottom: 6px; padding: 4px 8px 4px 4px; border-radius: 14px; line-height: 1.25; box-shadow: 0 3px 0 rgba(0,0,0,.15); }
+.fest.halloween { background: linear-gradient(90deg, #F2871E, #7A3EA8); }
+.fest.xmas { background: linear-gradient(90deg, #E8283C, #2F8A3A); }
+.fest.cny { background: linear-gradient(90deg, #E8283C, #F29C0E); }
+.fbadge { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: #E8283C; font-size: 12px; font-weight: 900; }
+.fest.halloween .fbadge { color: #E8761A; } .fest.xmas .fbadge { color: #2F8A3A; }
+.bookCard { width: min(640px, 100%); display: flex; flex-direction: column; max-height: 100%; padding: 12px 12px 10px; }
+.bookTot { font-weight: 900; color: #7A4AB0; font-size: 13px; background: #F3E8FF; border-radius: 12px; padding: 3px 10px; }
+.bgrid { flex: 1; display: grid; grid-auto-rows: max-content; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; overflow-y: auto; align-content: start; padding: 2px 2px 6px; min-height: 0; }
+.bent { border-radius: 14px; background: linear-gradient(#FFFFFF, #F4EEFA); border: 3px solid #E2D2F2; color: #4A3A20; font-weight: 900; font-size: 12px; padding: 4px 2px 5px; display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.bent img, .bent .ava { width: 52px; height: 52px; display: block; }
+.bent .ava { border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 22px; border: 3px solid #fff; box-shadow: 0 2px 0 rgba(0,0,0,.15); width: 46px; height: 46px; margin: 3px; }
+.bent small { font-size: 11px; color: #8A5AC0; font-weight: 800; }
+.bent.lock img, .bent.lock .ava { filter: brightness(0) opacity(.28); }
+.bent.lock span { color: #B8AACA; }
+.bent.lock small { color: #C8BCD8; }
+.bent.gold { background: linear-gradient(#FFF8D6, #FFE9A0); border-color: #F2C94C; }
+.bfoot { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 12px; font-weight: 800; color: #6A4A90; }
+.bfoot span { flex: 1; min-width: 0; line-height: 1.3; }
+.bfoot .small { flex: none; width: auto; margin-top: 0; padding-left: 20px; padding-right: 20px; }
+.sitem .lim { position: absolute; left: 3px; top: 2px; font-size: 10px; font-weight: 900; color: #fff; background: #E8283C; border-radius: 8px; padding: 0 5px; line-height: 16px; }
+.sitem .lim.bk { background: #9A5AD9; }
+@media (orientation: landscape) and (max-height: 420px) { .bent img { width: 44px; height: 44px; } .bent .ava { width: 38px; height: 38px; font-size: 18px; } .bgrid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); } }
+.bfoot .small.off { background: linear-gradient(#E6E0D2, #BDB4A0); box-shadow: 0 4px 0 #8A826F; }

@@ -43,13 +43,14 @@
     <button class="ibtn" id="hGear" aria-label="设置"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 5-.1-3 2-1.6-2-3.4-2.4.9a8 8 0 0 0-2.5-1.5L15 1.5h-4l-.4 2.4A8 8 0 0 0 8 5.4l-2.4-.9-2 3.4 2 1.6a8 8 0 0 0 0 3l-2 1.6 2 3.4 2.4-.9a8 8 0 0 0 2.6 1.5l.4 2.4h4l.4-2.4a8 8 0 0 0 2.5-1.5l2.4.9 2-3.4z"/></svg></button>
   </div>
   <div class="panel">
+    <div class="fest hidden" id="festBanner"><b class="fbadge" id="festBadge">节</b><span id="festText"></span></div>
     <div class="season" id="seasonLine"><b class="sbadge" id="seasonBadge">春</b><span id="seasonText"></span></div>
     <div class="htabs" id="homeTabs"><button data-p="1">花园庄园</button><button data-p="2">林场牧场</button><button data-p="3">湖畔酒庄</button></div>
     <div class="phead"><b id="restoreHead">用星星修复庄园</b> <span id="restoreHint"></span></div>
     <div class="restore" id="restoreList"></div>
     <button class="big" id="btnPlay">开始 第 1 关</button>
     <div class="brow"><button class="small shopBtn" id="btnShop"><i class="gc"></i>商店</button><button class="small" id="btnLevels">选择关卡</button></div>
-    <div class="brow"><button class="small ordBtn" id="btnOrders">订单<em class="dot hidden" id="ordDot"></em></button><button class="small crewBtn" id="btnCrew">雇工</button></div>
+    <div class="brow"><button class="small ordBtn" id="btnOrders">订单<em class="dot hidden" id="ordDot"></em></button><button class="small crewBtn" id="btnCrew">雇工</button><button class="small bookBtn" id="btnBook">图鉴<em class="dot hidden" id="bookDot"></em></button></div>
     <button class="small dailyBtn" id="btnDaily">每日挑战</button>
   </div>
 </div>
@@ -80,7 +81,7 @@
 
 <div id="shop" class="modal hidden"><div class="card wide shopCard">
   <div class="shopHead"><h2>商店</h2><div class="coinPill"><i class="gc"></i><b id="shopCoins">0</b></div><button class="xclose" data-close aria-label="关闭">✕</button></div>
-  <div class="htabs" id="shopTabs"><button data-t="outfit" class="on">服装</button><button data-t="deco">装饰</button><button data-t="uni">制服</button></div>
+  <div class="htabs" id="shopTabs"><button data-t="outfit" class="on">服装</button><button data-t="deco">装饰</button><button data-t="uni">制服</button><button data-t="pet">宠物</button></div>
   <div class="shopBody">
     <div class="pv"><canvas id="shopPrev"></canvas><div class="pvside"><div class="pvName" id="shopName"></div><div class="pvSub" id="shopSub"></div><button class="small warm" id="shopAct">购买</button></div></div>
     <div class="sgrid" id="shopGrid"></div>
@@ -98,6 +99,13 @@
   <div class="shopHead"><h2>我的雇工</h2><button class="xclose" data-close aria-label="关闭">✕</button></div>
   <div class="crewList" id="crewList"></div>
   <div class="note">关卡里雇来的工人就是他们（每关轮流上岗）。送货越多经验越多，等级越高特长越强（1 级 +5% → 10 级 +30%）。</div>
+</div></div>
+
+<div id="book" class="modal hidden"><div class="card wide bookCard">
+  <div class="shopHead"><h2>图鉴</h2><div class="bookTot" id="bookTot"></div><button class="xclose" data-close aria-label="关闭">✕</button></div>
+  <div class="htabs" id="bookTabs"><button data-p="crops">作物</button><button data-p="animal">动物</button><button data-p="golden">金色变种</button><button data-p="crew">工人</button></div>
+  <div class="bgrid" id="bookGrid"></div>
+  <div class="bfoot"><span id="bookReward"></span><button class="small warm" id="bookClaim">领取</button></div>
 </div></div>
 
 <div id="daily" class="modal hidden"><div class="card dailyCard">

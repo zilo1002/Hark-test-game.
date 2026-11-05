@@ -17,6 +17,8 @@ const crewLv = crewArg ? +crewArg.split('=')[1] : 0;
 // v4.0: default = neutral season, no rain (the numbers below are the balance reference); --season=0..3 / --rain to compare
 const seaArg = process.argv.find((a) => a.startsWith('--season='));
 const ENV = { season: seaArg ? +seaArg.split('=')[1] : null, rain: process.argv.includes('--rain') };
+// v4.0 B: --pet runs with the 宠物狗 (default: no pet, so the reference numbers stay the same)
+if (process.argv.includes('--pet')) ENV.pet = 'dog';
 const crewFor = (li) => crewLv ? levelCrew(crewDefaults().map((m) => ({ ...m, lv: crewLv })), li) : null;
 
 const PROFILES = {

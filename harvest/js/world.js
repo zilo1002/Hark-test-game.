@@ -178,7 +178,7 @@ export class World {
     this.crew = Array.isArray(opts.crew) ? opts.crew : null;   // v3.6 雇工: [{ id, name, trait, lv, mul }] by hire slot
     this.t = 0; this.money = 0; this.won = false; this.winT = 0;
     this.events = [];
-    this.stats = { collected: {}, sold: {}, produced: {}, earned: 0, unlocks: 0 };
+    this.stats = { collected: {}, sold: {}, produced: {}, golden: {}, earned: 0, unlocks: 0 };
     this.upg = { cap: 0, speed: 0, radius: 0, wcap: 0, wspeed: 0 };
     this.objs = {}; this.fields = []; this.coops = []; this.counters = []; this.procs = [];
     this.piles = []; this.tiles = []; this.workers = []; this.customers = []; this.solids = [];
@@ -191,6 +191,8 @@ export class World {
     this.L.tiles.forEach((t, i) => this.tiles.push({ ...t, order: i, paid: 0, bought: 0, done: false, visible: false,
       price0: t.price, payFx: 0, appearT: -9, cool: 0 }));
     this.player = makeCollector('player', this.L.start[0], this.L.start[1]);
+    // v4.0 B 宠物狗 (opts.pet = 'dog'); the sims never pass it, so their results are unchanged
+    this.dog = opts.pet === 'dog' ? { x: this.player.x - 30, y: this.player.y + 20, vx: 0, vy: 0, moving: false, walk: 0, face: 1, dirY: 0, sway: 0, state: 'follow', fetchT: CFG.pet.every * 0.6, carry: null, n: 0, tgt: null, fetched: 0, wag: 0 } : null;
     this.applyEnv();
     if (opts.money) this.money = opts.money;
     if (opts.speedUp) this.upg.speed += opts.speedUp;
@@ -533,6 +535,7 @@ export class World {
     for (const w of this.workers) this.interact(w, dt, false);
     this.updateFever(dt);
     this.playerExtras(dt);
+    if (this.dog) this.updateDog(dt);
     // counters & customers
     for (const c of this.counters) if (!c.hidden) this.updateCounter(c, dt);
     this.updateCustomers(dt);
@@ -675,6 +678,7 @@ export class World {
           if (f.gold[i]) {   // 金色作物: pays straight into the wallet
             const amount = itemPrice(f.item) * CFG.golden.mul;
             this.money += amount; this.stats.earned += amount;
+            this.stats.golden[f.item] = (this.stats.golden[f.item] || 0) + 1;   // v4.0 B 图鉴 金色变种
             this.emit('golden', { x: px, y: py, amount, who: c.kind });
           }
           f.gold[i] = this.rnd() < f.goldChance ? 1 : 0;
@@ -978,6 +982,74 @@ export class World {
     return best;
   }
 
+
+  // ---- v4.0 B 宠物狗 ------------------------------------------------------------
+  // follow: trots a little behind the farmer. Every CFG.pet.every s (when the stack has room) it looks for a
+  // ripe, non-golden plant (or a pile item) within range, runs to it, takes up to CFG.pet.carry in its mouth
+  // and brings them back: they hop onto the farmer's stack. A small help, never a second harvester.
+  dogFind() {
+    const d = this.dog, P = CFG.pet, R2 = P.range * P.range; let best = null, bd = R2;
+    for (const f of this.fields) {
+      if (f.hidden || f.spill || f.ripe <= 0 || !this.hasSink(f.item)) continue;
+      if (d.x < f.x - P.range || d.x > f.x + f.w + P.range || d.y < f.y - P.range || d.y > f.y + f.h + P.range) continue;
+      const i = f.nearestRipe(d.x, d.y); if (i < 0 || f.gold[i]) continue;
+      const dd = d2(f.px(i), f.py(i), d.x, d.y); if (dd < bd) { bd = dd; best = { f, i, x: f.px(i), y: f.py(i) }; }
+    }
+    for (const pl of this.piles) {
+      if (pl.owner.hidden || pl.total <= 0 || !this.hasSink(pl.type)) continue;
+      const i = pl.hottest(d.x, d.y, this.t); if (i < 0) continue;
+      const s = pl.safe(i), dd = d2(s.x, s.y, d.x, d.y); if (dd < bd) { bd = dd; best = { pl, x: s.x, y: s.y }; }
+    }
+    return best;
+  }
+  dogMove(dt, tx, ty, sp) {
+    const d = this.dog, wp = this.steer(d, tx, ty, 8), ex = wp.x - d.x, ey = wp.y - d.y, e = Math.hypot(ex, ey);
+    const v = e < 2 ? 0 : Math.min(sp, e * 6), k = Math.min(1, dt * 10);
+    d.vx += ((e ? ex / e : 0) * v - d.vx) * k; d.vy += ((e ? ey / e : 0) * v - d.vy) * k;
+    this.stepMove(d, dt, 7);
+    return Math.hypot(tx - d.x, ty - d.y);
+  }
+  updateDog(dt) {
+    const d = this.dog, p = this.player, P = CFG.pet, room = p.cap - p.stack.length - p.incoming;
+    d.wag += dt;
+    if (d.state === 'follow') {
+      const sp = Math.hypot(p.vx, p.vy), ax = sp > 8 ? -p.vx / sp : -0.7, ay = sp > 8 ? -p.vy / sp : 0.7;
+      const tx = p.x + ax * 30 - ay * 16, ty = p.y + ay * 30 + ax * 16, far = Math.hypot(tx - d.x, ty - d.y);
+      this.dogMove(dt, tx, ty, far > 70 ? P.speed * P.run : Math.max(P.speed * 0.7, sp));
+      if (far > 600) { d.x = tx; d.y = ty; }   // left far behind (a gate, a long detour): catch up
+      d.fetchT -= dt;
+      if (d.fetchT <= 0 && room >= 1 && !this.won) {
+        d.tgt = this.dogFind();
+        if (d.tgt) { d.state = 'fetch'; d.fetchT = P.every; } else d.fetchT = 2;
+      }
+    } else if (d.state === 'fetch') {
+      const g = d.tgt;
+      if (g.f && g.f.g[g.i] < 1) { d.tgt = this.dogFind(); if (!d.tgt) { d.state = 'follow'; return; } }
+      const dist = this.dogMove(dt, d.tgt.x, d.tgt.y, P.speed * P.run);
+      if (dist < 12) {
+        const t = d.tgt; let item = null, n = 0;
+        if (t.f) {
+          const f = t.f, cr = CFG.crops[f.item];
+          n = Math.min(P.carry, cr.yield || 1); item = f.item;
+          f.g[t.i] = 0; f.ripe--; f.cutAt[t.i] = this.t;
+          this.emit('harvest', { x: t.x, y: t.y, n: 1, item, who: 'dog' });
+        } else {
+          for (let k = 0; k < P.carry; k++) { if (t.pl.take(d.x, d.y, 26) < 0) break; n++; }
+          item = n ? t.pl.type : null;
+        }
+        d.carry = item; d.n = n; d.state = item ? 'return' : 'follow'; d.tgt = null;
+      } else if (this.t > 0 && dist > P.range * 2.2) { d.state = 'follow'; d.tgt = null; }
+    } else if (d.state === 'return') {
+      const dist = this.dogMove(dt, p.x, p.y, P.speed * P.run);
+      if (dist < 30) {
+        const n = Math.min(d.n, Math.max(0, room));
+        for (let k = 0; k < n; k++) { p.incoming++; this.launch(d.carry, 'stack', d.x, d.y, 10 + k * 6, p, 0, 0, 0, CFG.fly.pick); }
+        if (n) { this.stats.collected[d.carry] = (this.stats.collected[d.carry] || 0) + n; d.fetched += n; this.emit('petFetch', { x: d.x, y: d.y, item: d.carry, n }); }
+        d.carry = null; d.n = 0; d.state = 'follow';
+      }
+    }
+  }
+
   // ---- save/restore of a level in progress ---------
   snapshot() {
     return { li: this.li, t: this.t, money: this.money, stats: this.stats, env: { season: this.season, rain: this.rain },
@@ -993,7 +1065,8 @@ export class World {
       t.paid = Math.min(ts.paid || 0, t.price - 1);
     }
     this.t = s.t || 0; this.money = s.money || 0;
-    if (s.stats) this.stats = { collected: {}, sold: {}, produced: {}, earned: 0, unlocks: 0, ...s.stats };
+    if (s.stats) this.stats = { collected: {}, sold: {}, produced: {}, golden: {}, earned: 0, unlocks: 0, ...s.stats };
+    if (!this.stats.golden) this.stats.golden = {};
     if (Array.isArray(s.stack)) this.player.stack = s.stack.filter((x) => CFG.items[x]).slice(0, this.player.cap);
     (s.cash || []).forEach((v, i) => { if (this.counters[i]) this.counters[i].cash = v || 0; });
     (s.stock || []).forEach((v, i) => { if (this.counters[i] && Array.isArray(v)) this.counters[i].stock = v.filter((x) => CFG.items[x]); });

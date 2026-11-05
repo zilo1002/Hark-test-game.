@@ -4,6 +4,7 @@ import { shopDefaults, normShop, migrateCoins } from './shop.js';
 import { crewDefaults, normCrew } from './crew.js';
 import { ordersDefaults, normOrders } from './orders.js';
 import { dailyDefaults, normDaily } from './daily.js';
+import { bookDefaults, normBook, backfill } from './book.js';
 
 let memory = null;
 let storage = null;
@@ -15,7 +16,7 @@ try {
 export const storageAvailable = () => !!storage;
 
 export function defaults() {
-  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults(), daily: dailyDefaults() };
+  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults(), daily: dailyDefaults(), book: { ...bookDefaults(), filled: true } };
 }
 
 export function load() {
@@ -36,6 +37,8 @@ export function load() {
     out.crew = normCrew(d.crew); out.orders = normOrders(d.orders);
     // v4.0: 每日挑战 records (older saves start empty); an unknown in-progress env is simply re-rolled
     out.daily = normDaily(d.daily);
+    // v4.0 B: 图鉴 (older saves are back-filled once from their cleared levels and the 雇工 records)
+    out.book = normBook(d.book); backfill(out);
     if (out.cur && typeof out.cur !== 'object') out.cur = null;
     return out;
   } catch (_) { return defaults(); }

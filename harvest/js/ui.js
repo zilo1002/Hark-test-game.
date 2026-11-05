@@ -1,7 +1,9 @@
 // DOM layer: HUD, banners, pause menu, home panel, level select, settings, win card.
 import { CFG, goalText } from './config.js';
 import { starsLeft, storageAvailable } from './save.js';
-import { OUTFITS, DECOS, UNIFORMS, SLOTS, itemById, isOn } from './shop.js';
+import { OUTFITS, DECOS, UNIFORMS, PETS, SLOTS, itemById, isOn, onSale, festName } from './shop.js';
+import { PAGES, pageEntries, pageProgress, pageDone, claimable, bookTotals } from './book.js';
+import { festivalInfo, nextFestival } from './festival.js';
 import { ROSTER, TRAITS, traitBonus, xpNeed, CREW } from './crew.js';
 import { orderText, orderDone, TIER_NAME } from './orders.js';
 import { seasonInfo, cropNames } from './seasons.js';
@@ -42,6 +44,11 @@ export class UI {
     this.el.orders = $('orders'); this.el.crew = $('crew');
     $('btnOrders').onclick = () => this.openOrders();
     $('btnCrew').onclick = () => this.openCrew();
+    // v4.0 B 图鉴
+    this.el.book = $('book'); this.bookPage = 'crops';
+    $('btnBook').onclick = () => this.openBook();
+    for (const b of $('bookTabs').children) b.onclick = () => { this.bookPage = b.dataset.p; h.tap(); this.renderBook(); };
+    $('bookClaim').onclick = () => { const r = h.bookClaim(this.bookPage); if (r) this.renderBook(); };
     // 每日挑战
     this.el.daily = $('daily'); this.el.dres = $('dailyRes');
     $('btnDaily').onclick = () => this.openDaily();
@@ -50,7 +57,7 @@ export class UI {
     $('btnDrHome').onclick = () => { this.el.dres.classList.add('hidden'); h.home(); };
     this.el.play.onclick = () => h.play();
     $('btnNext').onclick = () => { this.el.win.classList.add('hidden'); h.next(); };
-    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop, this.el.orders, this.el.crew, this.el.daily]) {
+    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop, this.el.orders, this.el.crew, this.el.daily, this.el.book]) {
       m.addEventListener('click', (e) => { if (e.target === m || e.target.hasAttribute('data-close')) this.closeModal(m); });
     }
     $('optSound').onchange = (e) => h.setting('sound', e.target.checked);
@@ -180,6 +187,11 @@ export class UI {
     if (!dailyOpen(data)) { db.className = 'small dailyBtn lock'; db.innerHTML = `每日挑战<small>过第 ${CFG.daily.unlockAfter} 关开放</small>`; }
     else { const D = data.daily, td = D && D.day === dailyFor(data).day ? D : null; db.className = 'small dailyBtn';
       db.innerHTML = `每日挑战<small>${td && td.best ? `今日最佳 ${td.best.toLocaleString('en-US')}${td.paid ? ' · ' + TIER_LABEL[td.paid] : ''}` : '今天还没挑战'}</small>`; }
+    // v4.0 B 节日 banner (days left, limited items in the shop) and the 图鉴 red dot
+    const fi = festivalInfo(), fb = $('festBanner');
+    if (fi) { fb.className = `fest ${fi.id}`; $('festText').textContent = `${fi.name}活动 · ${fi.desc} · ${fi.left <= 1 ? '今天最后一天' : `还剩 ${fi.left} 天`} · 商店有限定`; }
+    else fb.className = 'fest hidden';
+    $('bookDot').classList.toggle('hidden', !claimable(data).length);
     const O = data.orders; $('ordDot').classList.toggle('hidden', !(O && O.list.some((o) => !o.claimed && orderDone(o))));
     this.el.list.innerHTML = '';
     for (const m of metas) {
@@ -194,12 +206,17 @@ export class UI {
   // ---------------------------------------------------------------- 商店
   openShop() {
     const d = this.h.data();
-    if (!this.shopSel) { const eq = d.shop.eq; this.shopSel = this.shopTab === 'outfit' ? (eq.hat || eq.top || OUTFITS[0].id) : this.shopTab === 'uni' ? (d.shop.uni || UNIFORMS[0].id) : (d.shop.deco[0] || DECOS[0].id); }
+    if (!this.shopSel) { const eq = d.shop.eq; this.shopSel = this.shopTab === 'outfit' ? (eq.hat || eq.top || OUTFITS[0].id) : this.shopTab === 'uni' ? (d.shop.uni || UNIFORMS[0].id) : this.shopTab === 'pet' ? (d.shop.pet.dog || d.shop.pet.cat || PETS[0].id) : (d.shop.deco[0] || DECOS[0].id); }
     this.openModal(this.el.shop);
     this.h.shopOpen();
     this.renderShop();
   }
-  shopList() { return this.shopTab === 'outfit' ? OUTFITS : this.shopTab === 'uni' ? UNIFORMS : DECOS; }
+  // limited items are listed only while their festival is on (or once owned); 图鉴 rewards only once earned
+  shopList() {
+    const d = this.h.data(), own = (it) => d.shop.owned.includes(it.id);
+    const L = this.shopTab === 'outfit' ? OUTFITS : this.shopTab === 'uni' ? UNIFORMS : this.shopTab === 'pet' ? PETS : DECOS;
+    return L.filter((it) => (!it.fest && !it.book) || own(it) || (it.fest && onSale(it)));
+  }
   renderShop() {
     const d = this.h.data(), list = this.shopList();
     for (const b of $('shopTabs').children) b.classList.toggle('on', b.dataset.t === this.shopTab);
@@ -211,21 +228,27 @@ export class UI {
       b.className = 'sitem' + (own ? ' owned' : d.coins >= it.price ? ' can' : ' poor') + (on ? ' on' : '') + (it.id === this.shopSel ? ' sel' : '');
       b.dataset.id = it.id;
       const slot = it.slot ? SLOTS.find((x) => x[0] === it.slot)[1] : '';
-      b.innerHTML = `<img alt="" src="${this.h.thumb(it) || ''}"><span>${it.name}</span><small>${own ? (on ? (it.slot || it.uni ? '穿着中' : '已摆放') : '已拥有') : `<i class="gc"></i>${it.price}`}</small>`;
+      const tag = it.fest ? `<em class="lim">${festName(it)}限定</em>` : it.book ? '<em class="lim bk">图鉴</em>' : '';
+      b.innerHTML = `${tag}<img alt="" src="${this.h.thumb(it) || ''}"><span>${it.name}</span><small>${own ? (on ? (it.slot || it.uni ? '穿着中' : it.pet ? '陪着你' : '已摆放') : '已拥有') : `<i class="gc"></i>${it.price}`}</small>`;
       b.title = slot ? `${slot} · ${it.name}` : it.name;
       b.onclick = () => { this.shopSel = it.id; this.h.tap(); this.renderShop(); };
       g.appendChild(b);
     }
     const it = itemById(this.shopSel), own = d.shop.owned.includes(it.id), on = isOn(d, it.id), a = $('shopAct');
     $('shopName').textContent = it.name;
-    $('shopSub').textContent = it.uni ? (own ? (on ? '所有雇工都穿着' : '一次只能穿一套') : '买了雇工们马上换上') : it.slot ? `${SLOTS.find((x) => x[0] === it.slot)[1]}${own ? '' : ' · 买了自动穿上'}` : own ? (on ? '庄园和关卡里都看得到' : '收在仓库里') : '摆在庄园，关卡围栏外也有';
+    const petSub = it.pet === 'dog' ? (own ? (on ? '关卡里跟着你，偶尔叼来作物' : '在家休息') : '关卡里跟着你跑，偶尔叼来附近的作物放进背篓') : it.pet === 'cat' ? (own ? (on ? '在庄园里晒太阳' : '在家休息') : '在庄园门前懒洋洋地晒太阳') : '';
+    $('shopSub').textContent = it.pet ? petSub : (it.fest && !own ? `${festName(it)}限定 · 活动结束就买不到了 · ` : '') + (it.uni ? (own ? (on ? '所有雇工都穿着' : '一次只能穿一套') : '买了雇工们马上换上') : it.slot ? `${SLOTS.find((x) => x[0] === it.slot)[1]}${own ? '' : ' · 买了自动穿上'}` : own ? (on ? '庄园和关卡里都看得到' : '收在仓库里') : '摆在庄园，关卡围栏外也有');
     a.className = 'small ' + (own ? (on ? 'off' : 'warm') : d.coins >= it.price ? 'warm' : 'poor');
-    a.innerHTML = own ? (it.slot || it.uni ? (on ? '脱下' : '穿上') : (on ? '收起来' : '摆出来')) : `购买 <i class="gc"></i>${it.price}`;
+    a.innerHTML = own ? (it.slot || it.uni ? (on ? '脱下' : '穿上') : it.pet ? (on ? '让它休息' : '带上它') : (on ? '收起来' : '摆出来')) : `购买 <i class="gc"></i>${it.price}`;
+    const nf = nextFestival(), fi = festivalInfo();
+    $('shopHow').textContent = this.shopTab === 'pet' ? '小狗：关卡里跟着你，大约每 9 秒叼回 1–2 个附近成熟的作物（背篓满了就只跟着）。小猫：庄园里的装饰伙伴。各一只，可以随时换。'
+      : fi ? `${fi.name}限定商品只在活动期间（还剩 ${fi.left} 天）出售，买下的永久保留。` : `过关就能拿金币：每关保底 10 + 本关收入的 2% + 每颗星 10；第一次拿到的星星每颗再 +20。${nf ? `下一个节日：${nf.name}（${nf.inDays} 天后）。` : ''}`;
   }
   // what the preview shows: the farmer trying the selected piece on, or the selected decoration
   shopView() {
     const d = this.h.data(), it = itemById(this.shopSel || '');
-    if (this.shopTab === 'deco') return { kind: 'deco', id: it && !it.slot && !it.uni ? it.id : DECOS[0].id };
+    if (this.shopTab === 'pet') return { kind: 'pet', id: it && it.pet ? it.id : PETS[0].id };
+    if (this.shopTab === 'deco') return { kind: 'deco', id: it && !it.slot && !it.uni && !it.pet ? it.id : DECOS[0].id };
     if (this.shopTab === 'uni') { const u = it && it.uni ? it : UNIFORMS[0]; return { kind: 'person', uni: u.id, style: u.style }; }
     const eq = { ...d.shop.eq }; if (it && it.slot) eq[it.slot] = it.id;
     return { kind: 'person', eq };
@@ -268,6 +291,25 @@ export class UI {
         + `<div class="cx">${max ? '满级！' : `经验 ${m.xp} / ${xpNeed(m.lv)}`} · 共送货 ${m.done.toLocaleString('en-US')} 件</div></div>`;
       box.appendChild(row);
     });
+  }
+  // ---------------------------------------------------------------- 图鉴
+  openBook(page) { if (page) this.bookPage = page; this.h.bookOpen(); this.openModal(this.el.book); this.renderBook(); }
+  renderBook() {
+    const d = this.h.data(), P = this.bookPage, cols = ['#3B8FE0', '#E8452C', '#4CB24E', '#F29C0E', '#B07ACC', '#FF6F92'];
+    for (const b of $('bookTabs').children) { const q = pageProgress(d, b.dataset.p), done = q.got >= q.n; b.classList.toggle('on', b.dataset.p === P); b.innerHTML = `${PAGES.find((x) => x.id === b.dataset.p).name} <em>${done ? '✓' : `${q.got}/${q.n}`}</em>`; }
+    const T = bookTotals(d); $('bookTot').textContent = `已收录 ${T.got} / ${T.n}`;
+    const g = $('bookGrid'); g.innerHTML = '';
+    pageEntries(d, P).forEach((e, k) => {
+      const b = document.createElement('div'); b.className = 'bent' + (e.got ? '' : ' lock') + (e.kind === 'gold' && e.got ? ' gold' : ''); b.dataset.id = e.id;
+      const pic = e.kind === 'crew' ? `<div class="ava" style="background:${cols[k % cols.length]}">${e.name[0]}</div>` : `<img alt="" src="${this.h.bookThumb(e.kind === 'gold' ? 'gold' : e.kind === 'animal' ? 'animal' : 'item', e.id) || ''}">`;
+      const n = e.count.toLocaleString('en-US');
+      const sub = !e.got ? '未收集' : e.sub ? e.sub : e.kind === 'crew' ? `送货 ${n} · ${e.lv} 级` : e.kind === 'gold' ? `金色 ×${n}` : e.count ? `收获 ${n}` : '已发现';
+      b.innerHTML = `${pic}<span>${e.got ? e.name : '？？？'}</span><small>${sub}</small>`;
+      g.appendChild(b);
+    });
+    const page = PAGES.find((x) => x.id === P), paid = d.book.paid.includes(P), done = pageDone(d, P), q = pageProgress(d, P), c = $('bookClaim');
+    $('bookReward').textContent = paid ? `本页已集齐，奖励「${page.rewardText}」已领取` : done ? `本页集齐！奖励：${page.rewardText}` : `集齐本页（还差 ${q.n - q.got} 个）奖励：${page.rewardText}${page.reward.item ? '（限定）' : ''}`;
+    c.className = 'small ' + (done && !paid ? 'warm' : 'off'); c.textContent = paid ? '已领取' : '领取'; c.disabled = !(done && !paid);
   }
   // ---------------------------------------------------------------- 每日挑战
   openDaily() {

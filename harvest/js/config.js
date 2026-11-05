@@ -47,6 +47,9 @@ export const CFG = {
   season: { bonus: 0.2, days: 7, epoch: [2026, 0, 5] },   // epoch: a Monday (local date) that starts a spring week
   // 雨天: a level run is rainy 1 time in 5 (never level 1, never the daily challenge unless it is its twist): +25% growth
   rain: { chance: 0.2, bonus: 0.25 },
+  // v4.0 B 宠物狗: follows the farmer; every `every` s it fetches up to `carry` ripe plants / pile items within `range`
+  // into the stack (only when the stack has room). Off in the sims unless --pet.
+  pet: { every: 9, range: 170, carry: 2, speed: 150, run: 1.45 },
   // v4.0 每日挑战: opens after level 10 is cleared. One remixed level a day (from the date), 3 minutes, score = money earned.
   // Tier thresholds = fraction of what the balance bot earns in that remix (sim/daily-ref.mjs → js/daily-ref.js).
   // 金币 per tier are paid once a day (reaching a higher tier later that day pays the difference).

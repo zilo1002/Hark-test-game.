@@ -1,6 +1,7 @@
 // 商店 (v3.4): a persistent 金币 wallet earned by clearing levels, spent on purely cosmetic
 // outfits for the farmer and decorations for the estate. DOM-free (shared with the sims/tests).
 import { CFG } from './config.js';
+import { currentFestival, FESTIVALS } from './festival.js';
 
 // ---- how 金币 are earned -------------------------------------------------------------------
 // every clear: 10 + 2% of what the level earned + 10 per star of this run;
@@ -34,6 +35,13 @@ export const OUTFITS = [
   { id: 'tux',      slot: 'top',  name: '金色礼服', price: 1200, style: { vest: '#E8B21E', bowtie: true, bowColor: '#7A3E9D', shirt: '#FFFFFF', sleeve: '#FFFFFF', pants: '#3A2A5A' }, sw: ['#E8B21E', '#7A3E9D'] },
   { id: 'bootsG',   slot: 'feet', name: '金靴子',   price: 1500, style: { boots: '#FFC21A', bootGold: true },  sw: ['#FFE16B', '#E8B21E'] },
   { id: 'crown',    slot: 'hat',  name: '金皇冠',   price: 2400, style: { hat: 'crown' },                      sw: ['#FFC21A', '#E8283C'] },
+  // v4.0 B 节日限定 (fest: only buyable while that festival is on; owned ones stay)
+  { id: 'pumpkinHat', slot: 'hat', name: '南瓜头', price: 260, fest: 'halloween', style: { hat: 'pumpkin' }, sw: ['#F2871E', '#3A2210'] },
+  { id: 'santaHat',   slot: 'hat', name: '圣诞帽', price: 260, fest: 'xmas',      style: { hat: 'santa' },   sw: ['#E8283C', '#FFFFFF'] },
+  { id: 'lionHat',    slot: 'hat', name: '舞狮帽', price: 320, fest: 'cny',       style: { hat: 'lion' },    sw: ['#E8283C', '#FFC21A'] },
+  // v4.0 B 图鉴奖励 (book: the page that gives it; never sold)
+  { id: 'bookHat',   slot: 'hat',  name: '图鉴大师帽', price: 0, book: 'crops',  style: { hat: 'scholar' },   sw: ['#2A2A3A', '#FFC21A'] },
+  { id: 'goldScarf', slot: 'neck', name: '金穗围巾',   price: 0, book: 'golden', style: { scarf: '#FFC21A' }, sw: ['#FFC21A', '#F29C0E'] },
 ];
 export const SLOTS = [['hat', '帽子'], ['top', '衣服'], ['neck', '围巾'], ['feet', '鞋子']];
 
@@ -51,7 +59,21 @@ export const DECOS = [
   { id: 'balloon',   name: '热气球',   price: 1300 },
   { id: 'statue',    name: '金色雕像', price: 2000 },
   { id: 'rainbow',   name: '彩虹桥',   price: 2800 },
+  // v4.0 B 节日限定
+  { id: 'jackLamp',  name: '南瓜灯',   price: 240, fest: 'halloween' },
+  { id: 'xmasTree',  name: '圣诞树',   price: 360, fest: 'xmas' },
+  { id: 'redLamps',  name: '红灯笼串', price: 300, fest: 'cny' },
 ];
+
+// ---- 宠物 (v4.0 B): a dog that follows the farmer in levels (and now and then fetches a ripe plant
+// into the stack) and a cat that lounges on the estate. One of each at a time; colour variants.
+export const PETS = [
+  { id: 'dogShiba', pet: 'dog', name: '柴犬',   price: 450, col: { body: '#E89A44', belly: '#FFF3DC', ear: '#C8752A', nose: '#2A1A10' }, sw: ['#E89A44', '#FFF3DC'] },
+  { id: 'dogWhite', pet: 'dog', name: '小白狗', price: 600, col: { body: '#F7F5EE', belly: '#FFFFFF', ear: '#D9B88A', nose: '#2A1A10', spot: '#5A3A22' }, sw: ['#F7F5EE', '#5A3A22'] },
+  { id: 'catOrange', pet: 'cat', name: '橘猫',  price: 300, col: { body: '#F2A040', belly: '#FFF3DC', ear: '#E8823A', nose: '#FF8FA0', stripe: '#D9762A' }, sw: ['#F2A040', '#FFF3DC'] },
+  { id: 'catTux',    pet: 'cat', name: '奶牛猫', price: 420, col: { body: '#2E2E36', belly: '#FFFFFF', ear: '#2E2E36', nose: '#FF8FA0' }, sw: ['#2E2E36', '#FFFFFF'] },
+];
+export const petById = (id) => PETS.find((p) => p.id === id) || null;
 
 // ---- 制服 (v3.6): one set at a time, worn by every hired worker in levels -----------------------
 // style overrides the worker's own look (gardener / carter / lumberjack / milker); beards stay.
@@ -68,9 +90,12 @@ export const UNIFORMS = [
 export const WORKER_BASE = { shirt: '#F7F5EE', overalls: '#3567C8', pants: '#3567C8', hair: '#5A3414', hat: 'straw', sleeve: '#F7F5EE' };
 export const uniformStyle = (id) => { const u = UNIFORMS.find((x) => x.id === id); return u ? u.style : null; };
 
-export const itemById = (id) => OUTFITS.find((o) => o.id === id) || DECOS.find((d) => d.id === id) || UNIFORMS.find((u) => u.id === id);
+export const itemById = (id) => OUTFITS.find((o) => o.id === id) || DECOS.find((d) => d.id === id) || UNIFORMS.find((u) => u.id === id) || PETS.find((p) => p.id === id);
+// a limited item can be bought only while its festival is on; a 图鉴 reward is never sold
+export const onSale = (it) => !!it && !it.book && (!it.fest || currentFestival() === it.fest);
+export const festName = (it) => (it && it.fest && FESTIVALS[it.fest] ? FESTIVALS[it.fest].name : '');
 
-export function shopDefaults() { return { owned: [], eq: { hat: null, top: null, neck: null, feet: null }, deco: [], uni: null }; }
+export function shopDefaults() { return { owned: [], eq: { hat: null, top: null, neck: null, feet: null }, deco: [], uni: null, pet: { dog: null, cat: null } }; }
 
 // normalise whatever is in the save (old saves have nothing; drop unknown ids)
 export function normShop(s) {
@@ -80,6 +105,7 @@ export function normShop(s) {
   for (const [k] of SLOTS) { const id = s.eq && s.eq[k]; const it = OUTFITS.find((o) => o.id === id); d.eq[k] = it && it.slot === k && d.owned.includes(id) ? id : null; }
   d.deco = Array.isArray(s.deco) ? s.deco.filter((id) => DECOS.some((x) => x.id === id) && d.owned.includes(id)) : [];
   d.uni = UNIFORMS.some((u) => u.id === s.uni) && d.owned.includes(s.uni) ? s.uni : null;
+  for (const k of ['dog', 'cat']) { const id = s.pet && s.pet[k], p = petById(id); d.pet[k] = p && p.pet === k && d.owned.includes(id) ? id : null; }
   return d;
 }
 
@@ -95,18 +121,22 @@ export function heroStyle(eq) {
 export function buy(data, id) {
   const it = itemById(id); if (!it) return 'unknown';
   if (data.shop.owned.includes(id)) return 'owned';
+  if (it.book) return 'reward';
+  if (!onSale(it)) return 'closed';
   if ((data.coins || 0) < it.price) return 'poor';
   data.coins -= it.price; data.shop.owned.push(id);
-  if (it.uni) data.shop.uni = id; else if (it.slot) data.shop.eq[it.slot] = id; else if (!data.shop.deco.includes(id)) data.shop.deco.push(id);   // new things go straight on
+  if (it.pet) data.shop.pet[it.pet] = id;
+  else if (it.uni) data.shop.uni = id; else if (it.slot) data.shop.eq[it.slot] = id; else if (!data.shop.deco.includes(id)) data.shop.deco.push(id);   // new things go straight on
   return 'ok';
 }
 export function toggle(data, id) {
   const it = itemById(id); if (!it || !data.shop.owned.includes(id)) return 'locked';
+  if (it.pet) { data.shop.pet[it.pet] = data.shop.pet[it.pet] === id ? null : id; return data.shop.pet[it.pet] ? 'on' : 'off'; }
   if (it.uni) { data.shop.uni = data.shop.uni === id ? null : id; return data.shop.uni ? 'on' : 'off'; }
   if (it.slot) { data.shop.eq[it.slot] = data.shop.eq[it.slot] === id ? null : id; return data.shop.eq[it.slot] ? 'on' : 'off'; }
   const i = data.shop.deco.indexOf(id);
   if (i >= 0) { data.shop.deco.splice(i, 1); return 'off'; }
   data.shop.deco.push(id); return 'on';
 }
-export const isOn = (data, id) => { const it = itemById(id); return !!it && (it.uni ? data.shop.uni === id : it.slot ? data.shop.eq[it.slot] === id : data.shop.deco.includes(id)); };
+export const isOn = (data, id) => { const it = itemById(id); return !!it && (it.pet ? data.shop.pet[it.pet] === id : it.uni ? data.shop.uni === id : it.slot ? data.shop.eq[it.slot] === id : data.shop.deco.includes(id)); };
 export const levelsTotal = () => CFG.levels.length;
