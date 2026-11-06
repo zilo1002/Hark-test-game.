@@ -3,6 +3,7 @@
 // the item thumbnails once (cached data URLs) with the same 3D models the game uses.
 import * as THREE from '../vendor/three.module.min.js';
 import * as M from './models.js';
+import * as A from './animals3d.js';
 import { heroStyle, WORKER_BASE, petById } from './shop.js';
 
 const GOLD = new THREE.MeshLambertMaterial({ color: 0xFFD23F, emissive: 0x7A5200 });
@@ -41,9 +42,10 @@ export class Preview {
       this.view = { y: 12, dist: 82, look: 11 };
     } else if (what.kind === 'item' || what.kind === 'animal') {
       const g = new THREE.Group();
-      const geo = what.kind === 'item' ? M.itemGeo(what.id) : what.id === 'fish' ? M.itemGeo('fish') : ANIM_GEO[what.id]();
-      g.add(new THREE.Mesh(geo, what.gold ? GOLD : M.vcMat()));
-      const box = new THREE.Box3().setFromObject(g), sz = box.getSize(new THREE.Vector3()), hgt = Math.max(sz.y, sz.x * 0.8, sz.z * 0.8);
+      const ani = what.kind === 'animal' && A.makeAnimal(what.id);   // v4.4 Quaternius cow / sheep, standing in Idle
+      if (ani) { ani.mixer.update(0.4); g.add(ani.root); g.updateMatrixWorld(true); }
+      else { const geo = what.kind === 'item' ? M.itemGeo(what.id) : what.id === 'fish' ? M.itemGeo('fish') : ANIM_GEO[what.id](); g.add(new THREE.Mesh(geo, what.gold ? GOLD : M.vcMat())); }
+      const box = new THREE.Box3().setFromObject(g, true), sz = box.getSize(new THREE.Vector3()), hgt = Math.max(sz.y, sz.x * 0.8, sz.z * 0.8);
       this.obj = g; this.pp = null; this.pet = null; this.sails = null; this.view = { y: hgt * 0.5, dist: hgt * 2.5 + 4, look: box.min.y + sz.y * 0.5 };
     } else {
       this.pet = null;

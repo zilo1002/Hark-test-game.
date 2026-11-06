@@ -125,7 +125,9 @@ harvest/js/render3d.js Three.js 渲染：东南方向俯视的透视相机（屏
                       太阳光阴影跟着镜头走；上层 2D 画布画价格、数字、粒子、箭头和摇杆；三档画质自适应
 harvest/js/models.js  低多边形模型：作物、14 种物品、卡通小人（头大身圆，走路/挥镰/抱塔姿势）、割草机、小车、
                       母鸡、番茄丛、围墙/木栅栏/铁门/树/树篱/谷仓、出售台、机器
-harvest/vendor/       three.module.min.js（r170，MIT）
+harvest/vendor/       three.module.min.js（r170，MIT）+ 同版本的 GLTFLoader.js / SkeletonUtils.js / BufferGeometryUtils.js（three.js examples/jsm r170，MIT，import 改为本地路径）
+harvest/models/       cow.glb、sheep.glb（Quaternius Farm Animal Pack，CC0，见 LICENSE-Quaternius.txt）
+harvest/js/animals3d.js 加载 GLB 奶牛 / 绵羊，SkeletonUtils 克隆 + 每只一个 AnimationMixer（Idle / Walk / Jump），失败时退回 models.js 的程序化模型
 harvest/js/sprites.js 2D 物品图案（解锁格子和庄园界面的小图标用）
 harvest/js/chars.js   园丁主角、雇来的园丁、顾客、母鸡、番茄丛、割草机、小车
 harvest/js/icons.js   解锁格子与机器招牌上的小图标
@@ -225,3 +227,18 @@ node harvest/sim/swath-check.mjs        # 27 条割痕全部 0 遗漏；背满�
 - **箭头 / 机器人**：箭头在关卡的格子顺序里看「接下来 3 个可见格子」，买其中第一个买得起的（`CFG.guideWindow`），不会永远先抢最便宜的升级；顺序是 第一个格子 → 机器 → 加工品台 → 原料搬运工 → 加工品搬运工 → 关卡原有格子 → 加工品店员 / 第二个搬运工 → 收银升级 → 机器升级。平衡机器人改走工人的 A* 路线（`World.botWay`），不会再卡在机器和新出售台之间的桌角。
 - **平衡**：45 关两种机器人全部通关，熟练 2:05–3:48（总 129:30，三星 45/45），休闲 2:16–4:32（总 144:10，三星 35/45；第 15 / 38 / 44 / 45 关略超 4 分钟）。因为开局不再白送员工，几个大关的目标下调：第 15 关 7650 → 5000 元、29 关 10550 → 8950、30 关 12600 → 9400、38 关 13600 → 12500、39 关 9800 → 9100、42 关 440 → 230 条熏鱼、43 关 160 → 110 个面包、44 关 16500 → 10000、45 关 18000 → 8000。三星时间全部重设（`node sim/set-par.mjs --from=1`），每日挑战分数线重算（`--part=K/2` 并行 + `--merge --write`）。stuck-check 0 卡住、layout-check OK（同一位置先后出现的格子不算重叠）、swath-check 全部干净、pond-check 通过。
 - 旧存档保留；在加工关卡里玩到一半的进度，加载后机器需要重新购买（格子 id 变了）。APK 4.3（versionCode 13）。
+
+### v4.4：奶牛和绵羊换成会动的低多边形模型（Quaternius，CC0）
+
+- **新模型**：第 18 / 19 / 27 / 28 / 30 关的奶牛、第 23 / 30 关的绵羊，以及图鉴「动物」页的缩略图，换成 Quaternius「Farm Animal Pack」里的奶牛和绵羊（CC0，https://quaternius.com/packs/farmanimal.html ，官方 Google Drive 下载的 FBX）。用 three.js r170 的 FBXLoader → GLTFExporter 在本地转成 GLB（`harvest/models/cow.glb` 约 488 KB、`sheep.glb` 约 228 KB，保留全部动画，不压缩），材质颜色按游戏配色烤进顶点色（白 / 墨黑 / 粉鼻），每只动物 1 个蒙皮网格。
+- **动画**：AnimationMixer 播放 Idle（每只随机起始帧）；奶牛隔 6–16 秒在围栏里往前溜达几步再走回原位（Walk，纯视觉，不影响产奶位置）；产出牛奶 / 羊毛时播一次 Jump（开心一蹦）。绵羊原包只有 Idle / Jump 两段动画（官方 FBX 里没有 Walk），所以绵羊不溜达。
+- **剪羊毛**：Quaternius 的绵羊身体是光的，背上加了一团和羊毛球同款的蓬松羊毛（绑在 Torso 骨骼上随动画动），头顶一撮；每次掉出羊毛时羊毛团缩小一下再长回来。
+- **大小 / 位置不变**：按旧程序化模型的高度和身长自动缩放（身长最多长 20%），站在原来的位置、朝向一样（朝向围栏里），旁边的奶桶保留；模拟和平衡完全不碰（world.js / config.js 未改，第 18 / 19 / 23 / 27 / 28 / 30 关模拟时间与 v4.3 逐字相同）。
+- **离线**：GLB 和加载器都打包在 APK 里（assets/harvest/models、vendor），不走 CDN，国内离线可用。启动时就开始加载；加载失败或网址带 `?noanim` 时使用旧的程序化奶牛 / 绵羊。
+- **性能**：几何体共享（SkeletonUtils.clone），每只一个 mixer；超过 16 只时 mixer 隔帧轮流更新；第 30 关 19 只动物 mixer 更新约 0.2 ms/帧（headless 测得）。
+- APK 4.4（versionCode 14）。
+
+## 素材授权
+
+- 奶牛、绵羊 3D 模型：**Farm Animal Pack by Quaternius**（https://quaternius.com/packs/farmanimal.html ），CC0 1.0 公有领域，无需署名，这里仍致谢。
+- three.js r170（MIT）。

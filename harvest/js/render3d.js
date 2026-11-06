@@ -11,6 +11,7 @@ import { drawIcon } from './icons.js';
 import { FONT, elastic, hash } from './util.js';
 import { customerStyle } from './chars.js';
 import * as M from './models.js';
+import * as A from './animals3d.js';
 
 const H2 = Math.PI / 2, TAU = Math.PI * 2, PITCH = 0.84, SINP = Math.sin(PITCH), COSP = Math.cos(PITCH), R2 = Math.SQRT1_2;
 const VIEW = { landW: 620, landH: 350, portW: 380, portH: 600, fov: 30 };
@@ -566,6 +567,7 @@ export class Renderer {
     }
   }
   buildCoops(w) {
+    this.animals = []; this.procAnimals = false;
     this.coopObjs = w.coops.map((c) => {
       const grp = new THREE.Group(); this.levelRoot.add(grp);
       const out = [];
@@ -582,9 +584,12 @@ export class Renderer {
           const hen = new THREE.Mesh(M.henGeo(), M.vcMat()); hen.position.y = 8.6; hen.castShadow = true; g.add(hen);
           g.userData.anim = hen;
         } else if (c.producer !== 'bush') {   // cow / sheep / hive / apple tree
-          const geo = { cow: M.cowGeo, sheep: M.sheepGeo, hive: M.hiveGeo, appletree: M.appleTreeGeo }[c.producer];
-          const m = new THREE.Mesh(this._prodGeo(c.producer, geo), M.vcMat()); m.castShadow = true; g.add(m);
-          const k = { cow: 1.15, sheep: 1.15, hive: 1.15, appletree: 1.35 }[c.producer] || 1; m.scale.setScalar(k); m.userData.k = k;
+          const k = { cow: 1.15, sheep: 1.15, hive: 1.15, appletree: 1.35 }[c.producer] || 1;
+          const ani = A.makeAnimal(c.producer, this.animals.length + 1);   // v4.4 animated Quaternius cow / sheep
+          let m;
+          if (ani) { m = ani.root; m.userData.ani = ani; this.animals.push(ani); }
+          else { if (c.producer === 'cow' || c.producer === 'sheep') this.procAnimals = true; const geo = { cow: M.cowGeo, sheep: M.sheepGeo, hive: M.hiveGeo, appletree: M.appleTreeGeo }[c.producer]; m = new THREE.Mesh(this._prodGeo(c.producer, geo), M.vcMat()); m.castShadow = true; }
+          g.add(m); m.scale.setScalar(k); m.userData.k = k;
           if (c.producer === 'cow' || c.producer === 'sheep') { const bucket = new THREE.Mesh(this._prodGeo('bucket', () => M.merge([M.P(M.cyl(3.4, 2.8, 5, 8), '#AEB6C2', [0, 2.5, 0]), M.P(M.cyl(3, 3, 0.4, 8), '#FFFFFF', [0, 4.9, 0])])), M.vcMat()); bucket.position.set(9, 0, 10); g.add(bucket); }
           g.userData.anim = m;
         } else {
@@ -843,13 +848,19 @@ export class Renderer {
         g.visible = a > 0; if (!g.visible) return; g.scale.setScalar(a);
         const an = g.userData.anim;
         if (c.producer === 'hen') { an.position.y = 8.6 + h.lay * 3; an.scale.set(1 + h.lay * 0.12, 1 - h.lay * 0.1, 1); an.rotation.y = Math.sin(time * 1.7 + i) * 0.35; }
-        else if (c.producer === 'cow' || c.producer === 'sheep') {   // a happy hop and a head-turn when a bottle / wool ball pops out
+        else if (an.userData.ani) {   // v4.4 animated model: Idle / Walk (a short stroll) and a Jump when a bottle / wool ball pops out
+          const ani = an.userData.ani, k = an.userData.k;
+          if (h.lay > 0.9 && !(ani.lastLay > 0.9)) A.hop(ani); ani.lastLay = h.lay;
+          A.step(ani, dt); an.scale.set(k * (1 + h.lay * 0.04), k * (1 - h.lay * 0.03), k);
+          if (ani.wool) ani.wool.scale.setScalar(ani.woolS * (1 - h.lay * 0.45));   // shorn for a moment, wool puffs regrow
+        } else if (c.producer === 'cow' || c.producer === 'sheep') {   // a happy hop and a head-turn when a bottle / wool ball pops out
           const k = an.userData.k; an.position.y = h.lay * 2.4; an.scale.set(k * (1 + h.lay * 0.06), k * (1 - h.lay * 0.05), k); an.rotation.y = Math.sin(time * 0.9 + i * 1.7) * 0.25;
         } else if (c.producer === 'hive') { const k = an.userData.k; an.scale.set(k * (1 + h.lay * 0.08), k * (1 - h.lay * 0.06), k * (1 + h.lay * 0.08)); an.rotation.z = Math.sin(time * 20 + i) * h.lay * 0.05; }
         else if (c.producer === 'appletree') { const k = an.userData.k; an.rotation.z = Math.sin(time * 18 + i) * h.lay * 0.06; an.scale.setScalar(k); }
         else { an.scale.set(1.3 + h.lay * 0.1, 1.3 - h.lay * 0.08, 1.3 + h.lay * 0.1); }
       });
     }
+    if (this.animals && this.animals.length) A.updateMixers(this.animals, dt);
     // counters: desk, zone, stock on the top, cash pile, cashier
     for (const o of this.counterObjs) {
       const c = o.c, a = c.hidden ? 0 : elastic((this.wt - c.appearT) / 0.6);

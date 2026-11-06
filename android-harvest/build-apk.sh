@@ -4,8 +4,8 @@
 #   ./build-apk.sh            → build/banmu-harvest-debug.apk (+ copy to /workspace/work/out/)
 # In CI (GitHub Actions) set SDK=$ANDROID_HOME and keep the runner's JAVA_HOME; OUT_DIR picks where the copy goes.
 set -euo pipefail
-VERSION_CODE=13
-VERSION_NAME=4.3
+VERSION_CODE=14
+VERSION_NAME=4.4
 TC=${TC:-/workspace/work/tc}
 if [ -z "${SDK:-}" ]; then
   export JAVA_HOME=$TC/jdk-17.0.21+9
@@ -18,7 +18,7 @@ JAR=$SDK/platforms/android-34/android.jar
 HERE=$(cd "$(dirname "$0")" && pwd); APP=$HERE/app/src/main; B=$HERE/build
 rm -rf "$B"; mkdir -p "$B/res" "$B/gen" "$B/classes" "$B/dex" "$B/assets/harvest"
 # game files → assets/harvest (offline copy of ../harvest; dev-only files stay out)
-( cd "$HERE/../harvest" && tar cf - index.html style.css js vendor ) | ( cd "$B/assets/harvest" && tar xf - )
+( cd "$HERE/../harvest" && tar cf - index.html style.css js vendor models ) | ( cd "$B/assets/harvest" && tar xf - )
 "$AAPT2" compile --dir "$APP/res" -o "$B/res/res.zip"
 sed 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android">#<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.zilo.banmuharvest">#' "$APP/AndroidManifest.xml" > "$B/AndroidManifest.xml"
 "$AAPT2" link -I "$JAR" --manifest "$B/AndroidManifest.xml" -o "$B/base.apk" --java "$B/gen" -A "$B/assets" "$B/res/res.zip" --min-sdk-version 24 --target-sdk-version 34 --version-code $VERSION_CODE --version-name $VERSION_NAME

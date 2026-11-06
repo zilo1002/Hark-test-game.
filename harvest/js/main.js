@@ -2,6 +2,7 @@
 import { CFG } from './config.js';
 import { World } from './world.js';
 import { Renderer } from './render3d.js';
+import { loadAnimals } from './animals3d.js';
 import { FX } from './fx.js';
 import { Input } from './input.js';
 import { Sound, Haptics } from './audio.js';
@@ -20,6 +21,8 @@ import { applyMode } from './layout.js';
 
 const cv = document.getElementById('cv'), gl = document.getElementById('gl');
 const R = new Renderer(cv, gl), fx = new FX(), input = new Input(cv), snd = new Sound(), hap = new Haptics();
+// v4.4: animated cow / sheep (bundled GLB). A level built before they finish loading is rebuilt once they are in.
+if (!/[?&]noanim/.test(location.search)) loadAnimals().then(() => { if (R.world && R.procAnimals) R.world = null; });
 let data = Save.load();
 Orders.ensureOrders(data);
 let ordBase = null, ordItems = new Set(), ordHudT = 0, bookBase = null;

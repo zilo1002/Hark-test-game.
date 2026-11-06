@@ -75,6 +75,7 @@ public class MainActivity extends Activity {
         MIME.put("css", "text/css"); MIME.put("png", "image/png"); MIME.put("jpg", "image/jpeg");
         MIME.put("svg", "image/svg+xml"); MIME.put("json", "application/json"); MIME.put("txt", "text/plain");
         MIME.put("wav", "audio/wav"); MIME.put("mp3", "audio/mpeg"); MIME.put("woff2", "font/woff2");
+        MIME.put("glb", "model/gltf-binary");
     }
 
     @SuppressLint("SetJavaScriptEnabled")

@@ -78,3 +78,5 @@ node sim/balance.mjs
 ```
 
 用一个“普通玩家”机器人跑 20 个随机种子，输出第一个收割工、种地工、挑夫等的中位解锁时间，以及第 10 分钟起完全不操作时雇工的产出。
+
+素材致谢：半亩·丰收 的奶牛 / 绵羊 3D 模型来自 Quaternius 的 Farm Animal Pack（CC0，https://quaternius.com/packs/farmanimal.html ）。
