@@ -4,7 +4,7 @@
 //   node sim/stuck-check.mjs [--level=N] [--secs=600]
 import { CFG } from '../js/config.js';
 import { World } from '../js/world.js';
-import { playLevel } from './balance.mjs';
+import { playLevel, botWay } from './balance.mjs';
 import { levelCrew, crewDefaults } from '../js/crew.js';
 // v3.6: seed 3 runs with a max-level (Lv10) 雇工 roster: faster / bigger workers must not get stuck either
 const maxCrew = (li) => levelCrew(crewDefaults().map((m) => ({ ...m, lv: 10 })), li);
@@ -17,9 +17,10 @@ let bad = 0;
 
 function hasWork(w, wk) {
   const space = wk.cap - wk.stack.length - wk.incoming;
-  if (wk.state === 'deliver') return wk.stack.length > 0 && (wk.toObjs || []).length > 0;
+  // v4.3: a machine with a full input (its goods can't be sold yet) is not work; neither is a crop nobody takes right now
+  if (wk.state === 'deliver') return wk.stack.length > 0 && (wk.toObjs || []).some((s) => s.kind === 'counter' ? wk.stack.some((t) => s.items.includes(t)) : !w.procFull(s) && wk.stack.includes(s.inItem));
   if (space <= 0) return false;
-  return (wk.sources || []).some((s) => (s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + (s.ripe || 0)) > 0);
+  return (wk.sources || []).some((s) => (s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + (s.ripe || 0)) > 0 && w.hasSink(s.kind === 'proc' ? s.outItem : s.item));
 }
 
 function watch(w, secs, tag, botFn) {
@@ -56,7 +57,7 @@ for (let li = 0; li < CFG.levels.length; li++) {
     n += watch(w2, SECS, `bot s${seed}`, () => {
       th -= DT; if (th <= 0) { tg = w2.guide(); th = 0.1; }
       if (!tg || Math.hypot(tg.x - p.x, tg.y - p.y) < 3) return [0, 0];
-      const wp = w2.steer(p, tg.x, tg.y), dx = wp.x - p.x, dy = wp.y - p.y, d = Math.hypot(dx, dy) || 1; return [dx / d, dy / d];
+      const wp = botWay(w2, p, tg), dx = wp.x - p.x, dy = wp.y - p.y, d = Math.hypot(dx, dy) || 1; return [dx / d, dy / d];
     });
   }
   console.log(`L${li + 1} ${CFG.levels[li].name}: ${n ? n + ' stuck' : 'ok'}`);

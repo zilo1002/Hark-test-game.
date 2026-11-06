@@ -16,7 +16,7 @@ CFG.levels.forEach((L, li) => {
   const S = CFG.tile.size;
   for (const t of w.tiles) {
     const showsHere = t.effect.show && t.effect.show.some((id) => { const o = w.objs[id]; return o && (o.kind === 'proc' || o.kind === 'counter') && Math.hypot(o.x - t.x, o.y - t.y) < 4; });
-    if (!showsHere) things.push({ n: `tile ${t.id}`, r: R(t.x, t.y, S, S) });
+    if (!showsHere) things.push({ n: `tile ${t.id}`, r: R(t.x, t.y, S, S), t });
   }
   for (const c of w.counters) { things.push({ n: `${c.id} zone`, r: c.zone }); things.push({ n: `${c.id} cash`, r: R(c.cashPos.x, c.cashPos.y, 40, 40) }); things.push({ n: `${c.id} desk`, r: c.desk }); things.push({ n: `${c.id} queue`, r: { x: c.serve.x - 8, y: c.y - 12, w: w.W - c.serve.x + 8, h: 24 } }); }
   for (const p of w.procs) { things.push({ n: `${p.id} in`, r: p.inZone }); things.push({ n: `${p.id} body`, r: p.body }); }
@@ -31,6 +31,8 @@ CFG.levels.forEach((L, li) => {
   for (let i = 0; i < things.length; i++) for (let j = i + 1; j < things.length; j++) {
     const a = things[i], b = things[j];
     if (a.n.split(' ')[0] === b.n.split(' ')[0] && !a.n.startsWith('tile')) continue;   // parts of one object
+    // v4.3: a tile that only appears once the tile on the same spot is bought (2nd hire, 收银升级 after its 店员)
+    if (a.t && b.t && a.t.x === b.t.x && a.t.y === b.t.y && ((a.t.req || []).includes(b.t.id) || (b.t.req || []).includes(a.t.id))) continue;
     if (ov(a.r, b.r, 2)) { console.log(`L${li + 1} ${L.name}: ${a.n} overlaps ${b.n}`); bad++; }
   }
   for (const t of things) { const r = t.r; if (!t.n.includes('queue') && !t.n.startsWith('hedge') && (r.x < 16 || r.y < 16 || r.x + r.w > w.W - 16 || r.y + r.h > w.H - 16)) { console.log(`L${li + 1}: ${t.n} touches the wall`); bad++; } }

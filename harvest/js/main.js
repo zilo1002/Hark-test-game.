@@ -396,7 +396,7 @@ if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
         th -= 1 / 30; if (th <= 0) { g = world.guide(); th = 0.1; }
         if (g && (g.kind === 'pile' || g.kind === 'field' || g.kind === 'pond')) g = world.guide() || g;
         let ix = 0, iy = 0;
-        if (i < stopAt * 30 && g && Math.hypot(g.x - p.x, g.y - p.y) > 3) { const wp = world.steer(p, g.x, g.y); const ex = wp.x - p.x, ey = wp.y - p.y, e = Math.hypot(ex, ey) || 1; ix = ex / e; iy = ey / e; }
+        if (i < stopAt * 30 && g && Math.hypot(g.x - p.x, g.y - p.y) > 3) { const wp = world.botWay(p, g); const ex = wp.x - p.x, ey = wp.y - p.y, e = Math.hypot(ex, ey) || 1; ix = ex / e; iy = ey / e; }
         world.update(1 / 30, ix, iy); world.events.length = 0;
       }
       input.everMoved = true; R.follow(0, true); ui.updateHUD(world, true); ui.tip(''); ui.el.banner.classList.add('hidden');

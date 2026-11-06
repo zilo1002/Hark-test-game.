@@ -318,7 +318,6 @@ export class World {
       this.tiles.push({ ...t, price, order: i, paid: 0, bought: 0, done: false, visible: false, price0: price, payFx: 0, appearT: -9, cool: 0 });
     });
     this.player = makeCollector('player', this.L.start[0], this.L.start[1]);
-    for (const p of this.procs) if (!p.hidden) this.staffProc(p);
     // v4.0 B 宠物狗 (opts.pet = 'dog'); the sims never pass it, so their results are unchanged
     this.dog = opts.pet === 'dog' ? { x: this.player.x - 30, y: this.player.y + 20, vx: 0, vy: 0, moving: false, walk: 0, face: 1, dirY: 0, sway: 0, state: 'follow', fetchT: CFG.pet.every * 0.6, carry: null, n: 0, tgt: null, fetched: 0, wag: 0 } : null;
     this.applyEnv();
@@ -384,7 +383,7 @@ export class World {
       this.piles.push(c.pile); this.coops.push(c); this.objs[o.id] = c;
     } else if (o.type === 'counter') {
       const K = CFG.counter, cu = CFG.customer;
-      const c = { ...base, kind: 'counter', stock: [], incoming: 0, queue: [], cash: 0, cashier: !!o.sale2,   // v4.2: the second counter has its two 店员 from the start
+      const c = { ...base, kind: 'counter', stock: [], incoming: 0, queue: [], cash: 0, cashier: false, clerks: 1, upLv: 0, buyBonus: 0,   // v4.3: every 店员 is a tile (none free)
                   spawnT: 0.5,
                   interval: cu.interval, serveRate: cu.serveRate, buyAcc: 0,
                   desk: rectAt(o.x, o.y, K.deskW, K.deskD),
@@ -561,7 +560,7 @@ export class World {
   tileReady(id) { const t = this.tiles.find((x) => x.id === id); return t && t.bought > 0; }
   updateTileVis(silent) {
     for (const t of this.tiles) {
-      const v = !t.done && (!t.req || t.req.every((r) => this.tileReady(r)));
+      const v = !t.done && (!t.req || t.req.every((r) => this.tileReady(r))) && (!t.reqAny || t.reqAny.some((r) => this.tileReady(r)));
       if (v && !t.visible && !silent) { t.appearT = this.t; this.emit('tileAppear', { x: t.x, y: t.y }); }
       t.visible = v;
     }
@@ -582,7 +581,6 @@ export class World {
         o.hidden = false; o.appearT = this.t;
         if (o.kind === 'field') { if (silent) { o.g.fill(1); o.ripe = o.n; } else o.sprout(this.rnd, this.t); }
         if (o.kind === 'pond') o.fill(silent ? 1 : 0.4);
-        if (o.kind === 'proc') this.staffProc(o);
       }
       this.rebuildSolids(); if (!silent) this.emit('ground', {});
     }
@@ -592,7 +590,11 @@ export class World {
       for (let i = before; i < c.n; i++) c.hens[i].appearT = this.t + (i - before) * 0.12;
     }
     if (e.up) { this.upg[e.up.key] += e.up.v; this.refreshStats(); }
-    if (e.worker) this.addWorker(e.worker.from, e.worker.to, t.x, t.y, t.icon === 'cart' || t.icon === 'milker');
+    if (e.worker) {
+      const w = this.addWorker(e.worker.from, e.worker.to, t.x, t.y, t.icon === 'cart' || t.icon === 'milker');
+      if (e.worker.porter) w.porter = true;     // v4.3 加工品搬运工 (tray → 加工品 counter)
+      if (e.worker.raw) w.rawCarrier = true;    // v4.3 原料搬运工 (fields → raw counter)
+    }
     if (e.upgradeWorkers === 'loader') {
       this.loaders = true;
       for (const w of this.workers) if (!w.cart && !w.loader && !w.porter) { w.loader = true; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
@@ -603,28 +605,16 @@ export class World {
     if (e.cashier) for (const id of e.cashier) { const c = this.objs[id]; c.cashier = true; if (c.cash > 0) { this.money += c.cash; c.cash = 0; } }
     if (e.feeder) { const pd = this.objs[e.feeder]; if (pd && pd.kind === 'pond') { pd.feeder = { x: t.x, y: t.y }; pd.feedT = CFG.pond.feeder.every - 1.5; pd.feederT = this.t; } }
     if (e.proc) for (const pe of e.proc) { const p = this.objs[pe.id]; p.time *= Math.min(pe.mul, CFG.procUp.timeMul); }
+    // v4.3 each machine has its own upgrade path: Lv1 = the v4.1 快机器 (×0.42), Lv2 ×0.7 more
+    if (e.procUp) { const p = this.objs[e.procUp]; if (p) { p.upLv = (p.upLv || 0) + 1; p.time *= p.upLv === 1 ? CFG.procUp.timeMul : CFG.procUp.time2; } }
+    // v4.3 收银升级: faster checkout, customers come more often; Lv2 they also buy more each
+    if (e.counterUp) for (const id of e.counterUp) {
+      const c = this.objs[id]; if (!c || c.kind !== 'counter') continue;
+      const U = CFG.v43.cup; c.upLv++; c.serveRate *= U.serve; c.interval *= U.interval; c.clerks = 2;
+      if (c.upLv >= 2) c.buyBonus = U.buy;
+    }
   }
 
-  // v4.2 a machine comes with its staff: one extra hand carrying the raw crop into it, and (level-wide) two
-  // 搬运工 carrying its goods from the output tray to the second counter (+1 per terminal machine beyond two)
-  staffProc(p) {
-    if (p.staffed) return; p.staffed = true;
-    const srcs = [...this.fields, ...this.ponds, ...this.coops].filter((o) => o.item === p.inItem).map((o) => o.id);
-    if (srcs.length) {
-      const coop = srcs.every((id) => this.objs[id].kind === 'coop');
-      const w = this.addWorker(srcs, [p.id], p.inZone.cx - 30, p.inZone.cy + 30, coop); w.staff = true;
-    }
-    const sale = p.outObj && p.outObj.kind === 'counter' ? p.outObj : null;
-    if (!sale || !p.pile) return;
-    const term = this.procs.filter((q) => q.pile && q.outObj === sale), live = term.filter((q) => q.staffed).length;
-    const want = Math.max(2, live), have = this.workers.filter((w) => w.porter).length;
-    if (sale.hidden) { sale.hidden = false; sale.appearT = this.t; this.rebuildSolids(); this.emit('ground', {}); }
-    for (let k = have; k < want; k++) {
-      const w = this.addWorker(term.map((q) => q.id), [sale.id], p.pile.x + p.pile.w / 2 + k * 10, p.pile.y + p.pile.h + 14, false);
-      w.porter = true; w.staff = true;
-    }
-    for (const w of this.workers) if (w.porter) w.from = term.map((q) => q.id);
-  }
   addWorker(from, to, x, y, cart) {
     {
       const t = { x, y };
@@ -929,16 +919,16 @@ export class World {
     if (c.canDrop && c.stack.length > 0) {
       let sink = null, accepts = null;
       for (const k of this.counters) if (!k.hidden && inRect(c.x, c.y, k.zone) && (!c.toObjs || c.toObjs.includes(k)) && c.stack.some((t) => k.items.includes(t))) { sink = k; accepts = (t) => k.items.includes(t); break; }
-      if (!sink) for (const p of this.procs) if (!p.hidden && inRect(c.x, c.y, p.inZone) && (!c.toObjs || c.toObjs.includes(p)) && c.stack.includes(p.inItem)) { sink = p; accepts = (t) => t === p.inItem; break; }
+      if (!sink) for (const p of this.procs) if (!p.hidden && inRect(c.x, c.y, p.inZone) && (!c.toObjs || c.toObjs.includes(p)) && c.stack.includes(p.inItem) && !this.procFull(p)) { sink = p; accepts = (t) => t === p.inItem; break; }
       c.dropping = !!sink;
       if (sink) {
         c.dropAcc = Math.min(c.dropAcc + c.dropRate * dt, Math.max(1, c.dropRate * 0.1));
         while (c.dropAcc >= 1) {
           let idx = -1; for (let j = c.stack.length - 1; j >= 0; j--) if (accepts(c.stack[j])) { idx = j; break; }
-          if (idx < 0) break;
+          if (idx < 0 || (sink.kind === 'proc' && this.procFull(sink))) break;
           const item = c.stack[idx];
           c.stack.splice(idx, 1); c.dropAcc--;
-          if (!isPlayer) c.done = (c.done || 0) + 1;   // 雇工 XP
+          if (!isPlayer) { c.done = (c.done || 0) + 1; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + 1; }   // 雇工 XP (+ v4.3 where it went)
           const z = 44 + idx * CFG.items[item].step;
           if (sink.kind === 'counter') { sink.incoming++; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop); }
           else { sink.inc++; this.launch(item, 'procIn', c.x, c.y, z, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop); }
@@ -996,7 +986,7 @@ export class World {
     if (c.spawnT <= 0 && c.queue.length < C.queue) {
       c.spawnT = c.interval * (0.7 + this.rnd() * 0.6);
       const cu = { x: c.spawn.x + this.rnd() * 30, y: c.spawn.y + (this.rnd() - 0.5) * 20, counter: c, state: 'in',
-                   want: C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)),
+                   want: C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)) + (c.buyBonus || 0),
                    bag: [], incoming: 0, wait: 0, hue: Math.floor(this.rnd() * 8), walk: this.rnd() * 6, face: -1, vx: 0, vy: 0, leg: 0 };
       if (this.rnd() < CFG.vip.chance * this.vipMul) { cu.vip = true; cu.wish = c.items.reduce((a, b) => (itemPrice(b) > itemPrice(a) ? b : a), c.items[0]); }
       c.queue.push(cu); this.customers.push(cu);
@@ -1091,9 +1081,11 @@ export class World {
       for (const s of sinks) {
         const ok = s.kind === 'counter' ? w.stack.some((t) => s.items.includes(t)) : w.stack.includes(s.inItem);
         if (!ok) continue;
+        if (s.kind === 'proc' && this.procFull(s)) { w.blocked = s; continue; }   // v4.3: machine full → wait by it
         const z = s.kind === 'counter' ? s.zone : s.inZone; const dd = d2(z.cx, z.cy, w.x, w.y); if (dd < bd) { bd = dd; bs = z; }
       }
-      if (bs) { const k = (w.seed + (w.sinkRot || 0)) | 0; tx = bs.cx + ((k % 3) - 1) * 8; ty = bs.cy + ((k % 2) ? 6 : -6); }
+      if (bs) { const k = (w.seed + (w.sinkRot || 0)) | 0; tx = bs.cx + ((k % 3) - 1) * 8; ty = bs.cy + ((k % 2) ? 6 : -6); w.blocked = null; }
+      else if (w.blocked && !w.blocked.hidden) { const z = w.blocked.inZone, k = w.seed | 0; tx = z.cx - 30 + (k % 3) * 8; ty = z.cy + 34 + (k % 2) * 8; w.blocked = null; }
       else if (w.stack.length) w.stack.length = 0;   // nothing takes these any more
     }
     const goal = Math.hypot(tx - w.x, ty - w.y), body = w.loader ? CFG.loader.body : 9;
@@ -1121,17 +1113,36 @@ export class World {
     this.stepMove(w, dt, w.loader ? CFG.loader.body : 9);
   }
 
+  // v4.3 bot / debug walker: the workers' A* path toward the guide target. navigate's straight-line test skips the
+  // cells round the start, so with no progress for 0.6 s it follows a fresh A* path for 1.5 s (the old corner-steer
+  // could wedge on a desk corner, e.g. between a machine and the 加工品 counter)
+  botWay(p, target) {
+    const b = p._bot || (p._bot = { x: p.x, y: p.y, t: this.t, until: -1 });
+    if (Math.hypot(p.x - b.x, p.y - b.y) > 6) { b.x = p.x; b.y = p.y; b.t = this.t; }
+    else if (this.t - b.t > 0.6) { b.until = this.t + 1.5; b.t = this.t; p.path = null; return this.navigate(p, target.x, target.y, 12, true); }
+    if (this.t < b.until && p.path && Math.hypot(p.pathGoal.x - target.x, p.pathGoal.y - target.y) < 30) {
+      const P = p.path; while (p.pathI < P.length - 1 && Math.hypot(P[p.pathI].x - p.x, P[p.pathI].y - p.y) < 7) p.pathI++;
+      return P[p.pathI];
+    }
+    return this.navigate(p, target.x, target.y, 12, false);
+  }
+
   // ---- guide: what should the player do next (arrow + sim bot) -----------------------
   // machines first (they turn raw flowers into pricier goods), then counters
   // produce nobody buys yet (no counter or machine takes it) is left in the field
+  // v4.3: a machine whose goods can't be sold yet (no 加工品 counter) stops eating the crop at inMax
+  procFull(p) { return p.buf + p.inc >= CFG.proc.inMax && !this.procSells(p); }
+  procSells(p) { const o = p.outObj; return !o || (o.kind === 'proc' ? !o.hidden && this.procSells(o) : !o.hidden); }
   hasSink(item) {
-    for (const p of this.procs) if (!p.hidden && p.inItem === item) return true;
+    for (const p of this.procs) if (!p.hidden && p.inItem === item && !this.procFull(p)) return true;
     for (const k of this.counters) if (!k.hidden && k.items.includes(item)) return true;
     return false;
   }
   sinksFor(item) {
     const out = [];
-    for (const p of this.procs) if (!p.hidden && p.inItem === item) out.push({ z: p.inZone, w: 0.5 });
+    // v4.3: the arrow sends a load to a machine only while it has real room, and prefers the counter while the
+    // machine's goods can't be sold yet (no 加工品 counter bought)
+    for (const p of this.procs) if (!p.hidden && p.inItem === item && (this.procSells(p) || p.buf + p.inc < CFG.proc.inMax * 0.5)) out.push({ z: p.inZone, w: this.procSells(p) ? 0.5 : 1.5 });
     for (const k of this.counters) if (!k.hidden && k.items.includes(item)) out.push({ z: k.zone, w: 1 });
     return out;
   }
@@ -1146,9 +1157,11 @@ export class World {
     // at max capacity the arrow always points at the counter / machine that takes the load
     if (free <= 0 && p.stack.length > 0) { this.gmode = 'deliver'; const s = this.sinkTarget(p); if (s) return { ...s, full: true }; }
     let tile = null;
-    for (const t of this.tiles) if (t.visible && t.price - t.paid <= this.money + 0.01) { tile = t; break; }
+    // v4.3: the arrow works down a short shopping list — the first affordable tile among the next 3 visible ones in
+    // the level's order — so it saves up for an important tile instead of always grabbing the cheapest upgrade
+    { let k = 0; for (const t of this.tiles) { if (!t.visible) continue; if (t.price - t.paid <= this.money + 0.01) { tile = t; break; } if (++k >= CFG.guideWindow) break; } }
     if (tile) return { x: tile.x, y: tile.y, kind: 'tile', obj: tile };
-    if (cashPos) for (const t of this.tiles) if (t.visible && t.price - t.paid <= this.money + cash) return { x: cashPos.x, y: cashPos.y, kind: 'cash' };
+    if (cashPos) { let k = 0; for (const t of this.tiles) { if (!t.visible) continue; if (t.price - t.paid <= this.money + cash) return { x: cashPos.x, y: cashPos.y, kind: 'cash' }; if (++k >= CFG.guideWindow) break; } }
     if (free <= 0 && p.stack.length > 0) this.gmode = 'deliver';
     if (this.gmode === 'deliver') {
       if (p.stack.length === 0 && p.incoming === 0) this.gmode = 'collect';
@@ -1167,7 +1180,7 @@ export class World {
   }
   sourceTarget(p, free) {
     let best = null, bs = -1;
-    const value = (item) => { let v = 0; for (const pr of this.procs) if (!pr.hidden && pr.inItem === item) v = Math.max(v, itemPrice(pr.outItem) / pr.ratio); for (const k of this.counters) if (!k.hidden && k.items.includes(item)) v = Math.max(v, itemPrice(item)); return v; };
+    const value = (item) => { let v = 0; for (const pr of this.procs) if (!pr.hidden && pr.inItem === item && !this.procFull(pr)) v = Math.max(v, this.procSells(pr) ? itemPrice(pr.outItem) / pr.ratio : 0.3); for (const k of this.counters) if (!k.hidden && k.items.includes(item)) v = Math.max(v, itemPrice(item)); return v; };
     for (const pl of this.piles) if (!pl.owner.hidden && pl.total > 0) {
       const val = value(pl.type); if (!val) continue;
       const i = pl.hottest(p.x, p.y, this.t); if (i < 0) continue;

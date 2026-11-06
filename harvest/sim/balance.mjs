@@ -26,6 +26,9 @@ const PROFILES = {
   casual: { stick: 0.8, think: 0.7, label: '休闲（80% 摇杆，0.7 秒反应）' },
 };
 
+// v4.3: the bot walks the workers' A* path (World.botWay; the old corner-steer could wedge on a desk corner)
+export function botWay(w, p, target) { return w.botWay(p, target); }
+
 export function playLevel(li, prof, seed) {
   const w = new World(li, { quiet: true, seed, crew: crewFor(li), ...ENV });
   const p = w.player;
@@ -40,7 +43,7 @@ export function playLevel(li, prof, seed) {
     if (target) {
       const stop = target.kind === 'tile' ? 4 : target.kind === 'pile' || target.kind === 'field' || target.kind === 'pond' ? 2 : 6;
       if (Math.hypot(target.x - p.x, target.y - p.y) > stop) {
-        const wp = w.steer(p, target.x, target.y);
+        const wp = botWay(w, p, target);
         const dx = wp.x - p.x, dy = wp.y - p.y, d = Math.hypot(dx, dy) || 1;
         ix = dx / d * prof.stick; iy = dy / d * prof.stick;
       }

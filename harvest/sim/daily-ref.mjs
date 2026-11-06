@@ -7,6 +7,7 @@ import fs from 'fs';
 import { CFG } from '../js/config.js';
 import { World } from '../js/world.js';
 import { buildLevel, worldOpts, swapMap, TWIST_IDS } from '../js/daily.js';
+import { botWay } from './balance.mjs';
 
 const DT = 1 / 30;
 function play(li, twist, seed) {
@@ -18,7 +19,7 @@ function play(li, twist, seed) {
     let ix = 0, iy = 0;
     if (target) {
       const stop = target.kind === 'tile' ? 4 : target.kind === 'pile' || target.kind === 'field' || target.kind === 'pond' ? 2 : 6;
-      if (Math.hypot(target.x - p.x, target.y - p.y) > stop) { const wp = w.steer(p, target.x, target.y); const dx = wp.x - p.x, dy = wp.y - p.y, d = Math.hypot(dx, dy) || 1; ix = dx / d; iy = dy / d; }
+      if (Math.hypot(target.x - p.x, target.y - p.y) > stop) { const wp = botWay(w, p, target); const dx = wp.x - p.x, dy = wp.y - p.y, d = Math.hypot(dx, dy) || 1; ix = dx / d; iy = dy / d; }
     }
     w.update(DT, ix, iy);
   }

@@ -153,6 +153,17 @@ export function drawIcon(g, kind, t = 0) {
     case 'cashier':
       g.save(); g.translate(-5, 2); ITEM_DRAW.bill(g); g.restore(); g.save(); g.translate(4, -3); ITEM_DRAW.bill(g); g.restore();
       arrowUp(g, 9, 4, 0.8, '#FFD23F'); break;
+    case 'porter':   // v4.3 加工品搬运工: red overalls, yellow cap, a crate of goods
+      g.save(); g.translate(-3, 12); g.scale(0.62, 0.62); person(g, t, 0, false, { ...BOY, shirt: '#FFFFFF', overalls: '#E8452C', pants: '#E8452C', sickle: false }); g.restore();
+      g.translate(7, -2); g.scale(0.85, 0.85); ITEM_DRAW.crate(g); break;
+    case 'register': {   // v4.3 收银升级: a cash register with a green up arrow
+      g.fillStyle = '#4C82DE'; g.strokeStyle = '#21468E'; g.lineWidth = 1.2;
+      g.beginPath(); g.roundRect(-11, 0, 18, 9, 2); g.fill(); g.stroke();
+      g.fillStyle = '#E9EEF6'; g.beginPath(); g.moveTo(-9, 0); g.lineTo(-7, -9); g.lineTo(5, -9); g.lineTo(5, 0); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#7FD7FF'; g.fillRect(-6, -7.5, 9, 3.5);
+      g.fillStyle = '#FFD23F'; for (const x of [-8, -4, 0]) g.fillRect(x, 3, 2.6, 2.6);
+      arrowUp(g, 9, -2, 0.9, '#3BC14A'); break;
+    }
     case 'gear':
       g.rotate(t * 2);
       g.fillStyle = '#FFD23F'; g.strokeStyle = COL.outline; g.lineWidth = 1.2;

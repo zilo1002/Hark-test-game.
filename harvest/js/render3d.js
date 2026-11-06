@@ -866,7 +866,7 @@ export class Renderer {
       }
       if (c.cashier && !o.cashier) { o.cashier = M.makePerson(CASHIER); o.cashier.root.position.set(c.x + 4, 0, c.y - 44); o.cashier.root.rotation.y = 0.3; this.levelRoot.add(o.cashier.root); }
       if (o.cashier) M.posePerson(o.cashier, { t: time, walk: 0, moving: false, carry: false, seed: 4 });
-      if (c.clerks === 2 && !o.clerk2) { o.clerk2 = M.makePerson(CASHIER2); o.clerk2.root.position.set(c.x - 24, 0, c.y - 6); o.clerk2.root.rotation.y = Math.PI / 2; this.levelRoot.add(o.clerk2.root); }
+      if (c.cashier && c.clerks === 2 && !o.clerk2) { o.clerk2 = M.makePerson(CASHIER2); o.clerk2.root.position.set(c.x - 24, 0, c.y - 6); o.clerk2.root.rotation.y = Math.PI / 2; this.levelRoot.add(o.clerk2.root); }
       if (o.clerk2) { o.clerk2.root.scale.setScalar(a * 1.15); M.posePerson(o.clerk2, { t: time + 1.3, walk: 0, moving: false, carry: c.stock.length > 0 && (time % 2) < 1, seed: 6 }); }
       if (o.cashier && c.clerks === 2) o.cashier.root.scale.setScalar(a * 1.15);
     }
