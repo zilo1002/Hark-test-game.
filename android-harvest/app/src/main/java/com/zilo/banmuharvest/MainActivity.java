@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.view.DisplayCutout;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -36,6 +37,12 @@ public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
     private static final String START = "https://" + HOST + "/harvest/index.html";
     private WebView web;
+    private int[] cut = { 0, 0, 0, 0 };
+
+    private void pushCutout() {
+        if (web == null) return;
+        web.evaluateJavascript("(function(s){s.setProperty('--cut-l','" + cut[0] + "px');s.setProperty('--cut-r','" + cut[1] + "px');s.setProperty('--cut-t','" + cut[2] + "px');s.setProperty('--cut-b','" + cut[3] + "px');window.dispatchEvent(new Event('resize'));})(document.documentElement.style)", null);
+    }
 
     /** JS: window.AndroidHaptics.vibrate(ms, amplitude 1..255) */
     public static final class Haptics {
@@ -120,11 +127,27 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public void onPageFinished(WebView view, String url) { pushCutout(); }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 return !HOST.equals(req.getUrl().getHost());   // stay inside the game
             }
         });
         setContentView(web);
+        // v4.1: some WebViews report env(safe-area-inset-*) as 0 around a camera cutout; hand the real
+        // cutout insets to the page as CSS variables (--cut-l/r/t/b, in CSS px) so the HUD stays clear of it
+        if (Build.VERSION.SDK_INT >= 28) {
+            web.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+                @Override public WindowInsets onApplyWindowInsets(View v, WindowInsets ins) {
+                    DisplayCutout c = ins.getDisplayCutout();
+                    float d = getResources().getDisplayMetrics().density;
+                    cut = c == null ? new int[] { 0, 0, 0, 0 } : new int[] { Math.round(c.getSafeInsetLeft() / d), Math.round(c.getSafeInsetRight() / d), Math.round(c.getSafeInsetTop() / d), Math.round(c.getSafeInsetBottom() / d) };
+                    pushCutout();
+                    return v.onApplyWindowInsets(ins);
+                }
+            });
+        }
         hideSystemBars();
         if (saved != null) web.restoreState(saved);
         else web.loadUrl(START);
@@ -178,9 +201,9 @@ public class MainActivity extends Activity {
         // back = open the in-game pause menu (or close the open dialog); from the farm screen it leaves the app
         if (web == null) { super.onBackPressed(); return; }
         web.evaluateJavascript(
-            "(function(){var m=[].slice.call(document.querySelectorAll('.modal')).filter(function(x){return !x.classList.contains('hidden')});"
+            "(function(){var m=[].slice.call(document.querySelectorAll('.modal')).filter(function(x){return !x.classList.contains('hidden')&&!x.classList.contains('dock')});"
           + "if(m.length){var b=m[m.length-1].querySelector('[data-close],#btnResume');if(b){b.click();return 'closed';}}"
-          + "var h=document.getElementById('hud');if(h&&!h.classList.contains('hidden')){document.getElementById('btnPause').click();return 'paused';}"
+          + "var bd=document.getElementById('btnBuildDone');if(bd&&document.body.classList.contains('inbuild')){bd.click();return 'closed';}var h=document.getElementById('hud');if(h&&!h.classList.contains('hidden')){document.getElementById('btnPause').click();return 'paused';}"
           + "return 'home';})()",
             new ValueCallback<String>() {
                 @Override public void onReceiveValue(String v) { if (v != null && v.contains("home")) moveTaskToBack(true); }

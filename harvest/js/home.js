@@ -19,7 +19,13 @@ export const SPOTS2 = {
   fence2: [180, 300], logpile: [244, 290], tractor: [176, 420],
 };
 const OL = '#4A3A20';
-function shadow(g, x, y, rx, ry) { g.fillStyle = 'rgba(30,70,15,0.25)'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, TAU); g.fill(); }
+// v4.1 soft contact shadow: a radial fade instead of a hard disc
+function shadow(g, x, y, rx, ry) {
+  g.save(); g.translate(x, y); g.scale(1, ry / rx);
+  const gr = g.createRadialGradient(0, 0, rx * 0.15, 0, 0, rx * 1.15);
+  gr.addColorStop(0, 'rgba(25,60,10,0.34)'); gr.addColorStop(0.6, 'rgba(25,60,10,0.18)'); gr.addColorStop(1, 'rgba(25,60,10,0)');
+  g.fillStyle = gr; g.beginPath(); g.arc(0, 0, rx * 1.15, 0, TAU); g.fill(); g.restore();
+}
 function rr(g, x, y, w, h, r, fill, stroke, lw = 1.4) { g.beginPath(); g.roundRect(x, y, w, h, r); g.fillStyle = fill; g.fill(); if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw; g.stroke(); } }
 // v4.0 四季: the estate follows the season of the real week (border trees, lawn, drifting petals / leaves / snow)
 let HSEASON = null;
@@ -29,11 +35,26 @@ const HS = {
   tree: [['#F7A8C8', '#F48DB6', '#FFC4DA', '#F9B6D0', '#FFFFFF'], null, ['#E8871E', '#C8551E', '#F6C343', '#D9662A', '#FFD86B'], ['#E3EDF2', '#D2E2EA', '#FFFFFF', '#C6D8E2', '#FFFFFF']],
 };
 function roundTree(g, t, blossom) {
-  shadow(g, 0, 0, 30, 9);
-  g.fillStyle = '#7A4A22'; g.fillRect(-5, -30, 10, 30);
+  shadow(g, 4, 0, 32, 10);
+  // trunk with a lit side
+  g.fillStyle = '#7A4A22'; g.beginPath(); g.moveTo(-6, 0); g.lineTo(-4, -32); g.lineTo(4, -32); g.lineTo(6, 0); g.closePath(); g.fill();
+  g.fillStyle = '#9A6232'; g.fillRect(-3.5, -30, 3, 28);
   const cols = blossom ? ['#F7A8C8', '#F48DB6', '#FFC4DA', '#FFD9E8', '#FFFFFF'] : (HSEASON !== null && HS.tree[HSEASON]) || ['#3E9A2A', '#378E26', '#4FB233', '#5CC23D', '#7BD655'];
-  for (const [x, y, r, i] of [[-16, -42, 18, 0], [16, -42, 18, 1], [0, -60, 22, 2], [-8, -48, 14, 3], [9, -64, 10, 4]]) { g.fillStyle = cols[i]; g.beginPath(); g.arc(x + Math.sin(t + i) * 0.5, y, r, 0, TAU); g.fill(); }
+  const sw = Math.sin(t * 0.9) * 0.6;
+  // dark under-canopy, main puffs, then light top puffs and a highlight
+  g.fillStyle = 'rgba(20,60,10,0.28)'; g.beginPath(); g.ellipse(sw, -36, 27, 10, 0, 0, TAU); g.fill();
+  for (const [x, y, r, i] of [[-17, -44, 17, 1], [17, -44, 17, 1], [0, -48, 20, 0], [-10, -62, 17, 2], [11, -62, 16, 2], [0, -74, 13, 3]]) { g.fillStyle = cols[i]; g.beginPath(); g.arc(x + sw * (1 + i * 0.3), y, r, 0, TAU); g.fill(); }
+  g.fillStyle = cols[4]; g.globalAlpha = 0.75;
+  for (const [x, y, r] of [[-12, -68, 6], [-4, -78, 4.5], [8, -70, 4], [-20, -50, 4]]) { g.beginPath(); g.arc(x + sw * 1.6, y, r, 0, TAU); g.fill(); }
+  g.globalAlpha = 1;
   if (blossom) for (let i = 0; i < 6; i++) { const u = (t * 0.25 + i / 6) % 1; g.fillStyle = 'rgba(255,170,200,0.9)'; g.beginPath(); g.ellipse(-24 + i * 9 + Math.sin(t + i) * 6, -40 + u * 44, 2, 1.2, u * 6, 0, TAU); g.fill(); }
+}
+// a little pine for the woods around the farm (page 2 / variety)
+function pine(g, k = 1) {
+  shadow(g, 3, 0, 20 * k, 7 * k);
+  g.fillStyle = '#6E4320'; g.fillRect(-3 * k, -12 * k, 6 * k, 12 * k);
+  const c = HSEASON === 3 ? ['#5E8C6A', '#FFFFFF'] : ['#2F7A3A', '#3E9A48'];
+  for (let i = 0; i < 3; i++) { const y = -10 * k - i * 13 * k, w = (20 - i * 5) * k; g.fillStyle = c[0]; g.beginPath(); g.moveTo(-w, y); g.lineTo(0, y - 22 * k); g.lineTo(w, y); g.closePath(); g.fill(); g.fillStyle = c[1]; g.beginPath(); g.moveTo(-w * 0.2, y - 2 * k); g.lineTo(0, y - 22 * k); g.lineTo(w * 0.75, y - 2 * k); g.closePath(); g.globalAlpha = HSEASON === 3 ? 0.9 : 0.55; g.fill(); g.globalAlpha = 1; }
 }
 function hedgeBlock(g, w, h) {
   rr(g, -w / 2, -h, w, h, 6, COL.hedge, '#3E8E22', 1.2);
@@ -610,51 +631,155 @@ function decoHat(g, o) {   // the farmer's 商店 hat in the 2D estate view
   if (o.scarf) { g.fillStyle = o.scarf === 'rainbow' ? '#FFD23F' : o.scarf; rr(g, -5.6, -23.4, 11.2, 3, 1.4, g.fillStyle, null); g.fillRect(1, -21, 2.6, 6); }
 }
 
-export function homeLayout(W, H, land, panelH = 0) {
-  // portrait: keep the estate above the bottom panel (its real height when known, v4.0 B)
-  const top = 56, panelW = land ? Math.min(330, W * 0.42) : 0, bottom = land ? 8 : Math.max(Math.min(250, H * 0.38), Math.min(panelH, H * 0.62));
-  const aw = W - panelW, ah = H - top - bottom;
-  const s = Math.min(aw / 380, ah / 450);
-  return { s, ox: (aw - 360 * s) / 2, oy: top + Math.max(0, (ah - 450 * s) / 2) };
+// v4.1: the estate sits on a raised lawn "plot" (design space x −16…376, y 92…452) in the middle of a
+// farm landscape that fills the whole screen. `area` is the screen rectangle the plot has to fit (the CSS
+// places #estateArea per layout mode); everything outside it is scenery.
+const PLOT = { x: -16, y: 92, w: 392, h: 360, r: 46 };
+export function homeLayout(W, H, area) {
+  const A = area || { x: 0, y: 56, w: W, h: H - 64 };
+  const s = Math.max(0.2, Math.min(A.w / 410, A.h / 432));
+  return { s, ox: A.x + A.w / 2 - 180 * s, oy: A.y + A.h / 2 - 254 * s };
+}
+const hsh = (k) => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const SEASON_GROUND = {   // [grass light, grass dark, plot lawn, plot lawn stripe, soil lip, field crop]
+  0: ['#A5DE70', '#8ED05A', '#9BDD5E', '#8CD150', '#B9844C', '#F2D34A'],
+  1: ['#9FDA62', '#86CC4C', '#90D852', '#80CA43', '#B07A44', '#F6CB4A'],
+  2: ['#C8CB6A', '#B4B858', '#BCC65C', '#AEB84E', '#A9733F', '#E8871E'],
+  3: ['#DDE9EF', '#CCDDE6', '#EEF5F8', '#E2EDF2', '#9C7A5C', '#FFFFFF'],
+};
+function inPlot(x, y, m) { return x > PLOT.x - m && x < PLOT.x + PLOT.w + m && y > PLOT.y - m - 30 && y < PLOT.y + PLOT.h + m; }
+// static ground layer: grass with mowed stripes and tufts, crop fields and woods around, the raised plot with
+// its soil lip, lawn stripes, picket fence and the lane out of the gate. Cached until size / season / page change.
+let GROUND = null;
+function groundLayer(W, H, dpr, L, page) {
+  const key = [W, H, dpr, L.s.toFixed(3), L.ox | 0, L.oy | 0, HSEASON, page].join('|');
+  if (GROUND && GROUND.key === key) return GROUND.cv;
+  const cv = GROUND && GROUND.cv || document.createElement('canvas');
+  cv.width = Math.max(1, Math.round(W * dpr)); cv.height = Math.max(1, Math.round(H * dpr));
+  const g = cv.getContext('2d'), C = SEASON_GROUND[HSEASON ?? 1] || SEASON_GROUND[1];
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = C[0]; g.fillRect(0, 0, W, H);
+  const { s, ox, oy } = L;
+  g.save(); g.translate(ox, oy); g.scale(s, s);
+  const x0 = -ox / s - 40, x1 = (W - ox) / s + 40, y0 = -oy / s - 60, y1 = (H - oy) / s + 60;
+  // mowed stripes across the whole meadow
+  g.fillStyle = C[1];
+  for (let k = Math.floor((x0 - y1) / 56) - 1; k * 56 < x1 - y0; k++) { const a = k * 56; g.beginPath(); g.moveTo(a + y0, y0); g.lineTo(a + 28 + y0, y0); g.lineTo(a + 28 + y1, y1); g.lineTo(a + y1, y1); g.closePath(); g.globalAlpha = 0.45; g.fill(); }
+  g.globalAlpha = 1;
+  // crop fields in the open land left / right / below the plot (rows of little plants)
+  const crops = HSEASON === 3 ? ['#FFFFFF', '#E6EEF2'] : [C[5], '#5DBB3A', '#E8453C', '#7A3EA8'];
+  for (let gx = Math.floor(x0 / 150) * 150; gx < x1; gx += 150) for (let gy = Math.floor(y0 / 120) * 120; gy < y1; gy += 120) {
+    const k = Math.round(gx * 0.7 + gy * 1.3), fx = gx + 14 + (hsh(k + 11) - 0.5) * 16, fy = gy + 16 + (hsh(k + 12) - 0.5) * 12, fw = 120, fh = 88;
+    if (inPlot(fx + fw / 2, fy + fh / 2, 150) || hsh(k) < 0.58) continue;
+    g.fillStyle = '#A8763E'; g.beginPath(); g.roundRect(fx - 4, fy - 4, fw + 8, fh + 10, 12); g.fill();
+    g.fillStyle = '#8E5E2C'; g.beginPath(); g.roundRect(fx, fy, fw, fh, 10); g.fill();
+    const col = crops[Math.floor(hsh(k + 3) * crops.length)];
+    for (let r = 0; r < 5; r++) { const ry = fy + 10 + r * 17; g.fillStyle = 'rgba(60,35,15,0.35)'; g.fillRect(fx + 6, ry + 6, fw - 12, 3);
+      for (let c = 0; c < 9; c++) { const px = fx + 10 + c * 12.5 + (r % 2) * 5; g.fillStyle = '#4E9E2E'; g.beginPath(); g.ellipse(px, ry + 4, 4.2, 3, 0, 0, TAU); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(px, ry + 1.5, 2.6, 0, TAU); g.fill(); } }
+  }
+  // grass tufts and wild flowers
+  for (let i = 0; i < 260; i++) {
+    const x = x0 + hsh(i) * (x1 - x0), y = y0 + hsh(i + 400) * (y1 - y0);
+    if (inPlot(x, y, -6)) continue;
+    g.strokeStyle = HSEASON === 3 ? 'rgba(150,180,195,0.6)' : 'rgba(50,120,25,0.5)'; g.lineWidth = 1.3; g.beginPath();
+    g.moveTo(x - 3, y); g.lineTo(x - 4, y - 5); g.moveTo(x, y); g.lineTo(x, y - 7); g.moveTo(x + 3, y); g.lineTo(x + 4, y - 5); g.stroke();
+    if (i % 5 === 0 && HSEASON !== 3) { g.fillStyle = ['#FFFFFF', '#FFE14D', '#FF8FB0', '#B98CFF'][i % 4]; g.beginPath(); g.arc(x + 6, y - 3, 2, 0, TAU); g.fill(); }
+  }
+  // woods: trees scattered around the plot (never on it), back ones first
+  const trees = [];
+  for (let gx = Math.floor(x0 / 70) * 70; gx < x1; gx += 70) for (let gy = Math.floor(y0 / 64) * 64; gy < y1 + 64; gy += 64) {
+    const k = Math.round(gx * 3.1 + gy * 7.7), x = gx + hsh(k) * 44, y = gy + hsh(k + 9) * 40;
+    if (inPlot(x, y, 26) || hsh(k + 5) < 0.3) continue;
+    let nearField = false;   // keep trees off the field patches
+    const cx = Math.floor((x - 14) / 150) * 150, cy = Math.floor((y - 16) / 120) * 120, kk = Math.round(cx * 0.7 + cy * 1.3);
+    if (!inPlot(cx + 74, cy + 60, 150) && hsh(kk) >= 0.58 && x > cx + 6 && x < cx + 140 && y > cy + 8 && y < cy + 112) nearField = true;
+    if (!nearField) trees.push([x, y, 0.75 + hsh(k + 2) * 0.35, hsh(k + 7) < (page === 2 ? 0.55 : 0.25)]);
+  }
+  // the lane out of the gate, down off the screen
+  g.strokeStyle = '#C9A86A'; g.lineWidth = 34; g.lineCap = 'round'; g.beginPath(); g.moveTo(180, PLOT.y + PLOT.h - 4); g.bezierCurveTo(180, PLOT.y + PLOT.h + 60, 230, PLOT.y + PLOT.h + 90, 250, y1 + 20); g.stroke();
+  g.strokeStyle = '#E3C98E'; g.lineWidth = 22; g.stroke();
+  // the plot: drop shadow, soil lip, lawn with stripes and a lighter rim
+  g.fillStyle = 'rgba(30,60,10,0.22)'; g.beginPath(); g.roundRect(PLOT.x + 6, PLOT.y + 18, PLOT.w, PLOT.h, PLOT.r); g.fill();
+  g.fillStyle = C[4]; g.beginPath(); g.roundRect(PLOT.x, PLOT.y + 12, PLOT.w, PLOT.h, PLOT.r); g.fill();
+  g.fillStyle = 'rgba(80,45,15,0.35)'; for (let i = 0; i < 28; i++) { g.beginPath(); g.ellipse(PLOT.x + 20 + hsh(i + 50) * (PLOT.w - 40), PLOT.y + PLOT.h + 4 + hsh(i + 70) * 6, 3, 1.6, 0, 0, TAU); g.fill(); }
+  g.save(); g.beginPath(); g.roundRect(PLOT.x, PLOT.y, PLOT.w, PLOT.h, PLOT.r); g.clip();
+  g.fillStyle = C[2]; g.fillRect(PLOT.x, PLOT.y, PLOT.w, PLOT.h);
+  g.fillStyle = C[3]; for (let x = PLOT.x; x < PLOT.x + PLOT.w; x += 44) g.fillRect(x, PLOT.y, 22, PLOT.h);
+  g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 6; g.beginPath(); g.roundRect(PLOT.x + 3, PLOT.y + 3, PLOT.w - 6, PLOT.h - 6, PLOT.r - 3); g.stroke();
+  for (let i = 0; i < 70; i++) { const x = PLOT.x + 14 + hsh(i + 900) * (PLOT.w - 28), y = PLOT.y + 14 + hsh(i + 950) * (PLOT.h - 28); g.fillStyle = HSEASON === 3 ? 'rgba(170,200,215,0.5)' : 'rgba(60,140,30,0.35)'; g.beginPath(); g.ellipse(x, y, 3, 1.4, 0, 0, TAU); g.fill(); }
+  // page ground details: page 1 gravel forecourt + path, page 2 dirt lane, page 3 cobbled lane (lake is animated, drawn later)
+  if (page === 1) {
+    g.fillStyle = '#D9C390'; g.beginPath(); g.ellipse(180, 196, 116, 38, 0, 0, TAU); g.fill();
+    g.fillStyle = '#EBDDB2'; g.beginPath(); g.ellipse(180, 192, 108, 32, 0, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(160,130,80,0.35)'; for (let i = 0; i < 40; i++) { g.beginPath(); g.arc(90 + hsh(i + 30) * 180, 172 + hsh(i + 60) * 40, 1.3, 0, TAU); g.fill(); }
+    g.strokeStyle = '#D9C390'; g.lineWidth = 26; g.beginPath(); g.moveTo(180, 224); g.lineTo(180, PLOT.y + PLOT.h); g.stroke();
+    g.strokeStyle = '#EBDDB2'; g.lineWidth = 18; g.stroke();
+  } else if (page === 2) {
+    g.strokeStyle = '#B98F55'; g.lineWidth = 26; g.beginPath(); g.moveTo(180, 176); g.bezierCurveTo(176, 260, 188, 330, 180, PLOT.y + PLOT.h); g.stroke();
+    g.strokeStyle = '#D2AE72'; g.lineWidth = 18; g.stroke();
+  } else {
+    g.strokeStyle = '#C9B98C'; g.lineWidth = 24; g.beginPath(); g.moveTo(196, 186); g.bezierCurveTo(206, 260, 230, 330, 186, PLOT.y + PLOT.h); g.stroke();
+    g.strokeStyle = '#E2D4AA'; g.lineWidth = 16; g.stroke();
+  }
+  g.restore();
+  // picket fence round the plot, gap at the gate
+  const fence = (x, y) => { g.fillStyle = 'rgba(40,60,20,0.25)'; g.fillRect(x - 1.6, y - 1, 5, 3); g.fillStyle = '#FFFFFF'; g.beginPath(); g.moveTo(x - 2.4, y); g.lineTo(x - 2.4, y - 11); g.lineTo(x, y - 14); g.lineTo(x + 2.4, y - 11); g.lineTo(x + 2.4, y); g.closePath(); g.fill(); g.strokeStyle = '#B9AE96'; g.lineWidth = 0.8; g.stroke(); };
+  const rail = (ax, ay, bx, by) => { g.strokeStyle = '#F4EFE4'; g.lineWidth = 2.2; for (const d of [5, 10]) { g.beginPath(); g.moveTo(ax, ay - d); g.lineTo(bx, by - d); g.stroke(); } };
+  const T = PLOT.y + 8, B = PLOT.y + PLOT.h - 4, Lx = PLOT.x + 8, Rx = PLOT.x + PLOT.w - 8;
+  rail(Lx + 20, T, Rx - 20, T); for (let x = Lx + 20; x <= Rx - 20; x += 12) fence(x, T);
+  rail(Lx, T + 26, Lx, B - 24); rail(Rx, T + 26, Rx, B - 24);
+  for (let y = T + 26; y <= B - 24; y += 12) { fence(Lx, y); fence(Rx, y); }
+  rail(Lx + 22, B, 156, B); rail(204, B, Rx - 22, B);
+  for (let x = Lx + 22; x <= 156; x += 12) fence(x, B); for (let x = 204; x <= Rx - 22; x += 12) fence(x, B);
+  // the woods (static, sorted back to front)
+  trees.sort((a, b) => a[1] - b[1]);
+  for (const [x, y, k, p] of trees) { g.save(); g.translate(x, y); g.scale(k, k); if (p) pine(g, 1.1); else roundTree(g, 0, false); g.restore(); }
+  g.restore();
+  GROUND = { key, cv };
+  return cv;
+}
+// which empty spot (of this page) a tap at screen (px, py) lands on, in 装扮 mode
+export function hitSpot(W, H, area, page, save, px, py) {
+  const { s, ox, oy } = homeLayout(W, H, area), x = (px - ox) / s, y = (py - oy) / s;
+  const spots = page === 3 ? SPOTS3 : page === 2 ? SPOTS2 : SPOTS, center = page === 3 ? 'winery' : page === 2 ? 'lodge' : 'manor';
+  const done = new Set(save.restored); let best = null, bd = 1.6;
+  for (const [id, [sx, sy]] of Object.entries(spots)) {
+    if (done.has(id)) continue;
+    const d = ((x - sx) / 30) ** 2 + ((y - (sy - 2 + (id === center ? 30 : 0))) / 18) ** 2;
+    if (d < bd) { bd = d; best = id; }
+  }
+  return best;
 }
 
-export function drawHome(g, W, H, save, t, dpr, land, page = 1, panelH = 0) {
+export function drawHome(g, W, H, save, t, dpr, area, page = 1) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   HSEASON = Number.isInteger(save.season) ? save.season : null;
-  const bgc = (HSEASON !== null && HS.bg[HSEASON]) || ['#9BDB6A', '#6CBF45'];
-  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, bgc[0]); gr.addColorStop(1, bgc[1]);
-  g.fillStyle = gr; g.fillRect(0, 0, W, H);
-  for (let i = 0; i < 40; i++) { g.fillStyle = i % 2 ? 'rgba(255,255,255,0.06)' : 'rgba(40,110,20,0.07)'; g.beginPath(); g.ellipse((i * 137) % W, (i * 89) % H, 40, 18, 0, 0, TAU); g.fill(); }
-  const { s, ox, oy } = homeLayout(W, H, land, panelH);
+  const L = homeLayout(W, H, area), { s, ox, oy } = L;
+  g.drawImage(groundLayer(W, H, dpr, L, page), 0, 0, W, H);
   g.save(); g.translate(ox, oy); g.scale(s, s);
-  for (const [x, y, k] of [[-14, 70, 1], [378, 50, 0.9], [-24, 300, 0.9], [386, 270, 1.1], [10, 470, 0.8], [360, 470, 0.9], [110, 40, 0.7], [250, 34, 0.8]]) { g.save(); g.translate(x, y); g.scale(k, k); roundTree(g, t, false); g.restore(); }
-  // the estate lawn with a gravel yard in front of the manor
-  g.fillStyle = (HSEASON !== null && HS.lawn[HSEASON]) || '#86D14C'; g.beginPath(); g.ellipse(180, 270, 200, 170, 0, 0, TAU); g.fill();
-  g.fillStyle = '#E8D7A6'; g.beginPath(); g.ellipse(180, 190, 110, 34, 0, 0, TAU); g.fill();
   const restored = new Set(save.restored);
   const flat = ['path', 'pond', 'fence2', 'dock'];
   const P2 = page === 2, P3 = page === 3;
   const spots = P3 ? SPOTS3 : P2 ? SPOTS2 : SPOTS, draw = P3 ? DRAW3 : P2 ? DRAW2 : DRAW, center = P3 ? 'winery' : P2 ? 'lodge' : 'manor';
   if (P3) {   // the lake, and a cobbled lane up to the winery
     lake(g, t);
-    g.fillStyle = '#D9C99A'; for (let i = 0; i < 6; i++) { g.beginPath(); g.ellipse(196 + (i % 2 ? 4 : -4), 200 + i * 20, 11, 4.6, 0, 0, TAU); g.fill(); }
   }
-  if (P2) { g.fillStyle = '#C9A86A'; for (let i = 0; i < 9; i++) { g.beginPath(); g.ellipse(180 + (i % 2 ? 4 : -4), 200 + i * 26, 12, 5, 0, 0, TAU); g.fill(); } }
   const decos = (save.shop && save.shop.deco) || [];
   const items = [...Object.entries(spots), ...decos.filter((id) => DECO_SPOTS[id]).map((id) => ['deco:' + id, DECO_SPOTS[id]])]
     .sort((a, b) => (flat.includes(b[0]) - flat.includes(a[0])) || ((b[0] === 'deco:pond') - (a[0] === 'deco:pond')) || a[1][1] - b[1][1]);
   for (const [id, [x, y]] of items) {
-    if (id.startsWith('deco:')) { g.save(); g.translate(x, y); g.scale(0.9, 0.9); DECO2D[id.slice(5)](g, t); g.restore(); continue; }
+    if (id.startsWith('deco:')) { g.save(); g.translate(x, y); g.scale(1.12, 1.12); DECO2D[id.slice(5)](g, t); g.restore(); continue; }
     g.save(); g.translate(x, y);
     const done = restored.has(id), a = done ? elastic((t - (save.restoredAt?.[id] || -9)) / 0.7) : 1;
     if (id === center) { g.scale(0.92 + 0.08 * a, 0.92 + 0.08 * a); if (P3) winery(g, done, t); else if (P2) lodge(g, done, t); else manor(g, done); }
     else if (done) { g.scale(a, a); draw[id](g, t); }
-    if (!done) {   // empty spot: a teal dashed ring with the star price
+    if (!done && save.build) {   // 装扮 mode: an empty spot is a teal dashed ring with the star price (tap to build)
       const m = CFG.meta.find((q) => q.id === id);
-      const ry = id === center ? 30 : 0;
-      g.setLineDash([5, 4]); g.strokeStyle = 'rgba(255,255,255,0.9)'; g.fillStyle = 'rgba(63,208,218,0.45)'; g.lineWidth = 2;
-      g.beginPath(); g.ellipse(0, -2 + ry, 22, 9, 0, 0, TAU); g.fill(); g.stroke(); g.setLineDash([]);
-      g.font = FONT(11); g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3; g.strokeStyle = '#1E5A68'; g.fillStyle = '#FFE14D';
+      const ry = id === center ? 30 : 0, pu = 1 + Math.sin(t * 3 + x * 0.05) * 0.06;
+      g.fillStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.ellipse(0, -2 + ry, 27 * pu, 12 * pu, 0, 0, TAU); g.fill();
+      g.setLineDash([5, 4]); g.strokeStyle = 'rgba(255,255,255,0.95)'; g.fillStyle = 'rgba(63,208,218,0.6)'; g.lineWidth = 2;
+      g.beginPath(); g.ellipse(0, -2 + ry, 23, 10, 0, 0, TAU); g.fill(); g.stroke(); g.setLineDash([]);
+      g.font = FONT(12); g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3; g.strokeStyle = '#1E5A68'; g.fillStyle = '#FFE14D';
       g.strokeText(`★${m ? m.cost : ''}`, 0, -3 + ry); g.fillText(`★${m ? m.cost : ''}`, 0, -3 + ry);
     }
     g.restore();

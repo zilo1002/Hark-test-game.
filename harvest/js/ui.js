@@ -8,30 +8,60 @@ import { ROSTER, TRAITS, traitBonus, xpNeed, CREW } from './crew.js';
 import { orderText, orderDone, TIER_NAME } from './orders.js';
 import { seasonInfo, cropNames } from './seasons.js';
 import { dailyOpen, dailyFor, ensureDay, TIER_LABEL } from './daily.js';
+import { MODES } from './layout.js';
 
 const $ = (id) => document.getElementById(id);
 const TABS = { 1: '花园庄园', 2: '林场牧场', 3: '湖畔酒庄' };
+const QNAME = { auto: '自动', 0: '低', 1: '中', 2: '高' };
+// horizontal swipe on an element → cb(+1 | -1)
+function swipe(el, cb) {
+  let x0 = null, y0 = 0;
+  el.addEventListener('pointerdown', (e) => { x0 = e.clientX; y0 = e.clientY; });
+  el.addEventListener('pointerup', (e) => { if (x0 === null) return; const dx = e.clientX - x0, dy = e.clientY - y0; x0 = null; if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) cb(dx < 0 ? 1 : -1); });
+  el.addEventListener('pointercancel', () => { x0 = null; });
+}
 
 export class UI {
   constructor(h) {
     this.h = h;
     this.el = { hud: $('hud'), money: $('money'), coin: $('coin'), lv: $('lvBadge'), goal: $('goalText'), bar: $('goalBar'), num: $('goalNum'),
                 tip: $('tip'), banner: $('banner'), home: $('home'), stars: $('starCount'), list: $('restoreList'), hint: $('restoreHint'),
-                play: $('btnPlay'), levels: $('levels'), grid: $('levelGrid'), settings: $('settings'), win: $('win'), pause: $('pause') };
-    this.lastMoney = -1; this.lastGoal = ''; this.stack = []; this.page = 0;
-    // 花园庄园 (stars from levels 1–15) / 林场牧场 (levels 16–30): one star pool, two estates
-    for (const b of $('homeTabs').children) b.onclick = () => { this.page = +b.dataset.p; this.renderHome(h.data()); };
+                play: $('btnPlay'), levels: $('levels'), grid: $('levelGrid'), settings: $('settings'), win: $('win'), pause: $('pause'),
+                menu: $('menu'), env: $('envInfo'), buildUI: $('build') };
+    this.lastMoney = -1; this.lastGoal = ''; this.stack = []; this.page = 0; this.build = false; this.trayTab = 'build'; this.lvPage = -1;
+    const tapped = (fn) => () => { h.tap(); fn(); };
+    // v4.1 home: estate + 开始游戏 / 选择关卡; top-right 商店 · 设置 · 声音; bottom-right ★ = 装扮庄园
+    for (const b of $('homeTabs').children) b.onclick = () => { this.page = +b.dataset.p; h.tap(); this.renderHome(h.data()); };
+    for (const b of $('trayTabs').children) b.onclick = () => { this.trayTab = b.dataset.t; h.tap(); this.renderHome(h.data()); };
+    $('btnBuild').onclick = tapped(() => this.setBuild(true));
+    $('btnBuildDone').onclick = tapped(() => this.setBuild(false));
+    $('hSound').onclick = () => { const on = !h.data().settings.sound; h.setting('sound', on); if (on) h.tap(); this.renderSound(); };
+    $('hShop').onclick = () => this.openShop();
+    $('coinPill').onclick = () => this.openShop();
+    $('starPill').onclick = tapped(() => this.setBuild(true));
+    $('envChip').onclick = tapped(() => this.openEnv());
+    $('hGear').onclick = tapped(() => this.openMenu());
+    // 设置 baskets
+    $('mDaily').onclick = () => this.openDaily();
+    $('mOrders').onclick = () => this.openOrders();
+    $('mBook').onclick = () => this.openBook();
+    $('mCrew').onclick = () => this.openCrew();
+    $('mBuild').onclick = tapped(() => { this.closeAll(); this.setBuild(true); });
+    $('mEnv').onclick = tapped(() => this.openEnv());
+    $('mMode').onclick = tapped(() => this.openSettings('mode'));
+    $('mQual').onclick = tapped(() => this.openSettings('qual'));
+    $('mSave').onclick = tapped(() => this.openSettings());
     $('btnPause').onclick = () => this.openPause();
     $('btnResume').onclick = () => this.closeModal(this.el.pause);
     $('btnHome').onclick = () => { this.closeAll(); h.home(); };
     $('btnPSettings').onclick = () => this.openSettings();
     $('btnPLevels').onclick = () => this.openLevels();
-    $('hGear').onclick = () => this.openSettings();
-    $('btnLevels').onclick = () => this.openLevels();
+    $('btnLevels').onclick = () => { h.tap(); this.openLevels(); };
+    for (const b of $('lvTabs').children) b.onclick = () => { this.lvPage = +b.dataset.p; h.tap(); this.renderLevels(); };
+    $('lvGo').onclick = () => { const li = +$('lvGo').dataset.li; this.closeAll(); h.start(li); };
+    swipe($('levelGrid').parentNode, (d) => { const n = Math.max(0, Math.min(2, this.lvPage + d)); if (n !== this.lvPage) { this.lvPage = n; h.tap(); this.renderLevels(); } });
     // 商店
     this.el.shop = $('shop'); this.shopTab = 'outfit'; this.shopSel = null;
-    $('btnShop').onclick = () => this.openShop();
-    $('coinPill').onclick = () => this.openShop();
     for (const b of $('shopTabs').children) b.onclick = () => { this.shopTab = b.dataset.t; this.shopSel = null; this.renderShop(); h.tap(); };
     $('shopAct').onclick = () => {
       const it = this.shopSel && itemById(this.shopSel); if (!it) return;
@@ -40,34 +70,39 @@ export class UI {
       else h.shopToggle(it.id);
       this.renderShop();
     };
-    // 订单板 / 雇工
+    // 订单板 / 雇工 / 图鉴 / 每日挑战
     this.el.orders = $('orders'); this.el.crew = $('crew');
-    $('btnOrders').onclick = () => this.openOrders();
-    $('btnCrew').onclick = () => this.openCrew();
-    // v4.0 B 图鉴
     this.el.book = $('book'); this.bookPage = 'crops';
-    $('btnBook').onclick = () => this.openBook();
     for (const b of $('bookTabs').children) b.onclick = () => { this.bookPage = b.dataset.p; h.tap(); this.renderBook(); };
     $('bookClaim').onclick = () => { const r = h.bookClaim(this.bookPage); if (r) this.renderBook(); };
-    // 每日挑战
     this.el.daily = $('daily'); this.el.dres = $('dailyRes');
-    $('btnDaily').onclick = () => this.openDaily();
     $('btnDailyGo').onclick = () => { this.closeAll(); h.dailyStart(); };
     $('btnDrAgain').onclick = () => { this.el.dres.classList.add('hidden'); h.dailyStart(); };
     $('btnDrHome').onclick = () => { this.el.dres.classList.add('hidden'); h.home(); };
     this.el.play.onclick = () => h.play();
     $('btnNext').onclick = () => { this.el.win.classList.add('hidden'); h.next(); };
-    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop, this.el.orders, this.el.crew, this.el.daily, this.el.book]) {
-      m.addEventListener('click', (e) => { if (e.target === m || e.target.hasAttribute('data-close')) this.closeModal(m); });
+    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop, this.el.orders, this.el.crew, this.el.daily, this.el.book, this.el.menu, this.el.env]) {
+      m.addEventListener('click', (e) => { if ((e.target === m && !m.classList.contains('dock')) || (e.target.closest && e.target.closest('[data-close]'))) this.closeModal(m); });
     }
-    $('optSound').onchange = (e) => h.setting('sound', e.target.checked);
+    $('optSound').onchange = (e) => { h.setting('sound', e.target.checked); this.renderSound(); };
     $('optVib').onchange = (e) => h.setting('vib', e.target.checked);
+    for (const b of $('optQual').children) b.onclick = () => { h.setting('quality', b.dataset.q === 'auto' ? 'auto' : +b.dataset.q); h.tap(); this.renderSettings(); };
+    for (const b of $('optMode').children) b.onclick = () => { h.setting('mode', b.dataset.m); h.tap(); this.renderSettings(); };
     const reset = $('btnReset');
     reset.onclick = () => {
       if (!reset.dataset.armed) { reset.dataset.armed = '1'; reset.textContent = '再点一次：确定清空所有进度'; setTimeout(() => { delete reset.dataset.armed; reset.textContent = '重置全部进度'; }, 3000); return; }
       delete reset.dataset.armed; reset.textContent = '重置全部进度';
-      this.closeAll(); this.page = 0; this._auto2 = this._auto3 = false; h.reset();
+      this.closeAll(); this.page = 0; this._auto2 = this._auto3 = false; this.setBuild(false, true); h.reset();
     };
+  }
+  renderSound() { const on = !!this.h.data().settings.sound; $('hSound').classList.toggle('muted', !on); $('hSound').setAttribute('aria-label', on ? '声音：开' : '声音：关'); }
+  // ★ 装扮庄园: build spots with stars, place / store decorations, switch the three estates
+  setBuild(on, quiet) {
+    this.build = !!on;
+    this.el.buildUI.classList.toggle('hidden', !on || this.el.home.classList.contains('hidden'));
+    this.el.home.classList.toggle('building', !!on);
+    document.body.classList.toggle('inbuild', !!on);
+    if (!quiet) { this.renderHome(this.h.data()); this.h.layout(); }
   }
   // modals stack: settings opened from pause returns to pause
   openModal(m) { if (!this.stack.includes(m)) this.stack.push(m); for (const x of this.stack) x.classList.add('hidden'); m.classList.remove('hidden'); this.h.modal(true); }
@@ -86,6 +121,7 @@ export class UI {
 
   showHUD(world) {
     this.el.home.classList.add('hidden'); this.el.hud.classList.remove('hidden'); $('hudBottom').classList.remove('hidden');
+    this.el.buildUI.classList.add('hidden'); this.dock();
     this._earn = []; this._note = ''; this._hudAt = -1e9; this._earnS = null; this._stackS = null; this._noteS = null;
     this.el.lv.textContent = world.daily ? '3:00' : `等级 ${world.li + 1}`;
     this.el.lv.classList.toggle('timer', !!world.daily); this._tm = '';
@@ -153,55 +189,105 @@ export class UI {
 
   showHome(data) {
     this.el.hud.classList.add('hidden'); $('hudBottom').classList.add('hidden'); this.tip(''); this.el.home.classList.remove('hidden');
-    this.renderHome(data);
+    this.el.buildUI.classList.toggle('hidden', !this.build);
+    this.renderHome(data); this.dock();
+  }
+  // two-pane 双屏 (duo, landscape): the 设置 baskets stay docked in the right pane on the farm screen
+  dock() {
+    const on = document.body.classList.contains('twopane') && !this.el.home.classList.contains('hidden') && !this.build;
+    const m = this.el.menu;
+    if (on) { m.classList.add('dock'); if (!this.stack.length) m.classList.remove('hidden'); this.renderMenu(); }
+    else if (m.classList.contains('dock')) { m.classList.remove('dock'); if (!this.stack.includes(m)) m.classList.add('hidden'); }
   }
   renderHome(data) {
     const left = starsLeft(data);
-    this.el.stars.textContent = left;
+    this.el.stars.textContent = left; $('starCount2').textContent = left;
     $('coinCount').textContent = (data.coins || 0).toLocaleString('en-US');
+    this.renderSound();
     const L = CFG.levels.length;
     const next = data.cur ? data.cur.li : Math.min(data.unlocked, L - 1);
     const allDone = data.unlocked >= L && !data.cur;
-    this.el.play.textContent = data.cur ? `继续 第 ${next + 1} 关` : allDone ? `全部通关！再玩第 ${L} 关` : `开始 第 ${next + 1} 关 · ${CFG.levels[next].name}`;
+    this.el.play.querySelector('span').textContent = data.cur ? '继续游戏' : '开始游戏';
+    $('playSub').textContent = allDone ? `全部通关！再玩第 ${L} 关` : `第 ${next + 1} 关 · ${CFG.levels[next].name}`;
     this.el.play.dataset.li = next;
     const restored = new Set(data.restored);
     if (!this.page) this.page = 1;
     if (data.unlocked >= 15 && !this._auto2) { this._auto2 = true; this.page = 2; }   // once past level 15, open on the new farm
     if (data.unlocked >= 38 && !this._auto3) { this._auto2 = this._auto3 = true; this.page = 3; }   // once past level 38, open on the lakeside winery
     const page = this.page, metas = CFG.meta.filter((m) => (m.page || 1) === page);
+    const canAny = CFG.meta.some((m) => !restored.has(m.id) && left >= m.cost && !((m.page || 1) === 3 && data.unlocked < 38));
     for (const b of $('homeTabs').children) {
       const p = +b.dataset.p, todo = CFG.meta.filter((m) => (m.page || 1) === p && !restored.has(m.id)).length;
       b.classList.toggle('on', p === page);
       b.innerHTML = `${TABS[p]}${todo ? '' : '<em>✓</em>'}`;
     }
     const locked3 = page === 3 && data.unlocked < 38;
-    $('restoreHead').textContent = page === 1 ? '用星星修复庄园' : page === 2 ? '用星星建林场牧场' : '用星星建湖畔酒庄';
     const cheapest = metas.filter((m) => !restored.has(m.id)).reduce((a, m) => Math.min(a, m.cost), 99);
-    this.el.hint.textContent = metas.every((m) => restored.has(m.id)) ? (page === 1 ? '· 庄园修好啦！' : page === 2 ? '· 牧场建好啦！' : '· 酒庄建好啦！')
-      : locked3 ? '· 过第 38 关开放' : left >= cheapest ? '· 点一下就能修' : page === 2 && data.unlocked < 15 ? '· 第 16 关起拿星星' : '· 过关拿星星';
-    // v4.0 四季: the season of the real week, and the 每日挑战 button
-    const si = seasonInfo();
-    const sb = $('seasonBadge'); sb.textContent = si.name; sb.className = `sbadge s${si.i}`;
-    $('seasonText').textContent = `${si.full} · ${cropNames(si.crops).join(' ')} +${Math.round(CFG.season.bonus * 100)}% · ${si.left <= 1 ? '明天换季' : `${si.left} 天后换季`}`;
-    const db = $('btnDaily');
-    if (!dailyOpen(data)) { db.className = 'small dailyBtn lock'; db.innerHTML = `每日挑战<small>过第 ${CFG.daily.unlockAfter} 关开放</small>`; }
-    else { const D = data.daily, td = D && D.day === dailyFor(data).day ? D : null; db.className = 'small dailyBtn';
-      db.innerHTML = `每日挑战<small>${td && td.best ? `今日最佳 ${td.best.toLocaleString('en-US')}${td.paid ? ' · ' + TIER_LABEL[td.paid] : ''}` : '今天还没挑战'}</small>`; }
-    // v4.0 B 节日 banner (days left, limited items in the shop) and the 图鉴 red dot
-    const fi = festivalInfo(), fb = $('festBanner');
-    if (fi) { fb.className = `fest ${fi.id}`; $('festText').textContent = `${fi.name}活动 · ${fi.desc} · ${fi.left <= 1 ? '今天最后一天' : `还剩 ${fi.left} 天`} · 商店有限定`; }
-    else fb.className = 'fest hidden';
-    $('bookDot').classList.toggle('hidden', !claimable(data).length);
-    const O = data.orders; $('ordDot').classList.toggle('hidden', !(O && O.list.some((o) => !o.claimed && orderDone(o))));
+    const doneN = metas.filter((m) => restored.has(m.id)).length;
+    this.el.hint.textContent = metas.every((m) => restored.has(m.id)) ? (page === 1 ? '庄园修好啦！' : page === 2 ? '牧场建好啦！' : '酒庄建好啦！')
+      : locked3 ? '过第 38 关开放' : left >= cheapest ? '点卡片或庄园上的虚线圈，用星星建造' : page === 2 && data.unlocked < 15 ? '第 16 关起拿星星' : '过关拿星星';
+    $('buildHint').textContent = `${doneN}/${metas.length}`;
+    // 季节 / 节日: a tiny badge by the title (tap for details)
+    const si = seasonInfo(), fi = festivalInfo();
+    for (const id of ['seasonBadge', 'seasonBadge2']) { const sb = $(id); sb.textContent = si.name; sb.className = `sbadge s${si.i}`; }
+    const fb = $('festBadge'); if (fi) { fb.className = `fbadge ${fi.id}`; fb.textContent = fi.name.slice(0, 1); } else fb.className = 'fbadge hidden';
+    // red dots: 订单 ready / 图鉴 reward → their tile, and the 设置 icon; a spot you can afford → the ★ button
+    const O = data.orders, ordReady = !!(O && O.list.some((o) => !o.claimed && orderDone(o))), bookReady = claimable(data).length > 0;
+    $('ordDot').classList.toggle('hidden', !ordReady); $('bookDot').classList.toggle('hidden', !bookReady);
+    $('gearDot').classList.toggle('hidden', !(ordReady || bookReady));
+    $('buildDot').classList.toggle('hidden', !canAny || this.build); $('mBuildDot').classList.toggle('hidden', !canAny);
+    for (const b of $('trayTabs').children) b.classList.toggle('on', b.dataset.t === this.trayTab);
     this.el.list.innerHTML = '';
-    for (const m of metas) {
+    if (this.trayTab === 'deco') this.renderDecoTray(data);
+    else for (const m of metas) {
       const b = document.createElement('button');
       const done = restored.has(m.id), can = !done && !locked3 && left >= m.cost;
       b.className = 'rbtn' + (done ? ' done' : can ? ' can' : ' poor');
-      b.innerHTML = `<span>${m.name}</span><small>${done ? '✓ 已修好' : (locked3 ? '未开放 ★ ' : '★ ') + m.cost}</small>`;
+      b.innerHTML = `<span>${m.name}</span><small>${done ? '✓ 已建好' : (locked3 ? '未开放 ★' : '★ ') + m.cost}</small>`;
       b.onclick = () => this.h.restore(m.id);
       this.el.list.appendChild(b);
     }
+    if (this.el.menu.classList.contains('dock') || !this.el.menu.classList.contains('hidden')) this.renderMenu();
+  }
+  // 装饰 tray: every decoration you own can be put out on the estate or stored; the rest link to the shop
+  renderDecoTray(data) {
+    const own = new Set(data.shop.owned), list = DECOS.filter((it) => own.has(it.id) || (!it.fest && !it.book) || onSale(it));
+    $('restoreHint').textContent = '摆出来的装饰在庄园和关卡围栏外都看得到';
+    for (const it of list) {
+      const b = document.createElement('button'), o = own.has(it.id), on = isOn(data, it.id);
+      b.className = 'rbtn deco' + (on ? ' done on' : o ? '' : ' poor');
+      b.innerHTML = `<img alt="" src="${this.h.thumb(it) || ''}"><span>${it.name}</span><small>${o ? (on ? '✓ 摆着' : '收着 · 点一下摆出') : `<i class="gc"></i>${it.price} 去商店`}</small>`;
+      b.onclick = () => { if (o) { this.h.shopToggle(it.id); this.renderHome(this.h.data()); } else { this.shopTab = 'deco'; this.shopSel = it.id; this.openShop(); } };
+      this.el.list.appendChild(b);
+    }
+  }
+  // ---------------------------------------------------------------- 设置 (baskets)
+  openMenu() { this.renderMenu(); if (this.el.menu.classList.contains('dock')) return; this.openModal(this.el.menu); }
+  renderMenu() {
+    const d = this.h.data(), O = d.orders;
+    if (!dailyOpen(d)) $('mDailySub').textContent = `过第 ${CFG.daily.unlockAfter} 关开放`;
+    else { const D = d.daily, td = D && D.day === dailyFor(d).day ? D : null; $('mDailySub').textContent = td && td.best ? `今日最佳 ${td.best.toLocaleString('en-US')}${td.paid ? ' · ' + TIER_LABEL[td.paid] : ''}` : '今天还没挑战'; }
+    $('mDaily').classList.toggle('lock', !dailyOpen(d));
+    const ready = O ? O.list.filter((o) => !o.claimed && orderDone(o)).length : 0, open = O ? O.list.filter((o) => !o.claimed).length : 0;
+    $('mOrdSub').textContent = ready ? `${ready} 张可以领取` : `${open} 张进行中`;
+    const T = bookTotals(d); $('mBookSub').textContent = claimable(d).length ? '有奖励可以领' : `已收录 ${T.got}/${T.n}`;
+    $('mCrewSub').textContent = `${ROSTER.length} 人 · 最高 ${Math.max(1, ...d.crew.map((m) => m.lv || 1))} 级`;
+    const left = starsLeft(d); $('mBuildSub').textContent = `★ ${left} · 建造和摆装饰`;
+    const si = seasonInfo(), fi = festivalInfo();
+    $('mEnvT').textContent = fi ? `${si.full} · ${fi.name}` : si.full;
+    $('mEnvSub').textContent = fi ? `${fi.name}还剩 ${fi.left} 天` : `${cropNames(si.crops).join(' ')} +${Math.round(CFG.season.bonus * 100)}%`;
+    const L = this.h.layoutInfo(); $('mModeSub').textContent = d.settings.mode && d.settings.mode !== 'auto' ? MODES[d.settings.mode] : `自动 · ${MODES[L.detected]}`;
+    $('mQualSub').textContent = QNAME[d.settings.quality ?? 'auto'];
+    $('mSaveSub').textContent = `震动${d.settings.vib ? '开' : '关'} · 重置进度`;
+  }
+  openEnv() {
+    const si = seasonInfo(), fi = festivalInfo(), nf = nextFestival();
+    $('seasonText').textContent = `${si.full}（第 ${si.day} 天）· 当季 ${cropNames(si.crops).join(' ')} 生长 +${Math.round(CFG.season.bonus * 100)}% · ${si.left <= 1 ? '明天换季' : `${si.left} 天后换季`}`;
+    const fb = $('festBanner');
+    if (fi) { fb.className = `fest ${fi.id}`; $('festBadge2').textContent = fi.name.slice(0, 1); $('festText').textContent = `${fi.name}活动 · ${fi.desc} · ${fi.left <= 1 ? '今天最后一天' : `还剩 ${fi.left} 天`} · 商店有限定`; }
+    else fb.className = 'fest hidden';
+    $('festNext').textContent = nf ? `下一个节日：${nf.name}（${nf.inDays} 天后）` : '';
+    this.openModal(this.el.env);
   }
   // ---------------------------------------------------------------- 商店
   openShop() {
@@ -314,7 +400,7 @@ export class UI {
   // ---------------------------------------------------------------- 每日挑战
   openDaily() {
     const d = this.h.data();
-    if (!dailyOpen(d)) { this.h.locked(); const b = $('btnDaily'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); return; }
+    if (!dailyOpen(d)) { this.h.locked(); const b = $('mDaily'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); return; }
     this.h.tap();
     const dc = dailyFor(d); if (ensureDay(d, dc.day, dc)) this.h.save();
     const D = d.daily;
@@ -335,28 +421,44 @@ export class UI {
   }
   shopOpenNow() { return !this.el.shop.classList.contains('hidden'); }
   openLevels() {
-    const d = this.h.data(); const g = this.el.grid; g.innerHTML = '';
-    CFG.levels.forEach((L, i) => {
-      const b = document.createElement('button');
-      const lock = i > d.unlocked && !(d.cur && d.cur.li === i);
-      const st = d.stars[i] || 0;
+    const d = this.h.data(), cur = Math.min(CFG.levels.length - 1, d.cur ? d.cur.li : d.unlocked);
+    this.lvPage = Math.floor(cur / 15);
+    this.openModal(this.el.levels); this.renderLevels();
+  }
+  // 45 levels in three pages by estate (1–15 / 16–30 / 31–45): tabs + swipe
+  renderLevels() {
+    const d = this.h.data(), g = this.el.grid, P = this.lvPage; g.innerHTML = '';
+    for (const b of $('lvTabs').children) b.classList.toggle('on', +b.dataset.p === P);
+    for (let i = P * 15; i < Math.min(CFG.levels.length, P * 15 + 15); i++) {
+      const L = CFG.levels[i], b = document.createElement('button');
+      const lock = i > d.unlocked && !(d.cur && d.cur.li === i), st = d.stars[i] || 0;
       b.className = 'lvb' + (lock ? ' lock' : '') + (d.cur && d.cur.li === i ? ' cur' : '');
-      b.innerHTML = `${i + 1}<em>${L.name}</em><small>${lock ? '<i class="lk"></i>' : '★'.repeat(st) + '☆'.repeat(3 - st)}</small>`;
+      b.innerHTML = `<b>${i + 1}</b><em>${L.name}</em><small>${lock ? '<i class="lk"></i>' : '★'.repeat(st) + '☆'.repeat(3 - st)}</small>`;
       b.title = L.name;
       if (!lock) b.onclick = () => { this.closeAll(); this.h.start(i); };
       g.appendChild(b);
-    });
-    this.openModal(this.el.levels);
-    // 30 levels: scroll the next level to play into view
-    const tgt = g.children[Math.min(CFG.levels.length - 1, d.cur ? d.cur.li : d.unlocked)];
-    if (tgt && tgt.scrollIntoView) tgt.scrollIntoView({ block: 'center', inline: 'nearest' });
+    }
+    const next = Math.min(CFG.levels.length - 1, d.cur ? d.cur.li : d.unlocked), go = $('lvGo');
+    go.dataset.li = next; go.textContent = `${d.cur ? '继续' : '开始'} 第 ${next + 1} 关`;
+    const got = Object.values(d.stars).reduce((a, x) => a + x, 0);
+    $('lvNote').textContent = `已得 ★${got} / ${CFG.levels.length * 3} · 左右滑动换页`;
   }
-  openSettings() {
+  openSettings(focus) {
+    this.renderSettings();
+    this.openModal(this.el.settings);
+    const t = focus === 'mode' ? $('optMode') : focus === 'qual' ? $('optQual') : null;
+    if (t && t.scrollIntoView) t.previousElementSibling.scrollIntoView({ block: 'start' });
+  }
+  renderSettings() {
     const d = this.h.data();
     $('optSound').checked = d.settings.sound; $('optVib').checked = d.settings.vib;
-    const vibOk = typeof navigator.vibrate === 'function';
-    $('storeNote').textContent = (storageAvailable() ? '进度自动保存在本机浏览器。' : '这个浏览器不能保存进度，关掉页面后会从头开始。') + (vibOk ? '' : ' 这台设备不支持震动。');
-    this.openModal(this.el.settings);
+    const q = d.settings.quality ?? 'auto', m = d.settings.mode || 'auto', L = this.h.layoutInfo();
+    for (const b of $('optQual').children) b.classList.toggle('on', String(q) === b.dataset.q);
+    for (const b of $('optMode').children) b.classList.toggle('on', m === b.dataset.m);
+    $('modeDet').textContent = `· 这台设备检测为「${MODES[L.detected]}」`;
+    const vibOk = typeof navigator.vibrate === 'function' || !!window.AndroidHaptics;
+    $('storeNote').textContent = (storageAvailable() ? '进度自动保存在本机。' : '这个浏览器不能保存进度，关掉页面后会从头开始。') + (vibOk ? '' : ' 这台设备不支持震动。');
+    this.renderSound();
   }
   showWin(li, stars, t, earned, coins = 0) {
     $('winTitle').textContent = `第 ${li + 1} 关 完成！`;

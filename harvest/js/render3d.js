@@ -82,7 +82,7 @@ export class Renderer {
     this.applyQuality(true);
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     const land = w >= h, vw = land ? VIEW.landW : VIEW.portW, vh = land ? VIEW.landH : VIEW.portH, tv = Math.tan(VIEW.fov * Math.PI / 360);
-    this.dist = Math.max(vw / (2 * tv * (w / h)), vh * SINP / (2 * tv));
+    this.dist = Math.max(vw / (2 * tv * (w / h)), vh * SINP / (2 * tv)) * (this.viewZoom || 1);   // v4.1: a little closer on tablets
     this.z = (h / (2 * tv * this.dist));          // ≈ screen px per world unit at the target (labels, particles)
   }
   applyQuality(force) {
@@ -99,7 +99,7 @@ export class Renderer {
   }
   // adaptive detail: called every frame with the raw frame time
   adapt(rawDt) {
-    if (rawDt > 0.25) return;
+    if (rawDt > 0.25 || this.qLocked) return;   // v4.1: a quality picked in 设置 stays put
     this.frameEma += (rawDt - this.frameEma) * 0.05;
     if (this.frameEma > 1 / 40) { this.slowT += rawDt; this.fastT = 0; if (this.slowT > 2 && this.q > 0) { this.q--; this.drops++; this.slowT = 0; this.frameEma = 1 / 60; this.applyQuality(); } }
     else if (this.frameEma < 1 / 57) { this.fastT += rawDt; this.slowT = 0; if (this.fastT > 12 && this.q < 2 && this.drops < 2) { this.q++; this.fastT = 0; this.applyQuality(); } }

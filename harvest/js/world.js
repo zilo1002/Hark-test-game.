@@ -188,8 +188,10 @@ export class World {
     this.deco = this.L.deco || {};
     for (const o of this.L.objects) this.build(o);
     for (const p of this.procs) p.outObj = p.outTo ? this.objs[p.outTo] : null;
-    this.L.tiles.forEach((t, i) => this.tiles.push({ ...t, order: i, paid: 0, bought: 0, done: false, visible: false,
-      price0: t.price, payFx: 0, appearT: -9, cool: 0 }));
+    this.L.tiles.forEach((t, i) => {
+      const price = t.effect && t.effect.proc ? Math.max(1, Math.round(t.price * CFG.procUp.price)) : t.price;   // v4.1 cheaper machine upgrades
+      this.tiles.push({ ...t, price, order: i, paid: 0, bought: 0, done: false, visible: false, price0: price, payFx: 0, appearT: -9, cool: 0 });
+    });
     this.player = makeCollector('player', this.L.start[0], this.L.start[1]);
     // v4.0 B 宠物狗 (opts.pet = 'dog'); the sims never pass it, so their results are unchanged
     this.dog = opts.pet === 'dog' ? { x: this.player.x - 30, y: this.player.y + 20, vx: 0, vy: 0, moving: false, walk: 0, face: 1, dirY: 0, sway: 0, state: 'follow', fetchT: CFG.pet.every * 0.6, carry: null, n: 0, tgt: null, fetched: 0, wag: 0 } : null;
@@ -472,7 +474,7 @@ export class World {
     if (e.sprinkler) for (const id of e.sprinkler) { const f = this.objs[id]; if (f && f.kind === 'field') { f.growMul = CFG.sprinkler.growMul; f.sprinkler = true; f.sprinklerT = this.t; } }
     if (e.vehicle) { this.player.vehicle = true; this.player.appearT = this.t; this.refreshStats(); }
     if (e.cashier) for (const id of e.cashier) { const c = this.objs[id]; c.cashier = true; if (c.cash > 0) { this.money += c.cash; c.cash = 0; } }
-    if (e.proc) for (const pe of e.proc) { const p = this.objs[pe.id]; p.time *= pe.mul; }
+    if (e.proc) for (const pe of e.proc) { const p = this.objs[pe.id]; p.time *= Math.min(pe.mul, CFG.procUp.timeMul); }
   }
 
   // ---- goal ------------------------------------------------------------------

@@ -125,6 +125,9 @@ export const CFG = {
   counter: { deskW: 30, deskD: 64, deskH: 20, zoneDx: -2, zoneDy: 62, zoneW: 50, zoneH: 44, serveDx: 34, queueGap: 22,
              cashDx: -58, cashDy: 62, stockMax: 300 },
   proc: { bodyW: 56, bodyD: 46, bodyH: 34, zoneDx: -52, zoneW: 42, zoneH: 46, chainMax: 60 },
+  // v4.1 二次加工 machines level up faster: every 快机器 / 快锯片 / 快烤箱 … tile costs 35% less and
+  // cuts the work time to 42% instead of 60% (speed ×2.38 instead of ×1.67)
+  procUp: { price: 0.65, timeMul: 0.42 },
   customer: { speed: 120, interval: 0.8, buyMin: 4, buyMax: 12, serveRate: 14, queue: 5, patience: 1.0 },
   tile: { size: 42 },
   fly: { pick: 0.30, drop: 0.24, lay: 0.5, harvest: 0.42, serve: 0.22, produce: 0.5 },
@@ -255,7 +258,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[420, 330, 340, 100]], hedges: [[40, 600, 180, 22]], trees: [[60, 450, 'round'], [720, 40, 'round']], bushes: [[200, 470], [720, 620]] } },
 
     // 7 — eggs into crates
-    { name: '蛋箱工坊', W: 780, H: 680, start: [440, 420], par: 160, bill: 10,
+    { name: '蛋箱工坊', W: 780, H: 680, start: [440, 420], par: 150, bill: 10,
       goal: { type: 'produce', item: 'crate', n: 310 },
       objects: [
         { id: 'K1', type: 'coop', item: 'egg', producer: 'hen', x: 70, y: 70, w: 330, h: 270, n: 6, max: 20, prefill: 1200 },
@@ -311,7 +314,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[420, 360, 360, 100], [510, 180, 80, 180]], hedges: [[40, 620, 180, 22]], trees: [[60, 470, 'round'], [740, 60, 'round']], bushes: [[200, 480], [560, 640]], barn: [700, 300] } },
 
     // 10 — tulips into flower baskets
-    { name: '花篮工坊', W: 820, H: 700, start: [460, 380], par: 160, bill: 10,
+    { name: '花篮工坊', W: 820, H: 700, start: [460, 380], par: 130, bill: 10,
       goal: { type: 'produce', item: 'basket', n: 370 },
       objects: [
         { id: 'F1', type: 'field', crop: 'tulip', x: 40, y: 40, w: 320, h: 270, gap: 8 },
@@ -353,7 +356,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[470, 380, 430, 100], [540, 140, 80, 260]], hedges: [[820, 700, 70, 22]], trees: [[860, 60, 'round'], [860, 740, 'round']], bushes: [[600, 40], [440, 740]], barn: [680, 120] } },
 
     // 12 — roses into perfume
-    { name: '玫瑰香水', W: 840, H: 720, start: [470, 400], par: 150, bill: 20,
+    { name: '玫瑰香水', W: 840, H: 720, start: [470, 400], par: 130, bill: 20,
       goal: { type: 'produce', item: 'perfume', n: 350 },
       objects: [
         { id: 'R1', type: 'field', crop: 'rose', x: 40, y: 40, w: 330, h: 290, gap: 9 },
@@ -467,7 +470,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[360, 290, 440, 90], [440, 370, 90, 260]], hedges: [[640, 560, 140, 22]], trees: [[760, 600, 'cone'], [760, 60, 'cone']], bushes: [[620, 40], [760, 470]] } },
 
     // 17 — the sawmill: logs in, planks out
-    { name: '锯木厂', W: 820, H: 680, start: [460, 400], par: 150, bill: 10,
+    { name: '锯木厂', W: 820, H: 680, start: [460, 400], par: 130, bill: 10,
       goal: { type: 'produce', item: 'plank', n: 270 },
       objects: [
         { id: 'T1', type: 'field', crop: 'log', x: 40, y: 40, w: 320, h: 300, gap: 30 },
@@ -508,7 +511,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[420, 370, 360, 100]], hedges: [[40, 620, 160, 22]], trees: [[60, 460, 'round'], [740, 40, 'round']], bushes: [[200, 470], [740, 640]], barn: [640, 120] } },
 
     // 19 — milk into cheese
-    { name: '奶酪工坊', W: 800, H: 680, start: [450, 420], par: 160, bill: 10,
+    { name: '奶酪工坊', W: 800, H: 680, start: [450, 420], par: 140, bill: 10,
       goal: { type: 'produce', item: 'cheese', n: 280 },
       objects: [
         { id: 'K1', type: 'coop', item: 'milk', producer: 'cow', x: 80, y: 80, w: 330, h: 270, n: 4, max: 12, prefill: 800 },
@@ -592,7 +595,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[400, 360, 440, 100], [520, 190, 90, 170]], hedges: [[740, 600, 90, 22]], trees: [[800, 680, 'round'], [800, 60, 'round']], bushes: [[600, 40], [400, 700]], barn: [600, 100] } },
 
     // 23 — fluffy sheep, wool into yarn
-    { name: '羊毛牧场', W: 800, H: 700, start: [450, 430], par: 160, bill: 20,
+    { name: '羊毛牧场', W: 800, H: 700, start: [450, 430], par: 140, bill: 20,
       goal: { type: 'sell', item: 'yarn', n: 290 },
       objects: [
         { id: 'S1', type: 'coop', item: 'wool', producer: 'sheep', x: 80, y: 80, w: 330, h: 280, n: 4, max: 14, prefill: 900 },
@@ -630,7 +633,7 @@ export const CFG = {
       deco: { theme: 'garden', paths: [[400, 250, 420, 100], [500, 350, 90, 270]], hedges: [[740, 640, 70, 22]], trees: [[780, 40, 'cone'], [380, 660, 'round']], bushes: [[600, 40], [780, 440]] } },
 
     // 25 — apple orchard: apples fall into the grass, a juice press
-    { name: '苹果园', W: 820, H: 700, start: [460, 430], par: 170, bill: 20,
+    { name: '苹果园', W: 820, H: 700, start: [460, 430], par: 160, bill: 20,
       goal: { type: 'produce', item: 'juice', n: 340 },
       objects: [
         { id: 'A1', type: 'coop', item: 'apple', producer: 'appletree', x: 80, y: 80, w: 340, h: 280, n: 4, max: 11, prefill: 800 },
@@ -648,7 +651,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[440, 380, 380, 100], [530, 190, 80, 190]], hedges: [[40, 640, 180, 22]], trees: [[60, 490, 'round'], [780, 650, 'round']], bushes: [[200, 500], [780, 320]] } },
 
     // 26 — logs → planks → chairs: one machine feeds the next
-    { name: '木椅工坊', W: 880, H: 740, start: [500, 420], par: 180, bill: 20,
+    { name: '木椅工坊', W: 880, H: 740, start: [500, 420], par: 150, bill: 20,
       goal: { type: 'produce', item: 'chair', n: 130 },
       objects: [
         { id: 'T1', type: 'field', crop: 'log', x: 40, y: 40, w: 330, h: 300, gap: 30 },
@@ -770,7 +773,7 @@ export const CFG = {
 
     // ======================= v3.7: levels 31–38 =======================
     // 31 — the wheat mill: wheat into flour, the mill's sails turn while it grinds
-    { name: '麦田磨坊', W: 820, H: 680, start: [460, 400], par: 160, bill: 20,
+    { name: '麦田磨坊', W: 820, H: 680, start: [460, 400], par: 130, bill: 20,
       goal: { type: 'produce', item: 'flour', n: 330 },
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 320, h: 300, gap: 9 },
@@ -791,7 +794,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[380, 350, 440, 100], [500, 180, 90, 170]], hedges: [[700, 560, 100, 22]], trees: [[780, 640, 'round'], [780, 280, 'round']], bushes: [[400, 40], [780, 40]] } },
 
     // 32 — the bakery: wheat → flour → bread, two machines in a row
-    { name: '面包房', W: 880, H: 740, start: [500, 420], par: 180, bill: 20,
+    { name: '面包房', W: 880, H: 740, start: [500, 420], par: 130, bill: 20,
       goal: { type: 'produce', item: 'bread', n: 130 },
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 330, h: 300, gap: 9 },
@@ -834,7 +837,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[360, 290, 440, 90], [440, 370, 90, 260]], hedges: [[680, 560, 100, 22]], trees: [[760, 600, 'round'], [760, 60, 'cone']], bushes: [[620, 40], [760, 470]] } },
 
     // 34 — the smokehouse: fish into smoked fish
-    { name: '熏鱼房', W: 820, H: 680, start: [460, 400], par: 160, bill: 20,
+    { name: '熏鱼房', W: 820, H: 680, start: [460, 400], par: 140, bill: 20,
       goal: { type: 'produce', item: 'smoked', n: 330 },
       objects: [
         { id: 'P1', type: 'field', crop: 'fish', x: 40, y: 40, w: 320, h: 300, gap: 16 },
@@ -876,7 +879,7 @@ export const CFG = {
       deco: { theme: 'garden', paths: [[380, 350, 440, 100], [500, 180, 90, 170]], hedges: [[720, 580, 90, 22]], trees: [[780, 660, 'cone'], [780, 60, 'cone']], bushes: [[380, 680], [600, 40]] } },
 
     // 36 — the grape juicer
-    { name: '葡萄汁坊', W: 820, H: 700, start: [460, 430], par: 180, bill: 20,
+    { name: '葡萄汁坊', W: 820, H: 700, start: [460, 430], par: 160, bill: 20,
       goal: { type: 'sell', item: 'gjuice', n: 300 },
       objects: [
         { id: 'G1', type: 'field', crop: 'grape', x: 40, y: 40, w: 320, h: 300, gap: 9, gapY: 24 },
@@ -920,7 +923,7 @@ export const CFG = {
       deco: { theme: 'garden', greenhouse: [[38, 38, 314, 304], [38, 408, 314, 324]], paths: [[380, 380, 520, 100], [640, 120, 80, 260]], hedges: [[820, 700, 70, 22]], trees: [[860, 740, 'cone'], [860, 60, 'round']], bushes: [[700, 40], [480, 40]] } },
 
     // 38 — the night farm: lanterns and fireflies; wheat → flour → bread, and greenhouse tomatoes → ketchup
-    { name: '夜间农场', W: 1000, H: 860, start: [560, 500], par: 230, bill: 50,
+    { name: '夜间农场', W: 1000, H: 860, start: [560, 500], par: 190, bill: 50,
       goal: { type: 'earn', n: 13600 },
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 300, h: 300, gap: 9 },
@@ -947,7 +950,7 @@ export const CFG = {
 
     // ======================= v3.7 part B: levels 39–45 — the lakeside winery =======================
     // 39 — the lakeside fishing village: two ponds, fishermen, a smokehouse; sell fish and smoked fish
-    { name: '湖畔渔村', W: 900, H: 760, start: [500, 420], par: 190, bill: 20,
+    { name: '湖畔渔村', W: 900, H: 760, start: [500, 420], par: 170, bill: 20,
       goal: { type: 'earn', n: 9800 },
       objects: [
         { id: 'P1', type: 'field', crop: 'fish', x: 40, y: 40, w: 330, h: 300, gap: 16 },
@@ -969,7 +972,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[400, 360, 480, 100], [520, 130, 90, 230]], hedges: [[780, 660, 90, 22]], trees: [[840, 700, 'cone'], [840, 60, 'round']], bushes: [[420, 40], [840, 440]] } },
 
     // 40 — the winery: grapes → grape juice → wine, aged in big oak barrels
-    { name: '葡萄酒庄', W: 900, H: 760, start: [500, 420], par: 180, bill: 20,
+    { name: '葡萄酒庄', W: 900, H: 760, start: [500, 420], par: 140, bill: 20,
       goal: { type: 'produce', item: 'wine', n: 130 },
       objects: [
         { id: 'G1', type: 'field', crop: 'grape', x: 40, y: 40, w: 330, h: 300, gap: 9, gapY: 24 },
@@ -991,7 +994,7 @@ export const CFG = {
       deco: { theme: 'garden', paths: [[400, 360, 480, 100], [520, 130, 90, 230]], hedges: [[780, 660, 90, 22]], trees: [[840, 700, 'cone'], [840, 60, 'cone']], bushes: [[420, 40], [840, 440]] } },
 
     // 41 — the greenhouse ketchup works: greenhouse tomatoes into ketchup, sweet peppers on the side
-    { name: '温室番茄酱厂', W: 940, H: 800, start: [540, 440], par: 190, bill: 20,
+    { name: '温室番茄酱厂', W: 940, H: 800, start: [540, 440], par: 180, bill: 20,
       goal: { type: 'earn', n: 11500 },
       objects: [
         { id: 'T1', type: 'field', crop: 'tomato', x: 50, y: 50, w: 300, h: 290, gap: 11 },
@@ -1040,7 +1043,7 @@ export const CFG = {
               paths: [[400, 380, 500, 100], [540, 120, 80, 260]], hedges: [[740, 740, 80, 20]], trees: [[885, 750, 'cone'], [880, 40, 'round']], bushes: [[600, 40], [480, 40]] } },
 
     // 43 — the morning bread market: wheat → flour → bread, sold from two market stalls
-    { name: '早市面包摊', W: 960, H: 820, start: [540, 450], par: 220, bill: 20,
+    { name: '早市面包摊', W: 960, H: 820, start: [540, 450], par: 170, bill: 20,
       goal: { type: 'sell', item: 'bread', n: 160 },
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 330, h: 320, gap: 9 },

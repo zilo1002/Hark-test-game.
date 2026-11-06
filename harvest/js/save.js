@@ -16,7 +16,7 @@ try {
 export const storageAvailable = () => !!storage;
 
 export function defaults() {
-  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults(), daily: dailyDefaults(), book: { ...bookDefaults(), filled: true } };
+  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true, mode: 'auto', quality: 'auto' }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults(), daily: dailyDefaults(), book: { ...bookDefaults(), filled: true } };
 }
 
 export function load() {

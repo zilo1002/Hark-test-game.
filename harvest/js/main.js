@@ -6,7 +6,7 @@ import { FX } from './fx.js';
 import { Input } from './input.js';
 import { Sound, Haptics } from './audio.js';
 import * as Save from './save.js';
-import { drawHome } from './home.js';
+import { drawHome, hitSpot } from './home.js';
 import { UI } from './ui.js';
 import * as Shop from './shop.js';
 import { Preview } from './preview3d.js';
@@ -16,6 +16,7 @@ import * as Seasons from './seasons.js';
 import * as Daily from './daily.js';
 import * as Book from './book.js';
 import * as Fest from './festival.js';
+import { applyMode } from './layout.js';
 
 const cv = document.getElementById('cv'), gl = document.getElementById('gl');
 const R = new Renderer(cv, gl), fx = new FX(), input = new Input(cv), snd = new Sound(), hap = new Haptics();
@@ -42,7 +43,9 @@ const ui = new UI({
   restore: (id) => restore(id),
   modal: (on) => { modalOpen = on; input.enabled = !on; if (on) snapshot(); },
   world: () => world,
-  setting: (k, v) => { data.settings[k] = v; if (k === 'sound') { snd.on = v; if (v) snd.unlock(); } if (k === 'vib') { hap.on = v; if (v) hap.buzz(60, 255); } Save.save(data); },
+  layout: () => relayout(),
+  layoutInfo: () => LAY,
+  setting: (k, v) => { data.settings[k] = v; if (k === 'mode') relayout(); if (k === 'quality') applyQualitySetting(); if (k === 'sound') { snd.on = v; if (v) snd.unlock(); } if (k === 'vib') { hap.on = v; if (v) hap.buzz(60, 255); } Save.save(data); },
   reset: () => { Save.wipe(); data = Save.load(); data.coins = 0; Save.save(data); applyLook(); world = null; for (const k in restoredAt) delete restoredAt[k]; goHome(); },
   data: () => data,
   starSfx: (i) => { snd.blip(880 + i * 220, 0.18, 'triangle', 0.16); hap.tick(18, 0); },
@@ -91,14 +94,31 @@ applyLook();
 
 input.onFirst = () => snd.unlock();
 
-let _hp = null;
-function homePanelH() { if (!_hp) _hp = document.querySelector('#home .panel'); return _hp ? _hp.offsetHeight : 0; }
-function resize() {
+// v4.1 界面模式: body classes for the layout (auto-detected or chosen in 设置), the estate's screen
+// rectangle (from #estateArea, which the CSS places per mode) and a closer level camera on tablets
+let LAY = { mode: 'phone-l', dev: 'phone', land: true, detected: 'phone-l' }, estateRect = null;
+const VIEW_ZOOM = { phone: 1, duo: 0.95, tab: 0.88, ipad: 0.9 };
+function relayout() {
+  LAY = applyMode(data.settings.mode || 'auto');
+  R.viewZoom = VIEW_ZOOM[LAY.dev] || 1;
   R.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1);
   if (world) R.follow(0, true);
+  estateRect = null;
+  if (ui) { ui.dock(); if (mode === 'home') ui.renderHome(data); }
 }
-window.addEventListener('resize', resize);
-resize();
+function areaRect() {
+  if (!estateRect) { const e = document.getElementById('estateArea'), r = e && e.getBoundingClientRect(); estateRect = r && r.width > 40 && r.height > 40 ? { x: r.left, y: r.top, w: r.width, h: r.height } : { x: 0, y: 56, w: R.W, h: R.H - 64 }; }
+  return estateRect;
+}
+function applyQualitySetting() { const q = data.settings.quality; if (q === 0 || q === 1 || q === 2) { R.q = q; R.qLocked = true; } else { R.qLocked = false; } R.applyQuality(); }
+window.addEventListener('resize', relayout);
+relayout(); applyQualitySetting();
+// tap a dashed ring on the estate (装扮 mode) to build that spot with stars
+cv.addEventListener('pointerup', (e) => {
+  if (mode !== 'home' || modalOpen || !ui.build) return;
+  const id = hitSpot(R.W, R.H, areaRect(), ui.page || 1, data, e.clientX, e.clientY);
+  if (id) restore(id);
+});
 
 let forceRain = null;   // ?debug: force the next run rainy / dry
 function start(li) {
@@ -171,7 +191,7 @@ function goHome(fromWin) {
   if (world && world.daily) { credit(); Save.save(data); world = null; }   // leaving a daily run mid-way gives it up
   else if (world && !world.won) snapshot(); else if (world) { credit(); Save.save(data); }
   Orders.ensureOrders(data);
-  mode = 'home'; R.setMode('home'); ui.hideAll(); ui.el.banner.classList.add('hidden'); ui.showHome(data); fx.clear();
+  mode = 'home'; R.setMode('home'); ui.hideAll(); estateRect = null; ui.el.banner.classList.add('hidden'); ui.showHome(data); fx.clear();
   input.enabled = true; modalOpen = false;
   if (fromWin) { /* stars freshly earned: nudge the cheapest affordable item */ }
 }
@@ -306,7 +326,7 @@ function frame(now) {
     saveT += dt; if (saveT > 5) { saveT = 0; snapshot(); }
   } else {
     fx.update(dt);
-    drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: Seasons.currentSeason(), fest: Fest.currentFestival() }, time, R.dpr, R.W > R.H * 1.15, ui.page || 1, homePanelH());
+    drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: Seasons.currentSeason(), fest: Fest.currentFestival(), build: ui.build }, time, R.dpr, areaRect(), ui.page || 1);
     R.g.setTransform(R.dpr, 0, 0, R.dpr, 0, 0); R.fxScreen(fx);
     if (preview && ui.shopOpenNow()) {   // turntable preview inside the shop
       const c = preview.cv, w = c.clientWidth, h = c.clientHeight;
@@ -339,6 +359,8 @@ if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
     festival: (id) => { Fest.forceFestival(id); applyLook(); if (mode === 'home') ui.renderHome(data); return Fest.festivalInfo(); },
     book: (p) => ui.openBook(p),
     dailyFinish: () => { if (!world || !world.daily) return null; while (!world.won) { world.events.length = 0; world.update(1 / 30, 0, 0); } return world.score; },
+    // v4.1: force a layout mode ('auto' | 'phone-p' | 'phone-l' | 'duo' | 'tab' | 'ipad'), open 设置 / 装扮 / 关卡
+    mode: (m) => { data.settings.mode = m || 'auto'; relayout(); return LAY; }, menu: () => ui.openMenu(), build: (on = true) => ui.setBuild(on), levels: () => ui.openLevels(), settings: () => ui.openSettings(), env: () => ui.openEnv(),
     shop: () => ui.openShop(), Shop, Crew, Orders, credit, orders: () => ui.openOrders(), crew: () => ui.openCrew(), applyLook, save: () => Save.save(data),
     // walk the bot into a field until the stack is tall (for screenshots of a cutting run)
     tallStack(n, extraCap = 0) {

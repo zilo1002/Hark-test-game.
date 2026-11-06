@@ -46,6 +46,10 @@ export const sph = (r, w = 8, h = 6) => G[`s${r},${w},${h}`] || (G[`s${r},${w},$
 export const ico = (r, d = 0) => G[`i${r},${d}`] || (G[`i${r},${d}`] = new THREE.IcosahedronGeometry(r, d));
 export const cone = (r, h, s = 8) => G[`k${r},${h},${s}`] || (G[`k${r},${h},${s}`] = new THREE.ConeGeometry(r, h, s));
 export const cap = (r, l, cs = 3, rs = 8) => G[`p${r},${l}`] || (G[`p${r},${l}`] = new THREE.CapsuleGeometry(r, l, cs, rs));
+// v4.1 outfit fitting: a dome (top half of a sphere) for caps / beanies, and a curved front panel
+// (an open cylinder segment centred on +Z) for aprons, bibs and shirt fronts that hug the torso
+export const dome = (r, w = 12, h = 6) => G[`d${r},${w},${h}`] || (G[`d${r},${w},${h}`] = new THREE.SphereGeometry(r, w, h, 0, Math.PI * 2, 0, Math.PI / 2));
+export const panel = (rt, rb, h, len) => G[`f${rt},${rb},${h},${len}`] || (G[`f${rt},${rb},${h},${len}`] = new THREE.CylinderGeometry(rt, rb, h, 10, 1, true, -len / 2, len));
 export const tor = (r, t, rs = 4, ts = 10, arc = Math.PI * 2) => G[`t${r},${t},${arc}`] || (G[`t${r},${t},${arc}`] = new THREE.TorusGeometry(r, t, rs, ts, arc));
 
 const H = Math.PI / 2;
@@ -421,32 +425,50 @@ export function makePerson(o = {}) {
   root.add(body);
   const M = (c) => colMat(c);
   const mesh = (geo, c, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new THREE.Mesh(geo, M(c)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; return m; };
-  // legs: pivot at the hip
+  // legs: pivot at the hip (leg = capsule r 2.5 from hip y −10.7 to +0.3; hips at x ±3.1)
   const legs = [];
   for (const s of [-1, 1]) {
     const hip = new THREE.Group(); hip.position.set(s * 3.1, 12.5, 0);
     hip.add(mesh(cap(2.5, 6, 2, 7), o.pants || '#3A4A78', 0, -5.2, 0));
-    if (o.boots) {   // 商店 boots: taller, rolled cuff (gold ones get a shiny band)
-      hip.add(mesh(box(5.2, 6.2, 5.6), o.boots, 0, -8.6, 0.2)); hip.add(mesh(box(5.4, 2.8, 7.2), o.boots, 0, -10.6, 1.2));
-      hip.add(mesh(box(5.8, 1.2, 6.0), o.bootGold ? '#FFF2A0' : '#FFFFFF', 0, -5.6, 0.2));
+    if (o.boots) {   // 商店 boots (v4.1 fitted): a round shaft just outside the leg, the shoe replaced by a boot foot, a slim cuff
+      hip.add(mesh(cyl(2.85, 2.8, 5.8, 10), o.boots, 0, -8.0, 0));
+      hip.add(mesh(box(4.8, 2.6, 6.6), o.boots, 0, -10.6, 1.1));
+      hip.add(mesh(cyl(2.95, 2.95, 1.1, 10), o.bootGold ? '#FFF2A0' : '#FFFFFF', 0, -5.0, 0));
+      if (o.bootGold) hip.add(mesh(cyl(2.9, 2.9, 0.6, 10), '#FFF2A0', 0, -9.0, 0));
     } else hip.add(mesh(box(4.6, 2.6, 6.4), o.shoes || '#5A3414', 0, -10.6, 1.0));
     body.add(hip); legs.push(hip);
   }
-  // torso
+  // torso (capsule r 6.4, z ×0.86, local y −2.7…15.5; the head sphere covers it above y ≈ 10)
   const torso = new THREE.Group(); torso.position.set(0, 12, 0); body.add(torso);
+  // v4.1: a vest / 礼服 replaces the shirt colour of the body itself (no layered shell), with the shirt as a front panel
   if (o.dress) torso.add(mesh(cyl(5.2, 7.6, 12, 9), o.dress, 0, 5.5, 0));
-  else torso.add(mesh(cap(6.4, 5.4, 3, 9), o.shirt || '#FFFFFF', 0, 6.4, 0, 1, 1, 0.86));
-  if (o.vest) torso.add(mesh(cyl(6.2, 6.6, 7.5, 9, 1), o.vest, 0, 6.4, 0, 1.04, 1, 0.92));
-  if (o.overalls) { torso.add(mesh(cyl(6.3, 6.8, 6.5, 9), o.overalls, 0, 3.6, 0, 1.03, 1, 0.92)); torso.add(mesh(box(6.2, 5, 1.2), o.overalls, 0, 8.4, 5.5)); }
-  if (o.apron) {   // 碎花围裙: a white bib apron with pink dots
-    torso.add(mesh(box(8.4, 9.6, 1.0), o.apron, 0, 4.4, 5.4)); torso.add(mesh(box(5.6, 3.4, 1.0), o.apron, 0, 10.2, 5.0));
-    for (const [x, y] of [[-2.4, 7.6], [2.2, 5.4], [-1.2, 2.4], [2.6, 1.2], [0.4, 10.4], [-3, 0.8]]) torso.add(mesh(sph(0.75, 5, 4), o.apronDot || '#FF6F92', x, y, 6.0));
+  else torso.add(mesh(cap(6.4, 5.4, 3, 9), o.vest || o.shirt || '#FFFFFF', 0, 6.4, 0, 1, 1, 0.86));
+  const front = (geo, c, y, zs = 0.9) => mesh(geo, c, 0, y, 0, 1, 1, zs);
+  if (o.vest) {
+    torso.add(front(panel(6.6, 6.75, 7.2, 0.9), o.shirt || '#FFFFFF', 7.6));
+    for (const y of [5.6, 3.4]) torso.add(mesh(sph(0.6, 5, 4), '#7A5A10', 0, y, 6.25));
   }
-  if (o.bowtie) torso.add(mesh(box(4.2, 1.8, 1.2), o.bowColor || '#C8352A', 0, 11.2, 5.4));
-  if (o.scarf) {   // 围巾: a chunky knit ring at the neck with a tail hanging in front
-    const cols = o.scarf === 'rainbow' ? ['#FF4D4D', '#FFD23F', '#3BA7FF'] : [o.scarf, o.scarf, o.scarf];
-    cols.forEach((c, i) => { const r = new THREE.Mesh(tor(5.4 - i * 0.2, 1.25, 5, 12), M(c)); r.rotation.x = H; r.position.set(0, 12.2 + i * 1.5, 0.3); r.castShadow = true; torso.add(r); });
-    torso.add(mesh(box(2.8, 7, 1.4), cols[0], 2.6, 7.6, 6.2)); torso.add(mesh(box(2.8, 2.2, 1.5), cols[2], 2.6, 4.2, 6.3));
+  if (o.overalls) {   // trousers part round the hips + a fitted bib + two buttons
+    torso.add(mesh(cyl(6.55, 6.9, 6.2, 12), o.overalls, 0, 3.4, 0, 1, 1, 0.9));
+    torso.add(front(panel(6.62, 6.62, 4.6, 1.15), o.overalls, 8.6));
+    for (const sx of [-1, 1]) torso.add(mesh(sph(0.7, 5, 4), '#FFD23F', sx * 2.6, 10.2, 5.95));
+  }
+  if (o.apron) {   // 碎花围裙: a skirt panel and a bib that follow the curve of the body, dots on its surface
+    torso.add(front(panel(6.7, 7.3, 8.2, 1.5), o.apron, 3.5));
+    torso.add(front(panel(6.55, 6.7, 4.0, 1.0), o.apron, 9.4));
+    for (const [a, y] of [[-0.45, 6.4], [0.35, 4.6], [-0.15, 2.0], [0.55, 1.2], [0.05, 10.0], [-0.55, 0.6], [0.4, 8.8]]) {
+      const R = (y > 7.5 ? 6.62 : 6.9 + (7.6 - y) * 0.07) + 0.15;
+      torso.add(mesh(sph(0.62, 5, 4), o.apronDot || '#FF6F92', Math.sin(a) * R, y, Math.cos(a) * R * 0.9, 1, 1, 0.5));
+    }
+  }
+  if (o.bowtie) torso.add(mesh(box(4.2, 1.8, 1.2), o.bowColor || '#C8352A', 0, 10.6, 6.0));
+  if (o.scarf) {   // 围巾 (v4.1 fitted): rings on the shoulders just outside the neck (they tuck under the sleeves),
+    // tail hanging down the chest centre, clear of the arms even when they hug the stack
+    const cols = o.scarf === 'rainbow' ? ['#FF4D4D', '#FFD23F', '#3BA7FF'] : [o.scarf, o.scarf];
+    // the ring is tilted: low under the chin in front (clear of the face), higher at the back over the collar
+    const sc = new THREE.Group(); sc.position.set(0, 9.9, -0.3); sc.rotation.x = 0.24; torso.add(sc);
+    cols.forEach((c, i) => { const r = new THREE.Mesh(tor(6.75 - i * 0.12, 1.1, 6, 16), M(c)); r.rotation.x = H; r.position.y = i * 0.9; r.scale.set(1, 0.92, 1); r.castShadow = true; sc.add(r); });
+    torso.add(mesh(box(2.6, 4.6, 1.2), cols[0], 1.5, 5.4, 6.25)); torso.add(mesh(box(2.6, 1.6, 1.3), cols[cols.length - 1], 1.5, 2.6, 6.2));
   }
   // arms: pivot at the shoulder
   const arms = [];
@@ -463,68 +485,69 @@ export function makePerson(o = {}) {
   const hm = new THREE.Mesh(HAIR_GEO, M(hair)); hm.position.set(0, 0.8, -0.4); hm.rotation.x = -0.42; hm.castShadow = true; head.add(hm);
   head.add(mesh(sph(6.6, 10, 7), hair, 0, -0.4, -2.6, 1.05, 1, 0.8));
   for (const s of [-1, 1]) {
-    const eye = new THREE.Mesh(sph(1.05, 6, 5), M('#2A1A10')); eye.position.set(s * 2.6, 0.2, 7.6); eye.scale.set(1, 1.3, 0.6); head.add(eye);
-    const cheek = new THREE.Mesh(sph(1.3, 6, 4), M('#FF9C8A')); cheek.position.set(s * 4.4, -2.4, 6.6); cheek.scale.set(1, 0.6, 0.4); head.add(cheek);
+    const eye = new THREE.Mesh(sph(1.05, 6, 5), M('#2A1A10')); eye.position.set(s * 2.6, 0.2, 7.6); eye.scale.set(1, 1.3, 0.6); eye.visible = o.hat !== 'pumpkin'; head.add(eye);
+    const cheek = new THREE.Mesh(sph(1.3, 6, 4), M('#FF9C8A')); cheek.position.set(s * 4.4, -2.4, 6.6); cheek.scale.set(1, 0.6, 0.4); cheek.visible = o.hat !== 'pumpkin'; head.add(cheek);
   }
-  const nose = new THREE.Mesh(sph(1.1, 6, 4), M('#F2B486')); nose.position.set(0, -1.2, 8.1); head.add(nose);
+  const nose = new THREE.Mesh(sph(1.1, 6, 4), M('#F2B486')); nose.position.set(0, -1.2, 8.1); nose.visible = o.hat !== 'pumpkin'; head.add(nose);
   if (o.beard) head.add(mesh(sph(5, 8, 6), o.beard, 0, -4.4, 4.2, 1.1, 0.7, 0.6));
   if (o.hat === 'beanie') {
-    head.add(mesh(sph(7.9, 10, 6, 0), o.capColor || '#E8452C', 0, 2.2, 0, 1, 0.85, 1));
-    head.add(mesh(cyl(8, 8, 2, 10), '#FFFFFF', 0, 2.4, 0));
-    head.add(mesh(sph(2.2, 6, 5), '#FFFFFF', 0, 9.6, 0));
+    head.add(mesh(dome(8.45, 12, 6), o.capColor || '#E8452C', 0, 2.2, -0.4, 1, 0.92, 1));
+    head.add(mesh(cyl(8.6, 8.6, 2, 12), '#FFFFFF', 0, 2.6, -0.4));
+    head.add(mesh(sph(2.2, 6, 5), '#FFFFFF', 0, 10.4, -0.6));
   } else if (o.hat === 'straw') {
     head.add(mesh(cyl(11, 11, 0.9, 12), '#F2CF6B', 0, 5.2, 0));
     head.add(mesh(cyl(6.2, 7.2, 4.6, 10), '#E8BE4E', 0, 7.6, 0));
     head.add(mesh(cyl(7.25, 7.25, 1.2, 10), '#C8352A', 0, 6.0, 0));
   } else if (o.hat === 'cap') {
-    head.add(mesh(sph(7.9, 10, 6, 0), o.capColor || '#3B7FE0', 0, 2.4, 0, 1, 0.75, 1));
-    head.add(mesh(box(8, 0.9, 6), o.capColor || '#3B7FE0', 0, 2.6, 7.4));
+    head.add(mesh(dome(8.35, 12, 6), o.capColor || '#3B7FE0', 0, 2.4, -0.4, 1, 0.82, 1));
+    head.add(mesh(box(8, 0.9, 6), o.capColor || '#3B7FE0', 0, 2.6, 8.4));
   }
   else if (o.hat === 'rain') {   // v3.7 渔夫: a yellow sou'wester, long brim at the back
-    head.add(mesh(sph(7.9, 10, 6, 0), o.capColor || '#FFC21A', 0, 2.6, 0, 1, 0.78, 1));
+    head.add(mesh(dome(8.35, 12, 6), o.capColor || '#FFC21A', 0, 2.6, -0.4, 1, 0.84, 1));
     head.add(mesh(cyl(10.5, 11.5, 1.1, 12), o.capColor || '#FFC21A', 0, 3.6, -1.4, 1, 1, 1.05));
-    head.add(mesh(cyl(8.05, 8.05, 1.1, 10), '#E8A20E', 0, 4.6, 0));
+    head.add(mesh(cyl(8.45, 8.45, 1.1, 12), '#E8A20E', 0, 4.6, -0.4));
   }
   else if (o.hat === 'cowboy') {
     head.add(mesh(cyl(12.5, 12.5, 0.9, 14), '#A0622D', 0, 5.0, 0, 1, 1, 0.82));
     for (const s of [-1, 1]) head.add(mesh(box(3, 0.9, 16), '#A0622D', s * 11.2, 6.3, 0, 1, 1, 0.8));
-    head.add(mesh(cyl(5.4, 6.8, 6.4, 10), '#B87436', 0, 8.6, 0));
-    head.add(mesh(cyl(6.9, 6.9, 1.4, 10), '#5A3414', 0, 6.4, 0));
+    head.add(mesh(cyl(5.6, 7.2, 6.4, 12), '#B87436', 0, 8.6, -0.4));
+    head.add(mesh(cyl(7.3, 7.3, 1.4, 12), '#5A3414', 0, 6.4, -0.4));
     head.add(mesh(box(6, 1.2, 9), '#9A5A28', 0, 11.6, 0));
   } else if (o.hat === 'chef') {
-    head.add(mesh(cyl(6.8, 6.8, 3.4, 12), '#FFFFFF', 0, 5.6, 0));
-    head.add(mesh(sph(7.2, 10, 7), '#FFFFFF', 0, 11.6, 0, 1.15, 0.8, 1.1));
-    for (const [x, z] of [[-4, 2], [4, 2], [0, -4]]) head.add(mesh(sph(4.2, 8, 6), '#F4F4F4', x, 13.6, z));
+    head.add(mesh(cyl(7.7, 7.7, 3.6, 14), '#FFFFFF', 0, 6.0, -0.4));
+    head.add(mesh(sph(7.2, 10, 7), '#FFFFFF', 0, 12.2, -0.4, 1.15, 0.8, 1.1));
+    for (const [x, z] of [[-4, 1.6], [4, 1.6], [0, -4.4]]) head.add(mesh(sph(4.2, 8, 6), '#F4F4F4', x, 14.2, z));
   } else if (o.hat === 'flower') {
-    const ring = new THREE.Mesh(tor(7.2, 0.9, 4, 14), M('#4FAE32')); ring.rotation.x = H; ring.position.y = 4.4; head.add(ring);
+    // v4.1: sits on the hair (r 7.9 round y 0.8) instead of sinking into the face
+    const ring = new THREE.Mesh(tor(7.6, 0.9, 5, 18), M('#4FAE32')); ring.rotation.x = H; ring.position.set(0, 5.0, -0.4); head.add(ring);
     const fc = ['#FF6F92', '#FFE16B', '#FFFFFF', '#B07ACC'];
-    for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2; head.add(mesh(sph(1.9, 7, 5), fc[k % 4], Math.sin(a) * 7.2, 5.0, Math.cos(a) * 7.2)); head.add(mesh(sph(0.8, 5, 4), '#FFB800', Math.sin(a) * 7.9, 5.3, Math.cos(a) * 7.9)); }
+    for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2; head.add(mesh(sph(1.85, 7, 5), fc[k % 4], Math.sin(a) * 8.0, 5.5, -0.4 + Math.cos(a) * 8.0)); head.add(mesh(sph(0.8, 5, 4), '#FFB800', Math.sin(a) * 9.0, 5.9, -0.4 + Math.cos(a) * 9.0)); }
   } else if (o.hat === 'bow') {
-    for (const s of [-1, 1]) head.add(mesh(sph(3.8, 8, 6), '#FF4D6D', s * 4.4, 8.2, -1, 1.25, 0.9, 0.6));
-    head.add(mesh(sph(2, 7, 5), '#E8283C', 0, 8.2, -0.6));
+    for (const s of [-1, 1]) head.add(mesh(sph(3.8, 8, 6), '#FF4D6D', s * 4.4, 9.4, -1.4, 1.25, 0.9, 0.6));
+    head.add(mesh(sph(2, 7, 5), '#E8283C', 0, 9.6, -1.0));
   } else if (o.hat === 'crown') {
-    head.add(mesh(cyl(6.4, 6, 3.6, 12), '#FFC21A', 0, 7.6, 0));
-    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; head.add(mesh(cone(1.6, 4, 5), '#FFD23F', Math.sin(a) * 5.4, 11.2, Math.cos(a) * 5.4)); head.add(mesh(sph(0.9, 5, 4), '#FFF6B0', Math.sin(a) * 5.4, 13.4, Math.cos(a) * 5.4)); }
-    head.add(mesh(sph(1.4, 6, 5), '#E8283C', 0, 7.8, 6.4)); head.add(mesh(sph(1.1, 6, 5), '#3BA7FF', 4.6, 7.8, 4.4)); head.add(mesh(sph(1.1, 6, 5), '#4CD08A', -4.6, 7.8, 4.4));
+    head.add(mesh(cyl(7.0, 6.7, 3.6, 14), '#FFC21A', 0, 7.6, -0.4));
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; head.add(mesh(cone(1.6, 4, 5), '#FFD23F', Math.sin(a) * 6.2, 11.2, -0.4 + Math.cos(a) * 6.2)); head.add(mesh(sph(0.9, 5, 4), '#FFF6B0', Math.sin(a) * 6.2, 13.4, -0.4 + Math.cos(a) * 6.2)); }
+    head.add(mesh(sph(1.4, 6, 5), '#E8283C', 0, 7.6, 6.6)); head.add(mesh(sph(1.1, 6, 5), '#3BA7FF', 4.8, 7.6, 4.2)); head.add(mesh(sph(1.1, 6, 5), '#4CD08A', -4.8, 7.6, 4.2));
   } else if (o.hat === 'pumpkin') {   // v4.0 B 万圣节 南瓜头: a carved pumpkin worn over the head
-    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; head.add(mesh(sph(4.6, 8, 6), k % 2 ? '#F2871E' : '#E8761A', Math.sin(a) * 4.8, 2.2, Math.cos(a) * 4.8, 0.8, 1.15, 0.8)); }
-    head.add(mesh(sph(7.6, 10, 8), '#F2871E', 0, 2.2, 0, 1.08, 0.95, 1.08));
-    head.add(mesh(cyl(1.1, 1.5, 3.6, 6), '#5A8A2A', 0, 10.4, 0)); head.add(mesh(sph(1.8, 6, 4), '#4FAE32', 2.2, 9.4, 0.6, 1.4, 0.4, 0.9));
-    for (const sx of [-1, 1]) head.add(mesh(cone(1.6, 2.6, 3), '#3A2210', sx * 3, 3.6, 8.2, 1, 1, 0.4));
-    head.add(mesh(box(6.4, 1.6, 0.8), '#3A2210', 0, -1.2, 8.4)); for (const x of [-2, 2]) head.add(mesh(box(1.4, 1, 0.9), '#3A2210', x, -0.2, 8.5));
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; head.add(mesh(sph(4.6, 8, 6), k % 2 ? '#F2871E' : '#E8761A', Math.sin(a) * 5.2, 2.2, -0.4 + Math.cos(a) * 5.2, 0.8, 1.15, 0.8)); }
+    head.add(mesh(sph(7.6, 12, 8), '#F2871E', 0, 1.6, -0.2, 1.18, 1.04, 1.18));
+    head.add(mesh(cyl(1.1, 1.5, 3.6, 6), '#5A8A2A', 0, 11.0, -0.4)); head.add(mesh(sph(1.8, 6, 4), '#4FAE32', 2.2, 10.0, 0.2, 1.4, 0.4, 0.9));
+    for (const sx of [-1, 1]) head.add(mesh(cone(1.6, 2.6, 3), '#3A2210', sx * 3, 3.4, 8.55, 1, 1, 0.4));
+    head.add(mesh(box(6.4, 1.6, 0.8), '#3A2210', 0, -1.4, 8.45)); for (const x of [-2, 2]) head.add(mesh(box(1.4, 1, 0.9), '#3A2210', x, -0.4, 8.6));
   } else if (o.hat === 'santa') {   // v4.0 B 圣诞帽
-    head.add(mesh(cyl(8.2, 8.2, 2.6, 12), '#FFFFFF', 0, 5.0, 0));
-    const tip = new THREE.Mesh(cone(7.4, 12, 10), M('#E8283C')); tip.position.set(-1.4, 11.4, -0.6); tip.rotation.z = 0.35; tip.castShadow = true; head.add(tip);
-    head.add(mesh(sph(2.2, 7, 5), '#FFFFFF', -5.6, 16.0, -0.6));
+    const tip = new THREE.Mesh(cone(7.9, 12, 12), M('#E8283C')); tip.position.set(-0.6, 11.2, -0.5); tip.rotation.z = 0.32; tip.castShadow = true; head.add(tip);
+    head.add(mesh(cyl(8.7, 8.7, 2.6, 14), '#FFFFFF', 0, 5.2, -0.4));
+    head.add(mesh(sph(2.2, 7, 5), '#FFFFFF', -2.9, 17.0, -0.5));
   } else if (o.hat === 'lion') {   // v4.0 B 春节 舞狮帽: big red-and-gold lion head, fluffy trim, horn, eyes
-    head.add(mesh(sph(8.6, 12, 8, 0), '#E8283C', 0, 3.4, -0.2, 1.1, 0.95, 1.1));
+    head.add(mesh(dome(8.7, 12, 7), '#E8283C', 0, 2.6, -0.4, 1.1, 1.05, 1.1));
     for (let k = 0; k < 10; k++) { const a = -1.4 + k / 9 * 2.8; head.add(mesh(sph(2.3, 6, 5), k % 2 ? '#FFFFFF' : '#FFE16B', Math.sin(a) * 9, 4.2 + Math.cos(a * 1.2) * 1.4, Math.cos(a) * 8.4)); }
     head.add(mesh(cone(1.6, 4.4, 6), '#FFC21A', 0, 13, 1.4)); head.add(mesh(box(9, 2, 1.4), '#FFC21A', 0, 9.2, 7.6));
     for (const sx of [-1, 1]) { head.add(mesh(sph(2.2, 7, 5), '#FFFFFF', sx * 3.4, 7.4, 7.6)); head.add(mesh(sph(1.1, 6, 4), '#1A1A22', sx * 3.4, 7.4, 9.4)); head.add(mesh(sph(2.4, 6, 4), '#FFC21A', sx * 9.4, 6.4, 1, 0.6, 1.2, 1)); }
     head.add(mesh(sph(1.6, 6, 4), '#FFC21A', 0, 4.6, 9.2));
   } else if (o.hat === 'scholar') {   // v4.0 B 图鉴大师帽: a mortarboard with a gold tassel
-    head.add(mesh(cyl(7.2, 7.4, 3.2, 12), '#2A2A3A', 0, 5.6, 0));
-    head.add(mesh(box(15, 1.2, 15), '#2A2A3A', 0, 7.8, 0, 1, 1, 1));
+    head.add(mesh(cyl(7.9, 8.0, 3.4, 14), '#2A2A3A', 0, 5.8, -0.4));
+    head.add(mesh(box(15, 1.2, 15), '#2A2A3A', 0, 8.0, -0.4, 1, 1, 1));
     head.add(mesh(sph(1, 6, 4), '#FFC21A', 0, 8.8, 0)); head.add(mesh(box(0.8, 0.6, 7), '#FFC21A', 0, 8.6, 3.6)); head.add(mesh(cyl(0.9, 1.4, 4.4, 6), '#FFC21A', 0, 6.2, 7.2));
   }
   if (o.pigtails) for (const s of [-1, 1]) head.add(mesh(sph(2.6, 7, 5), hair, s * 7.6, -0.8, -2.2));
