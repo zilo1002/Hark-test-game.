@@ -116,6 +116,14 @@ export function drawIcon(g, kind, t = 0) {
       g.strokeStyle = 'rgba(90,80,60,0.6)'; g.lineWidth = 0.6; for (const k of [-3, 0, 3]) { g.beginPath(); g.moveTo(k, -11.6); g.lineTo(k, -2.4); g.stroke(); g.beginPath(); g.moveTo(-6, -7 + k); g.lineTo(6, -7 + k); g.stroke(); }
       g.save(); g.translate(4, -9); g.scale(0.5, 0.5); ITEM_DRAW.fish(g); g.restore();
       break;
+    case 'feeder':   // v4.2 投喂器: a wooden post with a red hopper, pellets falling into a ripple
+      g.fillStyle = '#8E5627'; g.fillRect(-1.8, -4, 3.6, 14);
+      g.strokeStyle = COL.outline; g.lineWidth = 1;
+      g.fillStyle = '#E8452C'; g.beginPath(); g.moveTo(-8, -12); g.lineTo(8, -12); g.lineTo(5, -3); g.lineTo(-5, -3); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#FFD23F'; g.fillRect(-8, -14, 16, 3);
+      g.fillStyle = '#C8902A'; for (const [x, y] of [[-3, 1], [2, 3], [-1, 6], [4, -1]]) { g.beginPath(); g.arc(x + 6, y, 1.3, 0, 6.3); g.fill(); }
+      g.strokeStyle = 'rgba(120,200,255,0.9)'; g.lineWidth = 1.4; g.beginPath(); g.ellipse(7, 9, 6, 2.2, 0, 0, 6.3); g.stroke();
+      break;
     case 'axe':
       g.rotate(-0.5); g.fillStyle = '#A8741E'; g.strokeStyle = COL.outline; g.lineWidth = 1; g.beginPath(); g.roundRect(-1.4, -10, 2.8, 20, 1); g.fill(); g.stroke();
       g.fillStyle = '#C9D2DC'; g.beginPath(); g.moveTo(1, -9); g.lineTo(9, -11); g.quadraticCurveTo(11, -5, 9, 0); g.lineTo(1, -3); g.closePath(); g.fill(); g.stroke();

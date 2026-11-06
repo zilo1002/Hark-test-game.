@@ -26,7 +26,7 @@ let ordBase = null, ordItems = new Set(), ordHudT = 0, bookBase = null;
 snd.on = data.settings.sound; hap.on = data.settings.vib;
 
 let mode = 'home', world = null, guide = null, guideT = 0, saveT = 0, hudT = 0, time = 0, last = performance.now();
-let feverFxT = 0, fullFxT = -9, goldFxT = -9;
+let feverFxT = 0, fullFxT = -9, goldFxT = -9, catchFxT = -9, scatFxT = -9;
 let modalOpen = false, cashFxT = 0, winDone = false, harvestFxT = 0, saleHapT = 0;
 const restoredAt = {};            // session-only animation stamps for the home screen
 
@@ -273,7 +273,7 @@ function handleEvents() {
       case 'golden':   // 金色作物
         fx.burst(e.x, e.y, 14, 26, ['#FFD23F', '#FFF27A', '#FFFFFF', '#F29C0E'], 110, 160, 3.2, 'star', 1.0);
         fx.ring(e.x, e.y, '#FFE55A', 46);
-        if (e.who === 'player') { ui.earn(e.amount, performance.now() / 1000); ui.note('金色作物！', performance.now() / 1000);
+        if (e.who === 'player') { ui.earn(e.amount, performance.now() / 1000); ui.note(e.koi ? '金锦鲤！' : '金色作物！', performance.now() / 1000);
           if (time - goldFxT > 0.25) { goldFxT = time; for (let i = 0; i < 4; i++) fx.bill(R.X(e.x, e.y), R.Y(e.x, e.y, 30), coin.x, coin.y, i * 0.05); setTimeout(() => ui.bumpCoin(), 450); snd.play('coin'); hap.pattern([60, 30, 110], [255, 255]); } }
         break;
       case 'fever':
@@ -291,6 +291,20 @@ function handleEvents() {
       case 'produce': fx.burst(e.x, e.y, 40, 4, ['#FFFFFF', '#FFE16B', '#FF8FB0'], 30, 60, 2.6, 'star', 0.7); break;
       case 'lay': break;
       case 'petFetch': snd.play('pick'); fx.burst(e.x, e.y, 12, 6, ['#FFFFFF', '#FFE16B'], 30, 60, 2.4, 'star', 0.6); break;
+      // v4.2 鱼塘: splashes and ripples (no numbers)
+      case 'catch':
+        if (e.who === 'player' || time - catchFxT > 0.08) { catchFxT = time; fx.burst(e.x, e.y, 3, Math.min(16, 5 + e.n * 2), ['#FFFFFF', '#BFE8FF', '#7FD0FF'], 60, 130, 2.2, 'dot', 0.6); fx.ring(e.x, e.y, '#E8F8FF', 26 + Math.min(20, e.n * 3)); }
+        if (e.who === 'player') { snd.play('harvest'); hap.tick(16, 70, 235); }
+        break;
+      case 'fishIn': fx.ring(e.x, e.y, 'rgba(255,255,255,0.8)', 14); fx.burst(e.x, e.y, 2, 3, ['#FFFFFF', '#BFE8FF'], 30, 70, 1.6, 'dot', 0.4); break;
+      case 'scatter': if (time - scatFxT > 0.12) { scatFxT = time; fx.ring(e.x, e.y, 'rgba(230,248,255,0.9)', 18); fx.burst(e.x, e.y, 2, 4, ['#FFFFFF', '#BFE8FF'], 40, 60, 1.6, 'dot', 0.4); } break;
+      case 'feed': fx.burst(e.x, e.y, 22, 14, ['#C8902A', '#E8B04A', '#8E5627'], 40, 60, 1.8, 'dot', 0.9); fx.ring(e.x, e.y, '#FFFFFF', 30); break;
+      case 'pondLevel': {
+        const sp = CFG.pond.species[Math.min(e.lv, CFG.pond.species.length) - 1];
+        ui.note(`鱼塘升到 Lv${e.lv}！${sp ? '来了' + sp.name : ''}`, performance.now() / 1000);
+        fx.burst(e.x, e.y, 10, 36, ['#FFFFFF', '#BFE8FF', '#FFD23F', '#7FD0FF'], 140, 170, 3, 'conf', 1.1); fx.ring(e.x, e.y, '#FFFFFF', 120);
+        snd.play('unlock'); hap.pattern([40, 30, 80], [255, 255]); R.groundDirty = true; break;
+      }
       case 'ground': R.groundDirty = true; break;
       case 'win': if (!winDone) { winDone = true; if (world.daily) dailyWin(); else win(); } break;
     }
@@ -367,7 +381,7 @@ if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
       if (extraCap) { world.upg.cap += extraCap; world.refreshStats(); }
       const p = world.player; let g = null;
       for (let i = 0; i < 30 * 120 && p.stack.length + p.incoming < n; i++) {
-        g = world.guide(); if (g && g.kind !== 'field' && g.kind !== 'pile') { const f = world.fields.find((q) => !q.hidden && q.ripe > 0); if (f) { const j = f.nearestRipe(p.x, p.y); g = { x: f.px(j), y: f.py(j) }; } }
+        g = world.guide(); if (g && g.kind !== 'field' && g.kind !== 'pile' && g.kind !== 'pond') { const f = world.fields.find((q) => !q.hidden && q.ripe > 0); if (f) { const j = f.nearestRipe(p.x, p.y); g = { x: f.px(j), y: f.py(j) }; } }
         let ix = 0, iy = 0; if (g) { const ex = g.x - p.x, ey = g.y - p.y, e = Math.hypot(ex, ey) || 1; ix = ex / e; iy = ey / e; }
         world.update(1 / 30, ix, iy); world.events.length = 0;
       }
@@ -380,7 +394,7 @@ if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
       const p = world.player; let g = null, th = 0;
       for (let i = 0; i < secs * 30; i++) {
         th -= 1 / 30; if (th <= 0) { g = world.guide(); th = 0.1; }
-        if (g && (g.kind === 'pile' || g.kind === 'field')) g = world.guide() || g;
+        if (g && (g.kind === 'pile' || g.kind === 'field' || g.kind === 'pond')) g = world.guide() || g;
         let ix = 0, iy = 0;
         if (i < stopAt * 30 && g && Math.hypot(g.x - p.x, g.y - p.y) > 3) { const wp = world.steer(p, g.x, g.y); const ex = wp.x - p.x, ey = wp.y - p.y, e = Math.hypot(ex, ey) || 1; ix = ex / e; iy = ey / e; }
         world.update(1 / 30, ix, iy); world.events.length = 0;

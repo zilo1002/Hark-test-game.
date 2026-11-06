@@ -21,6 +21,8 @@ CFG.levels.forEach((L, li) => {
   for (const c of w.counters) { things.push({ n: `${c.id} zone`, r: c.zone }); things.push({ n: `${c.id} cash`, r: R(c.cashPos.x, c.cashPos.y, 40, 40) }); things.push({ n: `${c.id} desk`, r: c.desk }); things.push({ n: `${c.id} queue`, r: { x: c.serve.x - 8, y: c.y - 12, w: w.W - c.serve.x + 8, h: 24 } }); }
   for (const p of w.procs) { things.push({ n: `${p.id} in`, r: p.inZone }); things.push({ n: `${p.id} body`, r: p.body }); }
   for (const f of w.fields) things.push({ n: `${f.id} field`, r: { x: f.x, y: f.y, w: f.w, h: f.h } });
+  for (const f of w.ponds) things.push({ n: `${f.id} pond`, r: { x: f.X, y: f.Y, w: f.MW, h: f.MH } });   // v4.2: the full basin (the water grows into it)
+  for (const p of w.procs) if (p.pile) things.push({ n: `${p.id} tray`, r: { x: p.pile.x, y: p.pile.y, w: p.pile.w, h: p.pile.h } });
   for (const c of w.coops) things.push({ n: `${c.id} coop`, r: { x: c.x - 30, y: c.y - 30, w: c.w + 30, h: c.h + 30 } });
   (L.deco.hedges || []).forEach((h, i) => things.push({ n: `hedge${i}`, r: { x: h[0], y: h[1], w: h[2], h: h[3] } }));
   (L.deco.trees || []).forEach((t, i) => things.push({ n: `tree${i}`, r: R(t[0], t[1], 18, 18) }));

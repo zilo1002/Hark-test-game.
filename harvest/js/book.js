@@ -77,7 +77,7 @@ export function trackBook(data, stats, base) {
 export function pageEntries(data, page) {
   const B = data.book;
   if (page === 'crops') return CROPS.map((k) => ({ id: k, name: CFG.items[k].name, kind: 'item', item: k, count: B.c[k] || 0, got: (B.c[k] || 0) > 0 || B.seen.includes(k) }));
-  if (page === 'golden') return GOLDEN.map((k) => ({ id: k, name: '金' + CFG.items[k].name, kind: 'gold', item: k, count: B.g[k] || 0, got: (B.g[k] || 0) > 0 }));
+  if (page === 'golden') return GOLDEN.map((k) => ({ id: k, name: k === 'fish' ? '金锦鲤' : '金' + CFG.items[k].name, kind: 'gold', item: k, count: B.g[k] || 0, got: (B.g[k] || 0) > 0 }));
   if (page === 'animal') return ANIMALS.map((a) => {
     if (a.pet) { const own = (data.shop.owned || []).some((id) => id.startsWith(a.pet)); return { id: a.id, name: a.name, kind: 'animal', count: 0, got: own, sub: own ? '已领养' : '商店领养' }; }
     const c = B.c[a.item] || 0; return { id: a.id, name: a.name, kind: 'animal', item: a.item, count: c, got: c > 0 || B.seen.includes(a.item) };

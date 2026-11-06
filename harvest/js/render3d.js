@@ -28,6 +28,10 @@ const LUMBERJACK = { shirt: '#D9382A', vest: '#2D3A5A', pants: '#4A5A8A', hair: 
 const MILKER = { shirt: '#FFFFFF', overalls: '#3BA7FF', pants: '#3BA7FF', hair: '#3A2210', hat: 'cap', capColor: '#FFFFFF', sleeve: '#FFFFFF' };
 const FISHER = { shirt: '#FFC21A', overalls: '#3567C8', pants: '#3567C8', hair: '#3A2210', hat: 'rain', capColor: '#FFC21A', sleeve: '#FFC21A', boots: '#2F8F3A' };
 const CASHIER = { shirt: '#4CD08A', vest: '#2E8A5A', hair: '#3A2210', pants: '#2D3A5A', sleeve: '#4CD08A' };
+const CASHIER2 = { shirt: '#FFFFFF', vest: '#E8452C', hair: '#6B3A1E', pants: '#2D3A5A', sleeve: '#FFFFFF', pigtails: true };
+// v4.2 搬运工: carry machine goods from the output tray to the second counter
+const PORTER = { shirt: '#FFFFFF', overalls: '#E8452C', pants: '#E8452C', hair: '#3A2210', hat: 'cap', capColor: '#FFD23F', sleeve: '#FFFFFF' };
+const KOI_GOLD_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x8A5A00 });
 const ITEM_CAP = 1800;
 
 // write a Y-rotation + scale + translation matrix straight into an instance buffer
@@ -156,6 +160,7 @@ export class Renderer {
     this.buildEnv(w);
     this.buildDecos(w);
     this.buildFields(w);
+    this.buildPonds(w);
     this.buildPiles(w);
     this.buildCoops(w);
     this.buildCounters(w);
@@ -223,7 +228,25 @@ export class Renderer {
     };
     for (const p of w.deco.paths || []) pave(...p);
     for (const c of w.counters) pave(c.cashPos.x - 28, c.y - 40, w.W - c.cashPos.x + 28 + pad, 132);
-    for (const p of w.procs) pave(p.inZone.x - 8, p.y - 34, p.body.x + p.body.w - p.inZone.x + 18, 68);
+    for (const p of w.procs) {
+      pave(p.inZone.x - 8, p.y - 34, p.body.x + p.body.w - p.inZone.x + 18, 68);
+      if (p.pile) { const t = p.pile; pave(t.x - 6, t.y - 6, t.w + 12, t.h + 12); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.setLineDash([5, 4]); g.lineWidth = 1.6; g.strokeRect(t.x - 2, t.y - 2, t.w + 4, t.h + 4); g.setLineDash([]); }
+    }
+    // v4.2 鱼塘: the full basin is a damp grassy hollow; the water (and its stone-edged shore) grows with the pond level
+    for (const pd of w.ponds) {
+      g.fillStyle = 'rgba(70,130,40,0.35)'; g.fillRect(pd.X - 4, pd.Y - 4, pd.MW + 8, pd.MH + 8);
+      for (let i = 0; i < pd.MW * pd.MH / 300; i++) { g.fillStyle = i % 3 ? 'rgba(40,100,20,0.25)' : 'rgba(200,230,140,0.3)'; g.fillRect(pd.X + R(i + 6100) * pd.MW, pd.Y + R(i + 6300) * pd.MH, 1.4, 4); }
+      g.setLineDash([8, 6]); g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1.5; g.strokeRect(pd.X - 4, pd.Y - 4, pd.MW + 8, pd.MH + 8); g.setLineDash([]);
+      const x = pd.x, y = pd.y, pw = pd.w, ph = pd.h;
+      g.fillStyle = '#B9B2A4'; g.beginPath(); g.roundRect(x - 7, y - 7, pw + 14, ph + 14, 16); g.fill();
+      g.fillStyle = '#E3D3A8'; g.beginPath(); g.roundRect(x - 4, y - 4, pw + 8, ph + 8, 13); g.fill();
+      if (pd.hidden) { g.fillStyle = '#9C7A50'; g.beginPath(); g.roundRect(x, y, pw, ph, 10); g.fill(); continue; }
+      const gr2 = g.createRadialGradient(x + pw / 2, y + ph / 2, 10, x + pw / 2, y + ph / 2, Math.max(pw, ph) * 0.7);
+      gr2.addColorStop(0, '#2A86C8'); gr2.addColorStop(1, '#5CC0EE'); g.fillStyle = gr2; g.beginPath(); g.roundRect(x, y, pw, ph, 10); g.fill();
+      for (let i = 0; i < pw * ph / 300; i++) { g.strokeStyle = i % 3 ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.34)'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(x + 8 + R(i + 8100) * (pw - 16), y + 8 + R(i + 8300) * (ph - 16), 4 + R(i) * 7, 1.4 + R(i + 1) * 1.6, 0, 0, Math.PI); g.stroke(); }
+      for (let i = 0; i < 10 + pd.lv * 3; i++) { const e = i % 4, u = 0.1 + R(i + 8600) * 0.8; const lx = e === 0 ? x + u * pw : e === 1 ? x + pw - 7 : e === 2 ? x + u * pw : x + 7, ly = e === 0 ? y + 7 : e === 1 ? y + u * ph : e === 2 ? y + ph - 7 : y + u * ph;
+        g.fillStyle = '#4FAE32'; g.beginPath(); g.arc(lx, ly, 5, 0.5, TAU - 0.2); g.lineTo(lx, ly); g.fill(); if (i % 3 === 0) { g.fillStyle = '#FF8FB0'; g.beginPath(); g.arc(lx + 1, ly - 1, 2, 0, TAU); g.fill(); } }
+    }
     for (const f of w.fields) {
       const water = f.item === 'fish';
       const bed = f.hidden && !water ? COL.soil : { tulip: '#3F8A2C', rose: '#3A7A28', gold: '#4F9A26', wheat: '#8E6A34', potato: COL.soil, log: '#4F8A26', corn: '#9A7438', pumpkin: '#8A5A30', berry: '#3F8A2C',
@@ -464,6 +487,55 @@ export class Renderer {
       if (stubDirty) o.stub.instanceMatrix.needsUpdate = true;
     }
   }
+  // ---------------------------------------------------------------- v4.2 鱼塘
+  // one InstancedMesh per species for every fish of every pond (refilled each frame: ≤ ~170 matrices);
+  // a stone bank + reeds round the current water (rebuilt when the pond levels up); the 投喂器 post
+  buildPonds(w) {
+    this.pondObjs = [];
+    this.fishIM = null;
+    if (!w.ponds.length) return;
+    const cap = w.ponds.length * 100;
+    this.fishIM = [0, 1, 2, 3].map((sp) => {
+      const im = new THREE.InstancedMesh(M.swimFishGeo(sp), sp === 3 ? KOI_GOLD_MAT : M.vcMat(), cap);
+      im.count = 0; im.frustumCulled = false; im.castShadow = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.levelRoot.add(im);
+      return im;
+    });
+    for (const pd of w.ponds) this.pondObjs.push({ pd, bank: null, lv: -1, feeder: null });
+  }
+  pondBank(o) {
+    const pd = o.pd;
+    if (o.bank) { this.levelRoot.remove(o.bank); o.bank.geometry.dispose(); }
+    const out = [], st = '#C9C2B2', st2 = '#B3AB98', x = pd.x, y = pd.y, w = pd.w, h = pd.h;
+    // rounded stones along the four banks
+    const stones = (x0, y0, x1, y1) => { const L = Math.hypot(x1 - x0, y1 - y0), n = Math.max(2, Math.round(L / 13)); for (let i = 0; i <= n; i++) { const u = i / n, k = hash(i * 7 + x0 * 3 + y0); out.push(M.P(M.sph(4.6 + k * 1.6, 7, 4), k > 0.5 ? st : st2, [x0 + (x1 - x0) * u, 1.2, y0 + (y1 - y0) * u], [0, k * 3, 0], [1.2, 0.55, 1])); } };
+    stones(x - 7, y - 7, x + w + 7, y - 7); stones(x - 7, y + h + 7, x + w + 7, y + h + 7); stones(x - 7, y - 7, x - 7, y + h + 7); stones(x + w + 7, y - 7, x + w + 7, y + h + 7);
+    for (const [cx, cy] of [[x + 6, y + 6], [x + w - 6, y + 6], [x + 6, y + h - 6], [x + w - 6, y + h - 6]]) for (let k = 0; k < 6; k++) { const a = k * 1.1; out.push(M.P(M.cyl(0.5, 0.7, 10 + (k % 3) * 3, 4), '#5DA53A', [cx + Math.cos(a) * 3.4, 5 + (k % 3) * 1.5, cy + Math.sin(a) * 3.4])); if (k % 2 === 0) out.push(M.P(M.cap(0.9, 2.2, 2, 5), '#8E5627', [cx + Math.cos(a) * 3.4, 11 + (k % 3) * 3, cy + Math.sin(a) * 3.4])); }
+    o.bank = new THREE.Mesh(M.merge(out), M.vcMat()); o.bank.castShadow = true; o.bank.receiveShadow = true; o.bank.userData.own = true; this.levelRoot.add(o.bank);
+    o.lv = pd.lv;
+  }
+  updatePonds() {
+    if (!this.fishIM) return;
+    const cnt = [0, 0, 0, 0], t = this.time;
+    for (const o of this.pondObjs) {
+      const pd = o.pd;
+      if (o.lv !== pd.lv) this.pondBank(o);
+      if (pd.feeder && !o.feeder) {
+        const F = pd.feeder, fx = Math.min(pd.x + pd.w + 12, Math.max(pd.x - 12, F.x)), fy = Math.min(pd.y + pd.h + 12, Math.max(pd.y - 12, F.y));
+        o.feeder = new THREE.Mesh(M.feederGeo(), M.vcMat()); o.feeder.castShadow = true; o.feeder.position.set(fx, 0, fy);
+        o.feeder.rotation.y = Math.atan2(pd.x + pd.w / 2 - fx, pd.y + pd.h / 2 - fy); o.feeder.userData.own = true; this.levelRoot.add(o.feeder);
+      }
+      if (o.feeder) { const F = pd.feeder, fx = Math.min(pd.x + pd.w + 12, Math.max(pd.x - 12, F.x)), fy = Math.min(pd.y + pd.h + 12, Math.max(pd.y - 12, F.y)); o.feeder.position.set(fx, 0, fy); o.feeder.scale.setScalar(Math.max(0.001, elastic((this.wt - pd.feederT) / 0.6)) * (1 + (pd.feeding > 0 ? Math.sin(t * 18) * 0.03 : 0))); }
+      if (pd.hidden) continue;
+      if (pd.sprinkler) this.sprinklers.push({ f: pd });
+      const app = Math.max(0, Math.min(1, (this.wt - pd.appearT) / 0.5));
+      for (const f of pd.fish) {
+        const sp = f.gold ? 3 : f.sp, im = this.fishIM[sp], k = cnt[sp]++;
+        const sw = Math.sin(f.ph) * (f.sc > 0 ? 0.35 : 0.2), size = (sp === 0 ? 1.2 : sp === 1 ? 1.42 : 1.58) * (0.9 + (f.id % 7) * 0.03) * (pd.appearT > 0 ? 0.4 + 0.6 * app : 1);
+        put(im.instanceMatrix.array, k, f.x, 1.2 + Math.sin(f.ph * 0.5) * 0.25, f.y, Math.atan2(f.vx, f.vy) + sw, size);
+      }
+    }
+    for (let sp = 0; sp < 4; sp++) { const im = this.fishIM[sp]; im.count = cnt[sp]; if (cnt[sp]) im.instanceMatrix.needsUpdate = true; }
+  }
   buildPiles(w) {
     this.pileObjs = w.piles.map((pl) => {
       const im = new THREE.InstancedMesh(M.itemGeo(pl.type), M.vcMat(), pl.cap + 64);
@@ -529,7 +601,7 @@ export class Renderer {
       const grp = new THREE.Group(); grp.position.set(c.x, 0, c.y); this.levelRoot.add(grp);
       const out = []; M.Env.counter(out, { desk: { x: c.desk.x - c.x, y: c.desk.y - c.y, w: c.desk.w, h: c.desk.h } }, CFG.counter);
       const m = new THREE.Mesh(M.merge(out), M.vcMat()); m.castShadow = true; m.receiveShadow = true; m.userData.own = true; grp.add(m);
-      const zone = this.decal(c.zone.w, c.zone.h, (g, W, H) => this.paintZone(g, W, H, '出售', null));
+      const zone = this.decal(c.zone.w, c.zone.h, (g, W, H) => this.paintZone(g, W, H, c.sale2 ? '加工品' : '出售', null));
       zone.position.set(c.zone.cx, 0.3, c.zone.cy); this.levelRoot.add(zone);
       const cash = this.decal(42, 42, (g, W, H) => {
         g.fillStyle = 'rgba(40,52,60,0.55)'; g.beginPath(); g.roundRect(4, 4, W - 8, H - 8, 10); g.fill();
@@ -647,7 +719,7 @@ export class Renderer {
       const blob = new THREE.Mesh(M.BLOB_GEO, M.BLOB_MAT); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.3; blob.scale.set(17, 21, 1); root.add(blob);
       o = { c, pp, ld, loader: true, ang: 0.8, root };
     } else if (c.kind === 'worker') {
-      const pp = M.makePerson(this.wLook(c.cart ? (c.from && this.world.objs[c.from[0]] && this.world.objs[c.from[0]].producer === 'cow' ? MILKER : CARTER) : c.lumber ? LUMBERJACK : c.fisher ? FISHER : GARDENER));
+      const pp = M.makePerson(this.wLook(c.porter ? PORTER : c.cart ? (c.from && this.world.objs[c.from[0]] && this.world.objs[c.from[0]].producer === 'cow' ? MILKER : CARTER) : c.lumber ? LUMBERJACK : c.fisher ? FISHER : GARDENER));
       const root = new THREE.Group(); root.add(pp.root);
       let cart = null; if (c.cart) { cart = M.makeCart(); cart.root.position.set(0, 0, -20); root.add(cart.root); }
       this.levelRoot.add(root);
@@ -760,7 +832,8 @@ export class Renderer {
     this.placeCamera();
     const labels = this.labels || (this.labels = []); labels.length = 0;
     this.goldSpots = this.goldSpots || []; this.goldSpots.length = 0; this.sprinklers = this.sprinklers || []; this.sprinklers.length = 0;
-    this.updateFields(); this.updatePiles();
+    this.updateFields(); this.updatePiles(); this.updatePonds();
+    for (const pd of world.ponds) labels.push({ k: 'pond', pd });
     this.beginItems();
     // coops: hens bob when they lay, bushes shiver
     for (const o of this.coopObjs) {
@@ -793,6 +866,9 @@ export class Renderer {
       }
       if (c.cashier && !o.cashier) { o.cashier = M.makePerson(CASHIER); o.cashier.root.position.set(c.x + 4, 0, c.y - 44); o.cashier.root.rotation.y = 0.3; this.levelRoot.add(o.cashier.root); }
       if (o.cashier) M.posePerson(o.cashier, { t: time, walk: 0, moving: false, carry: false, seed: 4 });
+      if (c.clerks === 2 && !o.clerk2) { o.clerk2 = M.makePerson(CASHIER2); o.clerk2.root.position.set(c.x - 24, 0, c.y - 6); o.clerk2.root.rotation.y = Math.PI / 2; this.levelRoot.add(o.clerk2.root); }
+      if (o.clerk2) { o.clerk2.root.scale.setScalar(a * 1.15); M.posePerson(o.clerk2, { t: time + 1.3, walk: 0, moving: false, carry: c.stock.length > 0 && (time % 2) < 1, seed: 6 }); }
+      if (o.cashier && c.clerks === 2) o.cashier.root.scale.setScalar(a * 1.15);
     }
     // machines
     for (const o of this.procObjs) {
@@ -947,6 +1023,22 @@ export class Renderer {
         g.save(); g.translate(-10 * s, 0); g.scale(s * 0.85, s * 0.85); drawIcon(g, L.item, 0); g.restore();
         g.restore();
         this.label('×2', sx + 10 * s, sy - 16 * s + bob, 11 * s, '#FFD23F', '#8A4A00');
+      } else if (L.k === 'pond') {   // v4.2 鱼塘 level: a small fixed bar by the pond (写死: no tween, updates in place)
+        const pd = L.pd; if (pd.hidden) continue;
+        const [sx0, sy0] = this.proj(pd.X + pd.MW * 0.5, pd.Y - 8, 2); if (sx0 < -80 || sy0 < -40 || sx0 > this.W + 80 || sy0 > this.H + 40) continue;
+        const px = Math.max(9, 8 * z), nx = pd.next(), max = !nx;
+        const prev = CFG.pond.levels[pd.lv - 1].at, f = max ? 1 : Math.min(1, (pd.caught - prev) / (nx - prev));
+        const sp = CFG.pond.species[Math.min(pd.lv, CFG.pond.species.length) - 1].name;
+        const txt = `鱼塘 Lv${pd.lv} · ${sp}`, tail = max ? '满级' : `${pd.caught}/${nx}`;
+        g.font = FONT(px); const tw = g.measureText(txt).width, bw = Math.round(px * 6), tw2 = g.measureText(tail).width, W2 = tw + bw + tw2 + px * 2.2;
+        const sx = Math.round(Math.min(this.W - W2 / 2 - 6, Math.max(W2 / 2 + 6, sx0))), sy = Math.round(sy0);   // kept on screen
+        if (sy < this.H * 0.17 + 30) continue;   // never under the goal panel / coin pill
+        g.fillStyle = 'rgba(20,60,90,0.62)'; g.beginPath(); g.roundRect(sx - W2 / 2, sy - px * 0.85, W2, px * 1.7, px * 0.85); g.fill();
+        let x = sx - W2 / 2 + px * 0.6;
+        this.label(txt, x, sy, px, '#FFFFFF', '#14405A', 'left'); x += tw + px * 0.5;
+        g.fillStyle = 'rgba(255,255,255,0.25)'; g.beginPath(); g.roundRect(x, sy - px * 0.3, bw, px * 0.6, px * 0.3); g.fill();
+        g.fillStyle = max ? '#FFD23F' : '#7FE0FF'; g.beginPath(); g.roundRect(x, sy - px * 0.3, Math.max(px * 0.6, bw * f), px * 0.6, px * 0.3); g.fill();
+        x += bw + px * 0.5; this.label(tail, x, sy, px, max ? '#FFE27A' : '#E8F8FF', '#14405A', 'left');
       } else if (L.k === 'buf') {
         const [sx, sy] = this.proj(L.x, L.y, L.z), px = Math.max(10, 9 * z);
         g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); g.roundRect(sx - px * 1.5, sy - px * 0.8, px * 3, px * 1.6, px * 0.8); g.fill();
@@ -1008,6 +1100,22 @@ export class Renderer {
       g.globalAlpha = 1;
     }
     this.drawWeather(g, t);
+    // v4.2 鱼塘: soft rings where fish break the surface, pellets falling from the 投喂器
+    for (const pd of world.ponds) {
+      if (pd.hidden || !pd.fish.length) continue;
+      g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = Math.max(1, 1.1 * z);
+      for (let k = 0; k < 6; k++) {
+        const ph = t * 0.9 + k / 6, cyc = Math.floor(ph), u = ph - cyc, f = pd.fish[Math.floor(hash(cyc * 13 + k * 7 + pd.X) * pd.fish.length) % pd.fish.length];
+        if (!f) continue; const [sx, sy] = this.proj(f.x, f.y, 0.6); if (sx < -20 || sy < -20 || sx > this.W + 20 || sy > this.H + 20) continue;
+        g.globalAlpha = (1 - u) * 0.7; g.beginPath(); g.ellipse(sx, sy, (3 + u * 9) * z, (1.8 + u * 5) * z, 0, 0, TAU); g.stroke();
+      }
+      g.globalAlpha = 1;
+      if (pd.feeder && pd.feeding > 0) {
+        const fp = pd.feedPt(); g.fillStyle = '#C8902A';
+        for (let k = 0; k < 14; k++) { const u = (t * 1.6 + k / 14) % 1, a = hash(k * 5) * TAU, r = 4 + hash(k * 9) * 16; const [sx, sy] = this.proj(fp.x + Math.cos(a) * r, fp.y + Math.sin(a) * r, 20 * (1 - u)); g.globalAlpha = 0.9; g.beginPath(); g.arc(sx, sy, 1.3 * z, 0, TAU); g.fill(); }
+        g.globalAlpha = 1;
+      }
+    }
     for (const o of this.sprinklers) {
       const f = o.f, hx = f.x + f.w / 2, hy = f.y + f.h / 2, R = Math.min(f.w, f.h) * 0.45, head = 24 * 1.2;
       g.fillStyle = 'rgba(150,215,255,0.8)';

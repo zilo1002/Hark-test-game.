@@ -35,10 +35,10 @@ export function playLevel(li, prof, seed) {
   while (!w.won && w.t < LIMIT) {
     think -= DT;
     if (think <= 0) { target = w.guide(); think = prof.think; }
-    if (target && (target.kind === 'pile' || target.kind === 'field')) target = w.guide() || target; // keep chasing the field
+    if (target && (target.kind === 'pile' || target.kind === 'field' || target.kind === 'pond')) target = w.guide() || target; // keep chasing the field
     ix = iy = 0;
     if (target) {
-      const stop = target.kind === 'tile' ? 4 : target.kind === 'pile' || target.kind === 'field' ? 2 : 6;
+      const stop = target.kind === 'tile' ? 4 : target.kind === 'pile' || target.kind === 'field' || target.kind === 'pond' ? 2 : 6;
       if (Math.hypot(target.x - p.x, target.y - p.y) > stop) {
         const wp = w.steer(p, target.x, target.y);
         const dx = wp.x - p.x, dy = wp.y - p.y, d = Math.hypot(dx, dy) || 1;

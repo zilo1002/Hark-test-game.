@@ -1039,3 +1039,31 @@ export function windmillSails() {
   for (let k = 0; k < 4; k++) { const a = k * H; parts.push(P(box(3.2, 16, 0.6), '#FFFFFF', [Math.cos(a) * 9, Math.sin(a) * 9, 1], [0, 0, a - H]), P(box(1, 16, 0.7), '#7FB0FF', [Math.cos(a) * 9, Math.sin(a) * 9, 1.2], [0, 0, a - H])); }
   return merge(parts);
 }
+
+// ------------------------------------------------------------------ v4.2 鱼塘
+// swimming fish, nose along +Z (render rotates by heading): 0 鲫鱼 silver-blue, 1 鲤鱼 golden bronze,
+// 2 锦鲤 white with red patches, 3 金锦鲤 all gold (drawn with an emissive material)
+const SWIM_GEO = {};
+export function swimFishGeo(sp) {
+  if (SWIM_GEO[sp]) return SWIM_GEO[sp];
+  const C = [['#8FB4CC', '#E8F2F6', '#6E94AE'], ['#F0A23A', '#FBDDA0', '#D07A1E'], ['#FFFFFF', '#FFF4EE', '#F2F2F2'], ['#FFD23F', '#FFF0A0', '#F2B21E']][sp];
+  const parts = [
+    P(sph(1, 10, 7), C[0], [0, 0, 0], [0, 0, 0], [2.3, 1.5, 4.6]),
+    P(sph(1, 8, 5), C[1], [0, -0.55, 0.4], [0, 0, 0], [1.9, 0.9, 3.6]),
+    P(cone(1.9, 3.2, 4), C[2], [0, 0, -5.6], [Math.PI / 2, 0, 0], [0.35, 1, 1]),       // tail fan (wide end out)
+    P(cone(0.9, 2.4, 4), C[2], [0, 1.6, 0.4], [0, 0, 0], [0.35, 1, 1.6]),               // dorsal fin
+    P(sph(0.42, 5, 4), '#1A1A1A', [1.25, 0.45, 3.2]), P(sph(0.42, 5, 4), '#1A1A1A', [-1.25, 0.45, 3.2]),
+  ];
+  if (sp === 2) parts.push(P(sph(1, 7, 5), '#E8452C', [0.2, 0.9, 1.6], [0, 0, 0], [1.6, 0.8, 1.6]), P(sph(1, 7, 5), '#E8452C', [-0.3, 0.8, -1.8], [0, 0, 0], [1.4, 0.8, 1.3]), P(sph(0.6, 6, 4), '#2A2A30', [0.9, 0.9, -0.2]));
+  if (sp === 1) parts.push(P(cyl(0.12, 0.12, 2.2, 4), '#B8601A', [0.9, -0.2, 4.2], [Math.PI / 2.4, 0, 0.3]), P(cyl(0.12, 0.12, 2.2, 4), '#B8601A', [-0.9, -0.2, 4.2], [Math.PI / 2.4, 0, -0.3]));   // carp barbels
+  return (SWIM_GEO[sp] = merge(parts));
+}
+// 投喂器: a wooden post on the bank with a red hopper and a little chute over the water
+export function feederGeo() {
+  return merge([
+    P(cyl(1.2, 1.4, 16, 6), '#8E5627', [0, 8, 0]),
+    P(cyl(5, 3, 6, 8), '#E8452C', [0, 18, 0]), P(cyl(5.4, 5.4, 1.2, 8), '#FFD23F', [0, 21.4, 0]), P(cone(5.8, 3, 8), '#C8352A', [0, 23.4, 0]),
+    P(box(1.6, 1.2, 8), '#A8741E', [0, 14.6, 4.6], [0.35, 0, 0]),
+    P(box(6, 1, 6), '#8E5627', [0, 0.5, 0]),
+  ]);
+}

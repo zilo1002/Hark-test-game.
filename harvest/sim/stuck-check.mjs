@@ -19,7 +19,7 @@ function hasWork(w, wk) {
   const space = wk.cap - wk.stack.length - wk.incoming;
   if (wk.state === 'deliver') return wk.stack.length > 0 && (wk.toObjs || []).length > 0;
   if (space <= 0) return false;
-  return (wk.sources || []).some((s) => (s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + s.ripe) > 0);
+  return (wk.sources || []).some((s) => (s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + (s.ripe || 0)) > 0);
 }
 
 function watch(w, secs, tag, botFn) {

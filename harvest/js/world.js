@@ -1,6 +1,7 @@
 // 半亩·丰收 — game logic for one level. Pure JS, no DOM: the browser game and the
 // headless balance sim (sim/balance.mjs) both run exactly this code.
 import { CFG } from './config.js';
+import { splitSales } from './sales.js';
 
 export function rng32(seed) {
   let a = (seed >>> 0) || 1;
@@ -152,6 +153,129 @@ export class Field {
 }
 
 // ---------------------------------------------------------------------------
+// v4.2 Pond: fish swim freely as small schools (boids: cohesion, alignment, separation, a wandering school
+// goal, bank avoidance). A farmer moving fast close by startles them: they dart away and regroup a moment
+// later. Anything with a net (player, 渔夫) catches every fish inside its harvest radius while it has room.
+// Level object stays { type: 'field', crop: 'fish', x, y, w, h } (= the full basin); the water grows with the
+// pond level. `ripe` = fish in the water (so worker / guide code can treat it like a field's stock).
+export class Pond {
+  constructor(o, rnd) {
+    Object.assign(this, o);
+    this.kind = 'pond'; this.item = 'fish'; this.hidden = !!o.hidden; this.appearT = -9; this.rnd = rnd;
+    this.X = o.x; this.Y = o.y; this.MW = o.w; this.MH = o.h;
+    this.lv = 0; this.caught = 0; this.lvT = -9;
+    this.growMul = 1; this.envMul = 1; this.sprinkler = false; this.goldMul = o.goldMul || 1;
+    this.fish = []; this.schools = []; this.spawnAcc = 0; this.feeder = null; this.feedT = 0; this.feeding = 0; this.seq = 0;
+    this.setLevel(1);
+    if (!this.hidden) this.fill(1);
+  }
+  get ripe() { return this.fish.length; }
+  get N() { const s = CFG.pond.levels[this.lv - 1]; return s.schools * s.size; }
+  setLevel(lv) {
+    const S = CFG.pond.levels[lv - 1]; this.lv = lv;
+    this.w = this.MW * S.scale; this.h = this.MH * S.scale; this.x = this.X + (this.MW - this.w) / 2; this.y = this.Y + (this.MH - this.h) / 2;
+    while (this.schools.length < S.schools) { const g = this.randPt(30); this.schools.push({ gx: g.x, gy: g.y, wt: 2 + this.rnd() * 3, cx: g.x, cy: g.y, vx: 0, vy: 0, n: 0 }); }
+  }
+  next() { const L = CFG.pond.levels; return this.lv < L.length ? L[this.lv].at : 0; }
+  randPt(m) { return { x: this.x + m + this.rnd() * Math.max(1, this.w - 2 * m), y: this.y + m + this.rnd() * Math.max(1, this.h - 2 * m) }; }
+  pickSpecies() {
+    const mix = CFG.pond.levels[this.lv - 1].mix; let u = this.rnd(), k = 0;
+    for (; k < mix.length - 1; k++) { if (u < mix[k]) break; u -= mix[k]; }
+    return k;
+  }
+  spawn(atBank) {
+    const P = CFG.pond; let sc = 0;
+    for (let i = 1; i < this.schools.length; i++) if (this.schools[i].n < this.schools[sc].n) sc = i;
+    const s = this.schools[sc]; let x, y;
+    if (atBank) {   // a fish slips in from the bank and swims to its school
+      const e = (this.rnd() * 4) | 0, u = this.rnd();
+      x = e === 0 ? this.x + u * this.w : e === 1 ? this.x + this.w - 6 : e === 2 ? this.x + u * this.w : this.x + 6;
+      y = e === 0 ? this.y + 6 : e === 1 ? this.y + u * this.h : e === 2 ? this.y + this.h - 6 : this.y + u * this.h;
+    } else { x = s.cx + (this.rnd() - 0.5) * 30; y = s.cy + (this.rnd() - 0.5) * 30; }
+    const sp = this.pickSpecies(), a = this.rnd() * Math.PI * 2;
+    const f = { x, y, vx: Math.cos(a) * P.cruise, vy: Math.sin(a) * P.cruise, s: sc, sp, gold: sp === 2 && this.rnd() < P.goldChance * this.goldMul ? 1 : 0, sc: 0, al: 0, react: P.react[0] + this.rnd() * (P.react[1] - P.react[0]), ph: this.rnd() * 6.28, id: this.seq++ };
+    s.n++; this.fish.push(f);
+    return f;
+  }
+  fill(frac) { const n = Math.round(this.N * frac); while (this.fish.length < n) this.spawn(false); }
+  remove(i) { const f = this.fish[i]; this.schools[f.s].n--; this.fish[i] = this.fish[this.fish.length - 1]; this.fish.pop(); return f; }
+  update(dt, w) {
+    if (this.hidden) return;
+    const P = CFG.pond, S = CFG.pond.levels[this.lv - 1], fish = this.fish, sch = this.schools;
+    // respawn
+    if (fish.length < this.N) {
+      this.spawnAcc += dt * S.rate * this.growMul * this.envMul;
+      while (this.spawnAcc >= 1 && fish.length < this.N) { this.spawnAcc -= 1; const f = this.spawn(true); if (!w.quiet && this.rnd() < 0.35) w.emit('fishIn', { x: f.x, y: f.y }); }
+    } else this.spawnAcc = 0;
+    // 投喂器: every school swims to the feeder for a few seconds
+    let fx = 0, fy = 0;
+    if (this.feeder) {
+      this.feedT += dt;
+      if (this.feeding > 0) { this.feeding -= dt; }
+      else if (this.feedT >= P.feeder.every) { this.feedT = 0; this.feeding = P.feeder.dur; const fp = this.feedPt(); w.emit('feed', { x: fp.x, y: fp.y }); }
+      const fp = this.feedPt(); fx = fp.x; fy = fp.y;
+    }
+    // school centroids / headings
+    for (const s of sch) { s.cx = 0; s.cy = 0; s.vx = 0; s.vy = 0; s.k = 0; }
+    for (const f of fish) { const s = sch[f.s]; s.cx += f.x; s.cy += f.y; s.vx += f.vx; s.vy += f.vy; s.k++; }
+    for (const s of sch) {
+      if (s.k) { s.cx /= s.k; s.cy /= s.k; s.vx /= s.k; s.vy /= s.k; }
+      s.wt -= dt;
+      if (!s.k) { s.cx = s.gx; s.cy = s.gy; }
+      if (s.wt <= 0 || (s.k && Math.hypot(s.gx - s.cx, s.gy - s.cy) < 20)) { const g = this.randPt(28); s.gx = g.x; s.gy = g.y; s.wt = 3 + this.rnd() * 4; }
+    }
+    // the farmer startles fish when moving fast close by
+    const p = w.player, psp = Math.hypot(p.vx, p.vy), fast = psp > P.fastFrac * p.speed, fr = P.fleeR + p.harvestR * 0.5, fr2 = fr * fr;
+    const near = fast && p.x > this.x - fr && p.x < this.x + this.w + fr && p.y > this.y - fr && p.y < this.y + this.h + fr;
+    const x0 = this.x + P.edge, x1 = this.x + this.w - P.edge, y0 = this.y + P.edge, y1 = this.y + this.h - P.edge, sep2 = P.sep * P.sep;
+    for (let i = 0; i < fish.length; i++) {
+      const f = fish[i], s = sch[f.s];
+      let ax = 0, ay = 0;
+      if (f.sc > 0) f.sc -= dt;
+      const calm = f.sc <= 0;
+      // cohesion + alignment (weak while darting) + school goal (or the feeder)
+      const gx = this.feeding > 0 ? fx : s.gx, gy = this.feeding > 0 ? fy : s.gy;
+      ax += (s.cx - f.x) * (calm ? 1.6 : 0.3); ay += (s.cy - f.y) * (calm ? 1.6 : 0.3);
+      ax += (s.vx - f.vx) * (calm ? 1.2 : 0.2); ay += (s.vy - f.vy) * (calm ? 1.2 : 0.2);
+      const gd = Math.hypot(gx - f.x, gy - f.y) || 1, gk = this.feeding > 0 ? 70 : 34;
+      ax += (gx - f.x) / gd * gk; ay += (gy - f.y) / gd * gk;
+      // separation inside the school
+      for (let j = 0; j < fish.length; j++) {
+        if (j === i) continue; const o = fish[j]; if (o.s !== f.s) continue;
+        const dx = f.x - o.x, dy = f.y - o.y, dd = dx * dx + dy * dy;
+        if (dd < sep2 && dd > 1e-4) { const d = Math.sqrt(dd), k = (P.sep - d) / P.sep * 260; ax += dx / d * k; ay += dy / d * k; }
+      }
+      // flee
+      if (near) {
+        const dx = f.x - p.x, dy = f.y - p.y, dd = dx * dx + dy * dy;
+        // a startled fish reacts after a short, individual delay (so a quick sweep still nets part of a school)
+        if (dd < fr2) { f.al += dt; if (f.al > f.react) { const d = Math.sqrt(dd) || 1; ax += dx / d * P.accel * 2.2; ay += dy / d * P.accel * 2.2; if (f.sc <= 0) { f.sc = P.scareT; if (!w.quiet && i % 5 === 0) w.emit('scatter', { x: f.x, y: f.y }); } } }
+        else f.al = 0;
+      } else f.al = 0;
+      // banks
+      if (f.x < x0) ax += (x0 - f.x) * 30; else if (f.x > x1) ax -= (f.x - x1) * 30;
+      if (f.y < y0) ay += (y0 - f.y) * 30; else if (f.y > y1) ay -= (f.y - y1) * 30;
+      const am = Math.hypot(ax, ay), amax = P.accel * (calm ? 1 : 2.5);
+      if (am > amax) { ax *= amax / am; ay *= amax / am; }
+      f.vx += ax * dt; f.vy += ay * dt;
+      const sp = Math.hypot(f.vx, f.vy), vmax = calm ? P.cruise * (this.feeding > 0 ? 1.5 : 1) : P.dart, vmin = P.cruise * 0.45;
+      if (sp > vmax) { f.vx *= vmax / sp; f.vy *= vmax / sp; } else if (sp < vmin && sp > 1e-3) { f.vx *= vmin / sp; f.vy *= vmin / sp; }
+      f.x = Math.min(this.x + this.w - 3, Math.max(this.x + 3, f.x + f.vx * dt));
+      f.y = Math.min(this.y + this.h - 3, Math.max(this.y + 3, f.y + f.vy * dt));
+      f.ph += dt * (6 + sp * 0.12);
+    }
+  }
+  feedPt() { const F = this.feeder; return { x: Math.min(this.x + this.w - 22, Math.max(this.x + 22, F.x)), y: Math.min(this.y + this.h - 22, Math.max(this.y + 22, F.y)) }; }
+  // the school to chase from (x, y): most fish per distance; returns a lead point a little ahead of it
+  bestSchool(x, y, lead = 0.25) {
+    let best = null, bs = -1;
+    for (const s of this.schools) { if (!s.n) continue; const v = s.n / (Math.hypot(s.cx - x, s.cy - y) + 60); if (v > bs) { bs = v; best = s; } }
+    if (!best) return null;
+    return { x: Math.min(this.x + this.w - 4, Math.max(this.x + 4, best.cx + best.vx * lead)), y: Math.min(this.y + this.h - 4, Math.max(this.y + 4, best.cy + best.vy * lead)), n: best.n };
+  }
+}
+
+// ---------------------------------------------------------------------------
 function makeCollector(kind, x, y) {
   return { kind, x, y, vx: 0, vy: 0, face: 1, moving: false, walk: 0, dirY: 0,
            speed: 0, cap: 0, pickR: 0, harvestR: 0, cutRate: 0, pickRate: 0, dropRate: 0,
@@ -164,7 +288,8 @@ export class World {
   constructor(levelIndex, opts = {}) {
     this.li = levelIndex;
     // v4.0: opts.level = a remixed level object (每日挑战); otherwise the level from CFG
-    this.L = opts.level || CFG.levels[levelIndex];
+    // v4.2: machine goods go to a second counter (js/sales.js adds it, plus an output tray per machine)
+    this.L = splitSales(opts.level || CFG.levels[levelIndex]);
     this.daily = opts.level ? (opts.daily || {}) : null;
     this.timeLimit = opts.timeLimit || 0;     // 每日挑战: the run ends at this many seconds (score = money earned)
     this.vipMul = opts.vipMul || 1;
@@ -180,7 +305,7 @@ export class World {
     this.events = [];
     this.stats = { collected: {}, sold: {}, produced: {}, golden: {}, earned: 0, unlocks: 0 };
     this.upg = { cap: 0, speed: 0, radius: 0, wcap: 0, wspeed: 0 };
-    this.objs = {}; this.fields = []; this.coops = []; this.counters = []; this.procs = [];
+    this.objs = {}; this.fields = []; this.ponds = []; this.coops = []; this.counters = []; this.procs = [];
     this.piles = []; this.tiles = []; this.workers = []; this.customers = []; this.solids = [];
     this.fly = []; this.flyFree = [];
     this.gmode = 'collect';
@@ -193,6 +318,7 @@ export class World {
       this.tiles.push({ ...t, price, order: i, paid: 0, bought: 0, done: false, visible: false, price0: price, payFx: 0, appearT: -9, cool: 0 });
     });
     this.player = makeCollector('player', this.L.start[0], this.L.start[1]);
+    for (const p of this.procs) if (!p.hidden) this.staffProc(p);
     // v4.0 B 宠物狗 (opts.pet = 'dog'); the sims never pass it, so their results are unchanged
     this.dog = opts.pet === 'dog' ? { x: this.player.x - 30, y: this.player.y + 20, vx: 0, vy: 0, moving: false, walk: 0, face: 1, dirY: 0, sway: 0, state: 'follow', fetchT: CFG.pet.every * 0.6, carry: null, n: 0, tgt: null, fetched: 0, wag: 0 } : null;
     this.applyEnv();
@@ -213,6 +339,7 @@ export class World {
   }
   applyEnv() {
     for (const f of this.fields) f.envMul = this.envMul(f.item);
+    for (const f of this.ponds) f.envMul = this.envMul(f.item);
     for (const c of this.coops) { const m = this.envMul(c.item); if (m !== 1) c.period = CFG.producers[c.producer].period / m; }
   }
   // crops in this level that the season favours (for the HUD)
@@ -221,6 +348,7 @@ export class World {
     const S = CFG.seasons[this.season].crops, out = [];
     for (const f of this.fields) if (S.includes(f.item) && !out.includes(f.item)) out.push(f.item);
     for (const c of this.coops) if (S.includes(c.item) && !out.includes(c.item)) out.push(c.item);
+    for (const f of this.ponds) if (S.includes(f.item) && !out.includes(f.item)) out.push(f.item);
     return out;
   }
 
@@ -229,7 +357,9 @@ export class World {
   // ---- construction ------------------------------------------------------
   build(o) {
     const base = { ...o, hidden: !!o.hidden, appearT: -9 };
-    if (o.type === 'field') {
+    if (o.type === 'field' && o.crop === 'fish') {   // v4.2 鱼塘
+      const pd = new Pond(o, this.rnd); this.ponds.push(pd); this.objs[o.id] = pd;
+    } else if (o.type === 'field') {
       const f = new Field(o, this.rnd);
       if (f.spill) {
         f.pile = new Pile(o.crop, f.x, f.y, f.w, f.h);
@@ -254,7 +384,8 @@ export class World {
       this.piles.push(c.pile); this.coops.push(c); this.objs[o.id] = c;
     } else if (o.type === 'counter') {
       const K = CFG.counter, cu = CFG.customer;
-      const c = { ...base, kind: 'counter', stock: [], incoming: 0, queue: [], cash: 0, cashier: false, spawnT: 0.5,
+      const c = { ...base, kind: 'counter', stock: [], incoming: 0, queue: [], cash: 0, cashier: !!o.sale2,   // v4.2: the second counter has its two 店员 from the start
+                  spawnT: 0.5,
                   interval: cu.interval, serveRate: cu.serveRate, buyAcc: 0,
                   desk: rectAt(o.x, o.y, K.deskW, K.deskD),
                   zone: rectAt(o.x + K.zoneDx, o.y + K.zoneDy, K.zoneW, K.zoneH),
@@ -269,6 +400,10 @@ export class World {
       const p = { ...base, kind: 'proc', inItem: o.in, outItem: o.out, buf: 0, inc: 0, timer: 0, work: 0, outInc: 0,
                   body: rectAt(o.x, o.y, P.bodyW, P.bodyD),
                   inZone: rectAt(o.x + P.zoneDx, o.y, P.zoneW, P.zoneH) };
+      if (o.tray) {   // v4.2: the machine's goods heap up here; 搬运工 carry them to the second counter
+        p.pile = new Pile(o.out, o.tray[0], o.tray[1], o.tray[2], o.tray[3], CFG.proc.trayCap);
+        p.pile.owner = p; this.piles.push(p.pile);
+      }
       this.procs.push(p); this.objs[o.id] = p;
     }
   }
@@ -446,6 +581,8 @@ export class World {
         const o = this.objs[id]; if (!o) continue;
         o.hidden = false; o.appearT = this.t;
         if (o.kind === 'field') { if (silent) { o.g.fill(1); o.ripe = o.n; } else o.sprout(this.rnd, this.t); }
+        if (o.kind === 'pond') o.fill(silent ? 1 : 0.4);
+        if (o.kind === 'proc') this.staffProc(o);
       }
       this.rebuildSolids(); if (!silent) this.emit('ground', {});
     }
@@ -455,26 +592,53 @@ export class World {
       for (let i = before; i < c.n; i++) c.hens[i].appearT = this.t + (i - before) * 0.12;
     }
     if (e.up) { this.upg[e.up.key] += e.up.v; this.refreshStats(); }
-    if (e.worker) {
+    if (e.worker) this.addWorker(e.worker.from, e.worker.to, t.x, t.y, t.icon === 'cart' || t.icon === 'milker');
+    if (e.upgradeWorkers === 'loader') {
+      this.loaders = true;
+      for (const w of this.workers) if (!w.cart && !w.loader && !w.porter) { w.loader = true; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
+      this.refreshStats();
+    }
+    if (e.sprinkler) for (const id of e.sprinkler) { const f = this.objs[id]; if (f && (f.kind === 'field' || f.kind === 'pond')) { f.growMul = CFG.sprinkler.growMul; f.sprinkler = true; f.sprinklerT = this.t; } }
+    if (e.vehicle) { this.player.vehicle = true; this.player.appearT = this.t; this.refreshStats(); }
+    if (e.cashier) for (const id of e.cashier) { const c = this.objs[id]; c.cashier = true; if (c.cash > 0) { this.money += c.cash; c.cash = 0; } }
+    if (e.feeder) { const pd = this.objs[e.feeder]; if (pd && pd.kind === 'pond') { pd.feeder = { x: t.x, y: t.y }; pd.feedT = CFG.pond.feeder.every - 1.5; pd.feederT = this.t; } }
+    if (e.proc) for (const pe of e.proc) { const p = this.objs[pe.id]; p.time *= Math.min(pe.mul, CFG.procUp.timeMul); }
+  }
+
+  // v4.2 a machine comes with its staff: one extra hand carrying the raw crop into it, and (level-wide) two
+  // 搬运工 carrying its goods from the output tray to the second counter (+1 per terminal machine beyond two)
+  staffProc(p) {
+    if (p.staffed) return; p.staffed = true;
+    const srcs = [...this.fields, ...this.ponds, ...this.coops].filter((o) => o.item === p.inItem).map((o) => o.id);
+    if (srcs.length) {
+      const coop = srcs.every((id) => this.objs[id].kind === 'coop');
+      const w = this.addWorker(srcs, [p.id], p.inZone.cx - 30, p.inZone.cy + 30, coop); w.staff = true;
+    }
+    const sale = p.outObj && p.outObj.kind === 'counter' ? p.outObj : null;
+    if (!sale || !p.pile) return;
+    const term = this.procs.filter((q) => q.pile && q.outObj === sale), live = term.filter((q) => q.staffed).length;
+    const want = Math.max(2, live), have = this.workers.filter((w) => w.porter).length;
+    if (sale.hidden) { sale.hidden = false; sale.appearT = this.t; this.rebuildSolids(); this.emit('ground', {}); }
+    for (let k = have; k < want; k++) {
+      const w = this.addWorker(term.map((q) => q.id), [sale.id], p.pile.x + p.pile.w / 2 + k * 10, p.pile.y + p.pile.h + 14, false);
+      w.porter = true; w.staff = true;
+    }
+    for (const w of this.workers) if (w.porter) w.from = term.map((q) => q.id);
+  }
+  addWorker(from, to, x, y, cart) {
+    {
+      const t = { x, y };
       const w = makeCollector('worker', t.x, t.y);
-      w.from = e.worker.from; w.to = e.worker.to; w.state = 'collect'; w.wait = 0; w.tgt = null; w.retarget = 0;
-      w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = t.icon === 'cart' || t.icon === 'milker';
+      w.from = from; w.to = to; w.state = 'collect'; w.wait = 0; w.tgt = null; w.retarget = 0;
+      w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = cart;
       w.lumber = w.from.some((id) => this.objs[id] && this.objs[id].item === 'log');
-      w.fisher = w.from.some((id) => this.objs[id] && this.objs[id].item === 'fish');   // v3.7 渔夫 (render: net + rain hat)
+      w.fisher = w.from.some((id) => this.objs[id] && this.objs[id].item === 'fish' && this.objs[id].kind === 'pond');   // v3.7 渔夫 (render: net + rain hat)
       w.lv = 1; w.trips = 0; w.lvT = -9; w.loader = this.loaders && !w.cart;
       w.done = 0; const cm = this.crew && this.crew[this.workers.length];
       if (cm) { w.crewId = cm.id; w.crewName = cm.name; w.crewMul = cm.mul; }
       this.workers.push(w); this.refreshStats();
+      return w;
     }
-    if (e.upgradeWorkers === 'loader') {
-      this.loaders = true;
-      for (const w of this.workers) if (!w.cart && !w.loader) { w.loader = true; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
-      this.refreshStats();
-    }
-    if (e.sprinkler) for (const id of e.sprinkler) { const f = this.objs[id]; if (f && f.kind === 'field') { f.growMul = CFG.sprinkler.growMul; f.sprinkler = true; f.sprinklerT = this.t; } }
-    if (e.vehicle) { this.player.vehicle = true; this.player.appearT = this.t; this.refreshStats(); }
-    if (e.cashier) for (const id of e.cashier) { const c = this.objs[id]; c.cashier = true; if (c.cash > 0) { this.money += c.cash; c.cash = 0; } }
-    if (e.proc) for (const pe of e.proc) { const p = this.objs[pe.id]; p.time *= Math.min(pe.mul, CFG.procUp.timeMul); }
   }
 
   // ---- goal ------------------------------------------------------------------
@@ -508,6 +672,7 @@ export class World {
       }
     }
     if (!this.quiet) for (const f of this.fields) { const pop = f.pop; for (let i = 0, n = f.n; i < n; i++) if (pop[i] > 0) pop[i] = Math.max(0, pop[i] - dt * 3); }
+    for (const pd of this.ponds) pd.update(dt, this);
     // hens lay
     for (const c of this.coops) {
       if (c.hidden) continue;
@@ -548,14 +713,18 @@ export class World {
       // room on the counter: raw produce dumped there never blocks the machine's own goods
       const out = p.outObj, chain = out && out.kind === 'proc';
       // a machine can feed another machine (logs → planks → chairs)
-      let room = !out || (chain ? out.buf + out.inc < CFG.proc.chainMax : out.stock.length + out.incoming < CFG.counter.stockMax);
-      if (!room && !chain) { let k = 0; for (const it of out.stock) if (it === p.outItem) k++; room = k + out.incoming < CFG.counter.stockMax * 0.5; }
+      const tray = p.pile;
+      let room = tray ? tray.total + tray.pending < tray.cap : !out || (chain ? out.buf + out.inc < CFG.proc.chainMax : out.stock.length + out.incoming < CFG.counter.stockMax);
+      if (!room && !chain && !tray) { let k = 0; for (const it of out.stock) if (it === p.outItem) k++; room = k + out.incoming < CFG.counter.stockMax * 0.5; }
       if (p.buf >= p.ratio && room) {
         p.timer += dt; p.work = 1;
         if (p.timer >= p.time) {
           p.timer = 0; p.buf -= p.ratio;
           this.stats.produced[p.outItem] = (this.stats.produced[p.outItem] || 0) + 1;
-          if (chain) { out.inc++; this.launch(p.outItem, 'procIn', p.x, p.y, 36, out, out.x - 14, out.y, CFG.proc.bodyH + 10, CFG.fly.produce * 1.6, 40); }
+          if (tray) {   // v4.2: onto the output tray (a little heap the 搬运工 carry off)
+            const tx = tray.x + 4 + this.rnd() * (tray.w - 8), ty = tray.y + 4 + this.rnd() * (tray.h - 8);
+            tray.pending++; this.launch(p.outItem, 'pile', p.x, p.y, 36, tray, tx, ty, 0, CFG.fly.produce);
+          } else if (chain) { out.inc++; this.launch(p.outItem, 'procIn', p.x, p.y, 36, out, out.x - 14, out.y, CFG.proc.bodyH + 10, CFG.fly.produce * 1.6, 40); }
           else if (out) { out.incoming++; this.launch(p.outItem, 'counter', p.x, p.y, 36, out, out.x, out.y, CFG.counter.deskH + 4, CFG.fly.produce); }
           this.emit('produce', { x: p.x, y: p.y, item: p.outItem });
         }
@@ -704,6 +873,36 @@ export class World {
         }
         if (isPlayer) this.comboGain += cut;
         if (cut) { c.cutT = this.t; c.cutItem = f.item; this.emit('harvest', { x: cx / cut, y: cy / cut, n: cut, item: f.item, who: c.kind }); }
+      }
+      // v4.2 鱼塘: every fish inside the net is caught while there is room (each species fills its yield)
+      for (const pd of this.ponds) {
+        if (pd.hidden || !pd.fish.length || (srcs && !srcs.includes(pd)) || !this.hasSink('fish')) continue;
+        const hr = c.harvestR;
+        if (c.x < pd.x - hr || c.x > pd.x + pd.w + hr || c.y < pd.y - hr || c.y > pd.y + pd.h + hr) continue;
+        const hr2 = hr * hr, SP = CFG.pond.species; let got = 0, cx = 0, cy = 0;
+        for (let i = pd.fish.length - 1; i >= 0; i--) {
+          const f = pd.fish[i]; if (d2(f.x, f.y, c.x, c.y) > hr2) continue;
+          const room = space(); if (room <= 0) break;
+          pd.remove(i); pd.caught++; got++; cx += f.x; cy += f.y;
+          if (f.gold) {   // 金锦鲤: pays straight into the wallet, counts for the 图鉴 金色变种
+            const amount = itemPrice('fish') * CFG.golden.mul * CFG.pond.goldMul;
+            this.money += amount; this.stats.earned += amount;
+            this.stats.golden.fish = (this.stats.golden.fish || 0) + 1;
+            this.emit('golden', { x: f.x, y: f.y, amount, who: c.kind, koi: true });
+            continue;
+          }
+          const n = Math.min(SP[f.sp].yield, room);
+          for (let k = 0; k < n; k++) { c.incoming++; this.launch('fish', 'stack', f.x, f.y, 4 + k * 8, c, 0, 0, 0, CFG.fly.harvest + k * 0.06, 50); }
+          this.stats.collected.fish = (this.stats.collected.fish || 0) + n;
+          if (f.sp) this.stats.species = Object.assign(this.stats.species || {}, { [SP[f.sp].id]: ((this.stats.species || {})[SP[f.sp].id] || 0) + 1 });
+        }
+        if (got) {
+          if (isPlayer) this.comboGain += got;
+          c.cutT = this.t; c.cutItem = 'fish';
+          this.emit('catch', { x: cx / got, y: cy / got, n: got, who: c.kind });
+          const L = CFG.pond.levels;
+          while (pd.lv < L.length && pd.caught >= L[pd.lv].at) { pd.setLevel(pd.lv + 1); pd.lvT = this.t; this.emit('pondLevel', { x: pd.X + pd.MW / 2, y: pd.Y + pd.MH / 2, lv: pd.lv, id: pd.id }); this.emit('ground', {}); }
+        }
       }
       // piles
       if (space() > 0) {
@@ -866,7 +1065,7 @@ export class World {
     if (w.state === 'collect') {
       let best = null, bv = 0;
       for (const s of srcs) {
-        const v = s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + s.ripe;
+        const v = s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + (s.ripe || 0);
         if (v > bv) { bv = v; best = s; }
       }
       if (!best) {
@@ -874,7 +1073,9 @@ export class World {
         if (w.stack.length > 0 && w.wait > 1.5) w.state = 'deliver';
       } else {
         w.retarget -= dt;
-        if (w.retarget <= 0 || !w.tgt) {
+        if (best.kind === 'pond') {   // 渔夫 chase the nearest school (re-aimed often: fish move)
+          if (w.retarget <= 0 || !w.tgt) { w.retarget = 0.2; w.tgt = best.bestSchool(w.x, w.y, 0.3); }
+        } else if (w.retarget <= 0 || !w.tgt) {
           w.retarget = 0.4;
           const pl = best.pile;
           const i = pl && pl.total > 0 ? pl.hottest(w.x, w.y, T) : -1;
@@ -974,6 +1175,12 @@ export class World {
       const s = Math.min(free, pl.total) * val / (Math.sqrt(d2(x, y, p.x, p.y)) + 80);
       if (s > bs) { bs = s; best = { x, y, kind: 'pile' }; }
     }
+    for (const pd of this.ponds) if (!pd.hidden && pd.fish.length) {
+      const val = value('fish'); if (!val) continue;
+      const sc = pd.bestSchool(p.x, p.y, 0.35); if (!sc) continue;
+      const s = Math.min(free, sc.n * 1.6) * val / (Math.sqrt(d2(sc.x, sc.y, p.x, p.y)) + 80);
+      if (s > bs) { bs = s; best = { x: sc.x, y: sc.y, kind: 'pond' }; }
+    }
     for (const f of this.fields) if (!f.hidden && f.ripe > 0 && (!f.spill || f.pile.total < 20)) {
       const val = value(f.item); if (!val) continue;
       const i = f.nearestRipe(p.x, p.y); if (i < 0) continue;
@@ -1058,7 +1265,7 @@ export class World {
              tiles: this.tiles.map((t) => ({ id: t.id, paid: t.paid, bought: t.bought })),
              stack: this.player.stack.slice(0, 600),
              cash: this.counters.map((c) => c.cash), stock: this.counters.map((c) => c.stock.slice(0, 300)),
-             buf: this.procs.map((p) => p.buf) };
+             buf: this.procs.map((p) => p.buf), ponds: this.ponds.map((p) => p.caught) };
   }
   restore(s) {
     for (const ts of s.tiles || []) {
@@ -1073,6 +1280,7 @@ export class World {
     (s.cash || []).forEach((v, i) => { if (this.counters[i]) this.counters[i].cash = v || 0; });
     (s.stock || []).forEach((v, i) => { if (this.counters[i] && Array.isArray(v)) this.counters[i].stock = v.filter((x) => CFG.items[x]); });
     (s.buf || []).forEach((v, i) => { if (this.procs[i]) this.procs[i].buf = v || 0; });
+    (s.ponds || []).forEach((v, i) => { const pd = this.ponds[i]; if (!pd) return; pd.caught = v || 0; const L = CFG.pond.levels; while (pd.lv < L.length && pd.caught >= L[pd.lv].at) pd.setLevel(pd.lv + 1); if (!pd.hidden) pd.fill(1); });
     this.updateTileVis(true);
   }
 }
