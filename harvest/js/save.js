@@ -16,7 +16,7 @@ try {
 export const storageAvailable = () => !!storage;
 
 export function defaults() {
-  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true, mode: 'auto', quality: 'auto' }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults(), daily: dailyDefaults(), book: { ...bookDefaults(), filled: true } };
+  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true, mode: 'auto', quality: 'auto' }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults(), daily: dailyDefaults(), book: { ...bookDefaults(), filled: true }, valley: { season: null } };
 }
 
 export function load() {
@@ -39,6 +39,9 @@ export function load() {
     out.daily = normDaily(d.daily);
     // v4.0 B: 图鉴 (older saves are back-filled once from their cleared levels and the 雇工 records)
     out.book = normBook(d.book); backfill(out);
+    // v4.6 四季山谷: the season the player picked there (null = start on this week's season); older saves get the default
+    const vs = d.valley && d.valley.season;
+    out.valley = { season: Number.isInteger(vs) && vs >= 0 && vs < 4 ? vs : null };
     if (out.cur && typeof out.cur !== 'object') out.cur = null;
     return out;
   } catch (_) { return defaults(); }

@@ -25,3 +25,10 @@ export const currentSeason = () => seasonInfo().i;
 export function rollRain(li, r = Math.random) { return li > 0 && r() < CFG.rain.chance; }
 
 export const cropNames = (list) => list.map((c) => (CFG.items[c] ? CFG.items[c].name : c));
+
+// v4.6 四季山谷: there the player picks the season (saved in data.valley.season; first visit = this week's season)
+export const isValleyLi = (li) => !!CFG.valley && li >= CFG.valley.from && li < CFG.valley.from + CFG.valley.n;
+export const valleyOpen = (data) => !!CFG.valley && (data.unlocked || 0) >= CFG.valley.unlockAfter;
+export function valleySeason(data) { const s = data && data.valley && data.valley.season; return Number.isInteger(s) ? s : currentSeason(); }
+// the three crops of a season in the valley (and their products), for the switcher
+export function valleyCrops(s) { const L = CFG.valley.lines[s]; return ['A', 'B', 'C'].map((k) => L[k].crop); }

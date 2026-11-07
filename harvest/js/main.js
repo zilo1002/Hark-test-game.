@@ -36,7 +36,7 @@ const restoredAt = {};            // session-only animation stamps for the home 
 const ITEM_BITS = { wheat: ['#F6CB4A', '#FFE07A', '#C9962A'], potato: ['#5DBB3A', '#9C6331', '#C98A4B'], egg: ['#FFF3D6', '#FFFFFF'], tomato: ['#EE4630', '#5DBB3A'],
                     tulip: ['#F2486E', '#FF8FB0', '#FFB3C8', '#5DBB3A'], rose: ['#E0283C', '#FF5A78', '#8E0E1E', '#3E8F25'], gold: ['#FFC21A', '#FFE16B', '#F29C0E', '#5DBB3A'],
                     log: ['#9A5A2E', '#F2CF8A', '#5DBB3A', '#C99A5E'], corn: ['#FFD23F', '#6CCB3E', '#F2B529'], pumpkin: ['#F2871E', '#5DBB3A', '#FFAE58'], berry: ['#E8243C', '#5DBB3A', '#FFFFFF'],
-                    fish: ['#BDE8FF', '#FFFFFF', '#4FA8F0', '#FF8A3D'], grape: ['#7A3EA8', '#8E4EC0', '#5DBB3A'], pepper: ['#E8302C', '#FFC21A', '#5DBB3A'] };
+                    fish: ['#BDE8FF', '#FFFFFF', '#4FA8F0', '#FF8A3D'], grape: ['#7A3EA8', '#8E4EC0', '#5DBB3A'], pepper: ['#E8302C', '#FFC21A', '#5DBB3A'], chips: ['#FFD23F', '#E8302C'] };
 
 const ui = new UI({
   home: () => goHome(),
@@ -79,6 +79,15 @@ const ui = new UI({
     return r;
   },
   // 每日挑战
+  // v4.6 四季山谷: pick the season there. A valley run in progress in another season starts over (its fields would differ);
+  // restart = also restart the level being played (from the pause screen)
+  valleySeason: (s, restart) => {
+    if (!Number.isInteger(s) || s < 0 || s > 3) return;
+    data.valley = { season: s };
+    if (data.cur && Seasons.isValleyLi(data.cur.li) && (!data.cur.env || data.cur.env.season !== s)) data.cur = null;
+    Save.save(data); snd.play('appear'); hap.tick(14, 0);
+    if (restart && world && Seasons.isValleyLi(world.li) && world.season !== s) { const li = world.li; world = null; start(li); }
+  },
   dailyStart: () => { snd.unlock(); snd.play('tap'); startDaily(); },
   locked: () => { snd.play('full'); hap.tick(30, 0); },
   save: () => Save.save(data),
@@ -128,15 +137,18 @@ function start(li) {
   const resume = data.cur && data.cur.li === li;
   const crew = Crew.levelCrew(data.crew, li);   // 雇工: who works this level, with their 特长
   // v4.0 四季与天气: this week's season; 1 run in 5 is rainy (a resumed run keeps its weather)
+  // v4.6 四季山谷: the season the player picked there (a resumed run keeps the season it was started in)
+  const valley = Seasons.isValleyLi(li);
+  const sea = valley ? (resume && data.cur.env && Number.isInteger(data.cur.env.season) ? data.cur.env.season : Seasons.valleySeason(data)) : Seasons.currentSeason();
   const env = resume && data.cur.env && typeof data.cur.env === 'object'
-    ? { season: Seasons.currentSeason(), rain: !!data.cur.env.rain }
-    : { season: Seasons.currentSeason(), rain: forceRain !== null ? forceRain && li > 0 : Seasons.rollRain(li) };
+    ? { season: sea, rain: !!data.cur.env.rain }
+    : { season: sea, rain: forceRain !== null ? forceRain && li > 0 : Seasons.rollRain(li) };
   forceRain = null;
   R.setFestival(Fest.currentFestival());
   world = new World(li, { crew, pet: petOpt(), ...env });
   if (resume) { try { world.restore(data.cur); } catch (_) { world = new World(li, { crew, pet: petOpt(), ...env }); } }
   else data.cur = world.snapshot();
-  Orders.ensureOrders(data); ordBase = Orders.cloneStats(world.stats); ordItems = Orders.levelItems(li); bookBase = Book.cloneBookStats(world.stats);
+  Orders.ensureOrders(data); ordBase = Orders.cloneStats(world.stats); ordItems = Orders.levelItems(li, world.L); bookBase = Book.cloneBookStats(world.stats);
   data.played = true; Save.save(data);
   R.setWorld(world); R.setMode('play'); R.follow(0, true); fx.clear();
   mode = 'play'; winDone = false; guide = null; guideT = 0;

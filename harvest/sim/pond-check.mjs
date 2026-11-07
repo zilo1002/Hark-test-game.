@@ -84,7 +84,8 @@ for (const li of fishLevels) {
     const fishers = w.workers.filter((k) => k.fisher); let over = 0;
     for (let i = 0; i < 60 * 90; i++) { w.update(1 / 60, 0, 0); for (const k of fishers) if (k.stack.length + k.incoming > k.cap) over++; }
     const trips = fishers.reduce((a, k) => a + k.trips, 0);
-    ok(fishers.length > 0 && trips > fishers.length && over === 0, `${tag} 渔夫 ×${fishers.length}: delivery trips ${trips}, over-cap frames ${over}`);
+    // v4.6 smartStaff (四季山谷): fishers delivering to a stocked raw counter wait at their post, so fewer trips are expected
+    ok(fishers.length > 0 && trips > (w.smart ? 0 : fishers.length) && over === 0, `${tag} 渔夫 ×${fishers.length}: delivery trips ${trips}, over-cap frames ${over}`);
   }
 }
 console.log(fails ? `\n${fails} pond checks failed` : '\nall pond checks passed');

@@ -14,7 +14,8 @@ const segDist2 = (px, py, ax, ay, bx, by) => {
 };
 CFG.fever.perItem = 0;   // fever would widen the swath mid-run
 let fails = 0, runs = 0;
-for (const li of [0, 1, 4, 7, 13, 15, 19, 20, 21, 32, 34, 36, 43, 44]) {   // + v3.3: trees, corn, strawberries, pumpkins; + v3.7: fish pond, grape rows (gapY), greenhouse tomatoes; + v3.7b: lakeside market & estate mixes
+for (const li of [0, 1, 4, 7, 13, 15, 19, 20, 21, 32, 34, 36, 43, 44, 45, 46, 48]) {   // + v4.6 valley 46/47/49 (BANMU_SEASON=0..3 picks the season's crops)
+    // + v3.3: trees, corn, strawberries, pumpkins; + v3.7: fish pond, grape rows (gapY), greenhouse tomatoes; + v3.7b: lakeside market & estate mixes
   const L = CFG.levels[li];
   // v4.2: fish ponds are not fields any more (fish swim; sim/pond-check.mjs covers them)
   for (const f0 of L.objects.filter((o) => o.type === 'field' && !o.hidden && !CFG.crops[o.crop].spill && o.crop !== 'fish')) {
@@ -67,7 +68,7 @@ for (const li of [0, 1, 7, 15, 32, 34]) {   // v3.7: 第33关 fish, 第35关 gra
 }
 fails += mfails;
 // ---- gardeners / loaders never cut while full, and always go back to unload
-for (const li of [0, 7, 13, 15, 25, 29, 31, 32, 34, 36, 37]) {
+for (const li of [0, 7, 13, 15, 25, 29, 31, 32, 34, 36, 37, 45, 47, 51]) {
   const w = new World(li, { quiet: true, seed: 9 });
   for (const t of w.tiles) if (!t.done) w.completeTile(t, true);
   let over = 0, cutFull = 0, trips = 0;

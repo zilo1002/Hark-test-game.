@@ -64,14 +64,14 @@ export function worldOpts(twist) {
 // today's challenge for a save: { day, li, twist, name, desc, L, opts, tiers: [bronze, silver, gold], seed }
 export function dailyFor(data, d = new Date()) {
   const day = typeof d === 'string' ? d : today(d);
-  const cleared = Math.min(CFG.levels.length, Math.max(CFG.daily.unlockAfter, data.unlocked || 0));
+  const cleared = Math.min(CFG.valley ? CFG.valley.from : CFG.levels.length, Math.max(CFG.daily.unlockAfter, data.unlocked || 0));   // v4.6: never a 四季山谷 level (its crops follow the picked season)
   const r = rng(hashStr('daily:' + day));
   let li = 1 + Math.floor(r() * (cleared - 1));            // a cleared level, never the tutorial
   let twist = TWIST_IDS[Math.floor(r() * TWIST_IDS.length)];
   if (twist === 'swap' && !Object.keys(swapMap(li)).length) twist = 'gold';
   // once today's challenge has been opened it stays the same all day (clearing more levels doesn't re-roll it)
   const D = data.daily;
-  if (D && D.day === day && Number.isInteger(D.li) && D.li > 0 && D.li < CFG.levels.length && TWISTS[D.twist]) { li = D.li; twist = D.twist; }
+  if (D && D.day === day && Number.isInteger(D.li) && D.li > 0 && D.li < (CFG.valley ? CFG.valley.from : CFG.levels.length) && TWISTS[D.twist]) { li = D.li; twist = D.twist; }
   const L = buildLevel(li, twist);
   const ref = DAILY_REF[`${li}:${twist}`] || Math.round(CFG.levels[li].goal.type === 'earn' ? CFG.levels[li].goal.n / CFG.levels[li].par * CFG.daily.time : 3000);
   const tiers = CFG.daily.tiers.map((f) => nice(ref * f));

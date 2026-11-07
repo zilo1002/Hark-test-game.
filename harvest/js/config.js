@@ -112,6 +112,8 @@ export const CFG = {
     pepper:   { name: '甜椒',   unit: '个', price: 3,  step: 5.6 },
     // v3.7 part B — levels 39–45: the lakeside winery
     wine:     { name: '葡萄酒', unit: '瓶', price: 34, step: 9.5 },
+    // v4.6 四季山谷: winter potatoes go into the fryer
+    chips:    { name: '薯条',   unit: '份', price: 11, step: 8.5 },
   },
 
   pile: { cell: 10, layer: 4.4, slope: 3, cap: 3800 },
@@ -149,6 +151,10 @@ export const CFG = {
   // 加工品 porters are buyable tiles (js/sales.js generates them). Prices = factor × the level's median hire price s.
   // cup = 收银升级 per counter (each level: checkout ×serve, customers arrive ×interval; Lv2 also +buy items per customer).
   // mup = each machine's own upgrade path (Lv1 = the v4.1 快机器: ×0.42 work time; Lv2 ×0.7 more).
+  // v4.6 分工 (levels with smartStaff): raw counters in machine levels are only topped up (below rawLow, up to rawFull raw
+  // items); a raw carrier feeds a machine of its crop whose input is below starve × inMax first; a worker with no open sink
+  // stops collecting at holdAt × its stack and waits at a post (nobody delivers to a full counter / machine)
+  v46: { rawLow: 30, rawFull: 80, starve: 0.5, holdAt: 0.5 },
   v45: { batch: 0.5, backAt: 0.5, porterBack: 10 },   // v4.5 machine staff: feeder small batch = ≤50% of its stack (and what the machine has room for); help on the farm, back to the machine at ≤50% input / porter at ≥10 on the tray
   v43: { machine: 0.5, machine2: 0.7, sale: 0.35, raw: [0.4, 0.8], porter: [0.4, 0.8], clerk: 0.7,
          cup: { base: 0.5, mul: 1.6, times: 2, serve: 1.6, interval: 0.75, buy: 4 },
@@ -1001,7 +1007,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[400, 360, 480, 100], [520, 130, 90, 230]], hedges: [[780, 660, 90, 22]], trees: [[840, 700, 'cone'], [840, 60, 'round']], bushes: [[420, 40], [840, 440]] } },
 
     // 40 — the winery: grapes → grape juice → wine, aged in big oak barrels
-    { name: '葡萄酒庄', W: 900, H: 760, start: [500, 420], par: 250, bill: 20,
+    { name: '葡萄酒庄', W: 900, H: 760, start: [500, 420], par: 210, bill: 20, oneCounter: true, smartStaff: true,
       goal: { type: 'produce', item: 'wine', n: 130 },
       objects: [
         { id: 'G1', type: 'field', crop: 'grape', x: 40, y: 40, w: 330, h: 300, gap: 9, gapY: 24 },
@@ -1216,3 +1222,257 @@ export function goalText(g) {
     default: return '';
   }
 }
+
+// ======================= v4.6 四季山谷: levels 46–53 =======================
+// Opens once level 45 is cleared. In this area the player picks the season (春/夏/秋/冬) instead of the real
+// week: the season sets the look (render3d tints by world.season) AND which crops grow. Each season has three
+// crop lines A/B/C (crop + its machine product). Level specs below use tokens: a field crop 'A', a machine
+// in 'B' (its product follows), counter items 'A' / 'A+' (= A's product), a goal { item: 'B+', n: [春,夏,秋,冬] },
+// tile icon '$hire' / '$plot' / '$mach' / '$radius' / '$water' with `ln: 'A'` (labels follow the crop).
+// valleyLevel(k, season) resolves spec k into a normal level object (cached, so sales.js's cache holds);
+// CFG.levels[45 + k] is the spring version so every other system (orders, book, checks) sees a valid level.
+// All valley crops are that season's crops, so they all get the season's +20% regrow (CFG.seasons[s].crops).
+const VL = {
+  from: 45,   // first valley level index (level 46); unlocked by clearing level 45 (data.unlocked >= 45)
+  lines: [
+    { A: { crop: 'tulip',  gap: 8,  out: 'basket',  ratio: 6 }, B: { crop: 'rose',   gap: 9,  out: 'perfume', ratio: 6 }, C: { crop: 'berry',   gap: 9,  out: 'jam',    ratio: 5 } },
+    { A: { crop: 'corn',   gap: 10, out: 'popcorn', ratio: 6 }, B: { crop: 'tomato', gap: 11, out: 'ketchup', ratio: 5 }, C: { crop: 'gold',    gap: 9,  out: 'bouquet', ratio: 5 } },
+    { A: { crop: 'wheat',  gap: 9,  out: 'flour',   ratio: 5 }, B: { crop: 'grape',  gap: 9, gapY: 24, out: 'gjuice', ratio: 5 }, C: { crop: 'pumpkin', gap: 22, out: 'pie', ratio: 4 } },
+    { A: { crop: 'potato', gap: 30, out: 'chips',   ratio: 5 }, B: { crop: 'log',    gap: 30, out: 'plank',   ratio: 5 }, C: { crop: 'fish',    gap: 16, out: 'smoked', ratio: 5 } },
+  ],
+  specs: [
+    // 46 — one crop, two plots: the valley's tutorial for switching seasons
+    { name: '山谷溪田', W: 760, H: 620, start: [430, 320], par: 170, bill: 10,
+      goal: { type: 'earn', n: [1500, 1500, 1500, 2400] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 280, h: 240 },
+        { id: 'F2', type: 'field', crop: 'A', x: 40, y: 330, w: 280, h: 250, hidden: true },
+        { id: 'C1', type: 'counter', items: ['A'], x: 600, y: 320 },
+      ],
+      tiles: [
+        { id: 'a', x: 380, y: 450, price: 25, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 30 } } },
+        { id: 'b', x: 370, y: 360, price: 60, icon: '$plot', ln: 'A', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'c', x: 440, y: 550, price: 90, icon: '$hire', ln: 'A', req: ['a'], effect: { worker: { from: ['F1', 'F2'], to: ['C1'] } } },
+        { id: 'd', x: 390, y: 150, price: 110, icon: 'speed', label: '跑鞋', req: ['b'], effect: { up: { key: 'speed', v: 25 } } },
+        { id: 'e', x: 520, y: 560, price: 170, icon: '$hire', ln: 'A', req: ['c'], effect: { worker: { from: ['F1', 'F2'], to: ['C1'] } } },
+        { id: 'f', x: 480, y: 80, price: 140, icon: '$radius', ln: 'A', req: ['d'], effect: { up: { key: 'radius', v: 6 } } },
+        { id: 'g', x: 480, y: 200, price: 160, icon: 'loader', label: '园丁换铲车', req: ['c'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'h', x: 680, y: 200, price: 200, icon: 'cashier', label: '店员', req: ['c'], effect: { cashier: ['C1'] } },
+        { id: 'i', x: 370, y: 270, price: 150, icon: '$water', ln: 'A', req: ['b'], effect: { sprinkler: ['F1', 'F2'] } },
+      ],
+      deco: { theme: 'garden', paths: [[350, 270, 410, 100], [470, 370, 90, 250]], hedges: [[660, 480, 90, 22]], trees: [[720, 580, 'cone'], [700, 60, 'round']], bushes: [[600, 40], [720, 200], [640, 580]] } },
+
+    // 47 — two crops, two counters
+    { name: '坡上双田', W: 900, H: 780, start: [520, 430], par: 180, bill: 20,
+      goal: { type: 'earn', n: [3700, 5250, 3300, 3200] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 50, y: 50, w: 290, h: 280 },
+        { id: 'F2', type: 'field', crop: 'B', x: 50, y: 420, w: 290, h: 300, hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B'], x: 740, y: 300 },
+        { id: 'C2', type: 'counter', items: ['B', 'A'], x: 740, y: 540, hidden: true },
+      ],
+      tiles: [
+        { id: 'a', x: 480, y: 560, price: 50, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 50 } } },
+        { id: 'b', x: 420, y: 480, price: 120, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'c', x: 440, y: 150, price: 160, icon: '$hire', ln: 'A', req: ['a'], effect: { worker: { from: ['F1'], to: ['C1'] } } },
+        { id: 'd', x: 440, y: 690, price: 220, icon: '$hire', ln: 'B', req: ['b'], effect: { worker: { from: ['F2'], to: ['C2', 'C1'] } } },
+        { id: 'e', x: 740, y: 540, price: 160, icon: 'counter', label: '出售台', req: ['b'], effect: { show: ['C2'] } },
+        { id: 'f', x: 560, y: 150, price: 140, icon: 'speed', label: '跑鞋', req: ['c'], effect: { up: { key: 'speed', v: 25 } } },
+        { id: 'g', x: 560, y: 260, price: 320, icon: 'loader', label: '园丁换铲车', req: ['c'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'h', x: 850, y: 420, price: 260, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1', 'C2'] } },
+        { id: 'i', x: 440, y: 360, price: 200, icon: '$water', ln: 'B', req: ['b'], effect: { sprinkler: ['F1', 'F2'] } },
+      ],
+      deco: { theme: 'farm', paths: [[380, 380, 520, 100], [640, 120, 80, 260]], hedges: [[820, 700, 70, 22]], trees: [[860, 740, 'round'], [860, 60, 'cone']], bushes: [[700, 40], [480, 40]] } },
+
+    // 48 — the first valley machine: crop B into its product
+    { name: '山谷小作坊', W: 820, H: 680, start: [460, 400], par: 190, bill: 20,
+      goal: { type: 'produce', item: 'B+', n: [390, 430, 260, 170] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'B', x: 40, y: 40, w: 320, h: 300 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 390, w: 300, h: 250, hidden: true },
+        { id: 'M1', type: 'proc', in: 'B', ratio: 5, time: 0.5, x: 640, y: 200, outTo: 'C1' },
+        { id: 'C1', type: 'counter', items: ['B', 'B+'], x: 650, y: 420 },
+      ],
+      tiles: [
+        { id: 'a', x: 440, y: 540, price: 50, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 40 } } },
+        { id: 'b', x: 420, y: 150, price: 150, icon: '$hire', ln: 'B', req: ['a'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'c', x: 400, y: 450, price: 100, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'd', x: 460, y: 640, price: 230, icon: '$hire', ln: 'B', req: ['c'], effect: { worker: { from: ['F2'], to: ['M1'] } } },
+        { id: 'e', x: 740, y: 90, price: 230, icon: 'gear', label: '快机器', req: ['b'], effect: { proc: [{ id: 'M1', mul: 0.6 }] } },
+        { id: 'f', x: 560, y: 640, price: 250, icon: 'cashier', label: '店员', req: ['d'], effect: { cashier: ['C1'] } },
+        { id: 'g', x: 480, y: 280, price: 280, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'h', x: 530, y: 520, price: 180, icon: '$water', ln: 'B', req: ['c'], effect: { sprinkler: ['F1', 'F2'] } },
+      ],
+      deco: { theme: 'farm', paths: [[380, 350, 440, 100], [500, 180, 90, 170]], hedges: [[700, 560, 100, 22]], trees: [[780, 640, 'round'], [780, 280, 'cone']], bushes: [[400, 40], [780, 40]] } },
+
+    // 49 — three terraces, all three crops of the season
+    { name: '三色梯田', W: 920, H: 820, start: [530, 420], par: 190, bill: 20,
+      goal: { type: 'earn', n: [3600, 3900, 3500, 3800] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 220 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 300, w: 300, h: 220, hidden: true },
+        { id: 'F3', type: 'field', crop: 'C', x: 40, y: 560, w: 300, h: 220, hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B', 'C'], x: 760, y: 300 },
+        { id: 'C2', type: 'counter', items: ['C', 'B', 'A'], x: 760, y: 560, hidden: true },
+      ],
+      tiles: [
+        { id: 'a', x: 480, y: 560, price: 50, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 50 } } },
+        { id: 'b', x: 400, y: 330, price: 110, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'c', x: 420, y: 120, price: 160, icon: '$hire', ln: 'A', req: ['a'], effect: { worker: { from: ['F1'], to: ['C1'] } } },
+        { id: 'd', x: 400, y: 640, price: 180, icon: '$plot', ln: 'C', req: ['b'], effect: { show: ['F3'] } },
+        { id: 'e', x: 760, y: 560, price: 160, icon: 'counter', label: '出售台', req: ['b'], effect: { show: ['C2'] } },
+        { id: 'f', x: 460, y: 740, price: 240, icon: '$hire', ln: 'C', req: ['d'], effect: { worker: { from: ['F3', 'F2'], to: ['C2', 'C1'] } } },
+        { id: 'g', x: 560, y: 120, price: 220, icon: '$hire', ln: 'B', req: ['b'], effect: { worker: { from: ['F2', 'F1'], to: ['C1', 'C2'] } } },
+        { id: 'h', x: 870, y: 420, price: 260, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1', 'C2'] } },
+        { id: 'i', x: 580, y: 240, price: 320, icon: 'loader', label: '园丁换铲车', req: ['g'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'j', x: 560, y: 680, price: 140, icon: 'speed', label: '跑鞋', req: ['c'], effect: { up: { key: 'speed', v: 25 } } },
+      ],
+      deco: { theme: 'garden', paths: [[380, 380, 540, 100], [640, 120, 80, 260]], hedges: [[780, 770, 60, 18]], trees: [[880, 780, 'cone'], [880, 60, 'round']], bushes: [[700, 40], [480, 40]] } },
+
+    // 50 — two machines by the stream: A and C each into their product, one counter
+    { name: '溪畔双坊', W: 940, H: 800, start: [540, 600], par: 210, bill: 20,
+      goal: { type: 'earn', n: [3000, 2800, 2200, 3000] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 300 },
+        { id: 'F2', type: 'field', crop: 'C', x: 40, y: 420, w: 300, h: 300, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.45, x: 700, y: 160, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'C', time: 0.45, x: 580, y: 460, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'C', 'A+', 'C+'], x: 800, y: 560 },
+      ],
+      tiles: [
+        { id: 'a', x: 600, y: 640, price: 60, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
+        { id: 'b', x: 400, y: 150, price: 180, icon: '$hire', ln: 'A', req: ['a'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'c', x: 400, y: 480, price: 140, icon: '$plot', ln: 'C', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'd', x: 580, y: 460, price: 230, icon: '$mach', ln: 'C', req: ['c'], effect: { show: ['M2'] } },
+        { id: 'e', x: 420, y: 740, price: 250, icon: '$hire', ln: 'C', req: ['d'], effect: { worker: { from: ['F2'], to: ['M2'] } } },
+        { id: 'f', x: 900, y: 420, price: 300, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1'] } },
+        { id: 'g', x: 520, y: 290, price: 320, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'h', x: 820, y: 300, price: 300, icon: 'gear', label: '快机器', req: ['b'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }] } },
+        { id: 'i', x: 560, y: 740, price: 200, icon: '$water', ln: 'C', req: ['c'], effect: { sprinkler: ['F1', 'F2'] } },
+      ],
+      deco: { theme: 'farm', paths: [[440, 360, 500, 100], [740, 220, 80, 300]], hedges: [[800, 760, 50, 18]], trees: [[905, 765, 'round'], [900, 40, 'cone']], bushes: [[560, 40], [460, 40]] } },
+
+    // 51 — the valley market: three crops, the middle one through a machine, two raw counters
+    { name: '山谷集市', W: 980, H: 840, start: [560, 460], par: 200, bill: 20,
+      goal: { type: 'earn', n: [5250, 5750, 2900, 3200] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 230 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 310, w: 300, h: 230 },
+        { id: 'F3', type: 'field', crop: 'C', x: 40, y: 580, w: 300, h: 220, hidden: true },
+        { id: 'M1', type: 'proc', in: 'B', time: 0.45, x: 700, y: 140, outTo: 'C1' },
+        { id: 'C1', type: 'counter', items: ['A', 'B', 'C', 'B+'], x: 820, y: 380 },
+      ],
+      tiles: [
+        { id: 'a', x: 560, y: 600, price: 60, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
+        { id: 'b', x: 420, y: 330, price: 180, icon: '$hire', ln: 'B', req: ['a'], effect: { worker: { from: ['F2'], to: ['M1'] } } },
+        { id: 'c', x: 420, y: 620, price: 160, icon: '$plot', ln: 'C', req: ['a'], effect: { show: ['F3'] } },
+        { id: 'd', x: 440, y: 760, price: 240, icon: '$hire', ln: 'C', req: ['c'], effect: { worker: { from: ['F3', 'F1'], to: ['C1'] } } },
+        { id: 'e', x: 420, y: 120, price: 220, icon: '$hire', ln: 'A', req: ['b'], effect: { worker: { from: ['F1', 'F3'], to: ['C1'] } } },
+        { id: 'f', x: 930, y: 260, price: 300, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1'] } },
+        { id: 'g', x: 560, y: 260, price: 340, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'h', x: 580, y: 760, price: 160, icon: 'speed', label: '跑鞋', req: ['c'], effect: { up: { key: 'speed', v: 25 } } },
+        { id: 'i', x: 600, y: 520, price: 200, icon: '$water', ln: 'B', req: ['c'], effect: { sprinkler: ['F1', 'F2', 'F3'] } },
+      ],
+      deco: { theme: 'garden', paths: [[460, 500, 520, 100], [640, 120, 80, 300]], hedges: [[820, 800, 70, 18]], trees: [[945, 805, 'cone'], [940, 40, 'round']], bushes: [[560, 40], [940, 640]] } },
+
+    // 52 — the four-season workshop: all three crops of the season, each through its own machine
+    { name: '四季工坊', W: 1040, H: 900, start: [600, 480], par: 220, bill: 50,
+      goal: { type: 'earn', n: [2600, 2300, 2100, 2900] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 250 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 340, w: 300, h: 250, hidden: true },
+        { id: 'F3', type: 'field', crop: 'C', x: 40, y: 640, w: 300, h: 220, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.45, x: 700, y: 140, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'B', time: 0.45, x: 560, y: 420, outTo: 'C1', hidden: true },
+        { id: 'M3', type: 'proc', in: 'C', time: 0.45, x: 640, y: 780, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B', 'C', 'A+', 'B+', 'C+'], x: 900, y: 520 },
+      ],
+      tiles: [
+        { id: 'a', x: 620, y: 600, price: 60, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
+        { id: 'b', x: 400, y: 150, price: 190, icon: '$hire', ln: 'A', req: ['a'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'c', x: 400, y: 380, price: 150, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'k', x: 560, y: 420, price: 230, icon: '$mach', ln: 'B', req: ['c'], effect: { show: ['M2'] } },
+        { id: 'd', x: 400, y: 500, price: 250, icon: '$hire', ln: 'B', req: ['k'], effect: { worker: { from: ['F2'], to: ['M2'] } } },
+        { id: 'e', x: 400, y: 680, price: 160, icon: '$plot', ln: 'C', req: ['c'], effect: { show: ['F3'] } },
+        { id: 'f', x: 640, y: 780, price: 260, icon: '$mach', ln: 'C', req: ['e'], effect: { show: ['M3'] } },
+        { id: 'g', x: 460, y: 820, price: 270, icon: '$hire', ln: 'C', req: ['f'], effect: { worker: { from: ['F3'], to: ['M3'] } } },
+        { id: 'h', x: 1000, y: 400, price: 420, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1'] } },
+        { id: 'i', x: 760, y: 680, price: 460, icon: 'loader', label: '园丁换铲车', req: ['d'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'j', x: 780, y: 320, price: 420, icon: 'gear', label: '快机器', req: ['b'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }, { id: 'M3', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'farm', paths: [[440, 520, 560, 100], [740, 220, 80, 320]], hedges: [[860, 850, 90, 22]], trees: [[1000, 860, 'round'], [1000, 50, 'cone']], bushes: [[560, 40], [1000, 720]], barn: [500, 70] } },
+
+    // 53 — the grand valley estate: four plots and three machines
+    { name: '四季山谷大庄园', W: 1120, H: 960, start: [640, 520], par: 230, bill: 50,
+      goal: { type: 'earn', n: [2700, 2600, 2600, 2800] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 270 },
+        { id: 'F2', type: 'field', crop: 'B', x: 400, y: 60, w: 260, h: 210, hidden: true },
+        { id: 'F3', type: 'field', crop: 'C', x: 50, y: 380, w: 280, h: 260, hidden: true },
+        { id: 'F4', type: 'field', crop: 'A', x: 40, y: 700, w: 300, h: 220, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.45, x: 920, y: 200, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'B', time: 0.45, x: 760, y: 120, outTo: 'C1', hidden: true },
+        { id: 'M3', type: 'proc', in: 'C', time: 0.45, x: 580, y: 440, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B', 'C', 'A+', 'B+', 'C+'], x: 960, y: 580 },
+      ],
+      tiles: [
+        { id: 'a', x: 640, y: 640, price: 60, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
+        { id: 'b', x: 380, y: 330, price: 200, icon: '$hire', ln: 'A', req: ['a'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'c', x: 520, y: 300, price: 180, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2', 'M2'] } },
+        { id: 'd', x: 700, y: 300, price: 260, icon: '$hire', ln: 'B', req: ['c'], effect: { worker: { from: ['F2'], to: ['M2'] } } },
+        { id: 'e', x: 580, y: 440, price: 260, icon: '$mach', ln: 'C', req: ['a'], effect: { show: ['F3', 'M3'] } },
+        { id: 'f', x: 420, y: 560, price: 270, icon: '$hire', ln: 'C', req: ['e'], effect: { worker: { from: ['F3'], to: ['M3'] } } },
+        { id: 'g', x: 400, y: 760, price: 200, icon: '$plot', ln: 'A', req: ['b'], effect: { show: ['F4'] } },
+        { id: 'h', x: 520, y: 840, price: 290, icon: '$hire', ln: 'A', req: ['g'], effect: { worker: { from: ['F4'], to: ['M1'] } } },
+        { id: 'i', x: 1060, y: 460, price: 450, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1'] } },
+        { id: 'j', x: 780, y: 760, price: 480, icon: 'loader', label: '园丁换铲车', req: ['f'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'k', x: 780, y: 470, price: 440, icon: 'gear', label: '快机器', req: ['d'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }, { id: 'M3', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'garden', paths: [[480, 580, 580, 100], [800, 220, 80, 360]], hedges: [[960, 880, 120, 22]], trees: [[1080, 920, 'round'], [1080, 60, 'cone']], bushes: [[700, 40], [1080, 780]] } },
+  ],
+};
+const HIRE = { log: ['lumber', '雇伐木工'], fish: ['fisher', '雇渔夫'] };
+const PLOT = { log: '种树林', fish: '挖鱼塘', grape: '种葡萄', rose: '种玫瑰', tulip: '种花圃', gold: '种花圃', berry: '种草莓' };
+const MACH = { basket: '花篮机', perfume: '香水机', jam: '果酱机', popcorn: '爆米花机', ketchup: '番茄酱机', bouquet: '花束机', flour: '磨坊',
+  gjuice: '葡萄榨汁机', pie: '南瓜派烤炉', chips: '薯条炸锅', plank: '锯木机', smoked: '熏鱼房' };
+const VCACHE = new Map();
+export function valleyLevel(k, season = 0) {
+  const s = ((season | 0) % 4 + 4) % 4, key = k * 4 + s;
+  if (VCACHE.has(key)) return VCACHE.get(key);
+  const sp = VL.specs[k], ln = VL.lines[s];
+  const tok = (t) => { if (typeof t !== 'string') return t; const m = /^([ABC])(\+?)$/.exec(t); return m ? (m[2] ? ln[m[1]].out : ln[m[1]].crop) : t; };
+  const L = JSON.parse(JSON.stringify(sp));
+  L.valley = k; L.season = s; L.smartStaff = true;
+  L.goal = { ...L.goal, n: Array.isArray(sp.goal.n) ? sp.goal.n[s] : sp.goal.n };
+  if (L.goal.item) L.goal.item = tok(L.goal.item);
+  for (const o of L.objects) {
+    if (o.type === 'field') { const l = ln[o.crop]; o.crop = l.crop; o.gap = o.gap || l.gap; if (l.gapY) o.gapY = l.gapY; }
+    if (o.type === 'proc') { const l = ln[o.in]; o.in = l.crop; o.out = l.out; o.ratio = l.ratio; o.time = o.time || 0.5; }
+    if (o.type === 'counter') o.items = [...new Set(o.items.map(tok))];
+  }
+  for (const t of L.tiles) {
+    const l = t.ln ? ln[t.ln] : null, c = l && l.crop;
+    if (t.icon === '$hire') { const h = HIRE[c] || ['worker', '雇园丁']; t.icon = h[0]; t.label = h[1]; }
+    else if (t.icon === '$plot') { t.icon = 'plot'; t.label = PLOT[c] || '开新田'; }
+    else if (t.icon === '$mach') { t.icon = l.out; t.label = MACH[l.out] || '加工机'; }
+    else if (t.icon === '$radius') { t.icon = c === 'fish' ? 'net' : 'shears'; t.label = c === 'fish' ? '大渔网' : c === 'log' ? '大斧头' : '大镰刀'; }
+    else if (t.icon === '$water') { t.icon = 'sprinkler'; t.label = c === 'fish' ? '增氧机' : '洒水器'; }
+    delete t.ln;
+  }
+  VCACHE.set(key, L);
+  return L;
+}
+export const isValley = (li) => li >= VL.from && li < VL.from + VL.specs.length;
+// the area holds 15 levels (46–60); 46–53 are built, 54–60 are planned (shown as「即将开放」): append specs to VL.specs
+// and they appear in place. estatePage 4 is reserved for the valley's own estate (not built yet).
+CFG.valley = { from: VL.from, n: VL.specs.length, size: 15, unlockAfter: 45, estatePage: 4, lines: VL.lines };
+// level-select areas (tabs): [first index, slots]; an area's slots past CFG.levels.length show as「即将开放」
+CFG.areas = [
+  { id: 'garden', name: '花园庄园', from: 0, size: 15 },
+  { id: 'farm', name: '林场牧场', from: 15, size: 15 },
+  { id: 'lake', name: '湖畔酒庄', from: 30, size: 15 },
+  { id: 'valley', name: '四季山谷', from: VL.from, size: 15, seasons: true },
+];
+// the sims / checks can put the whole valley in one season: BANMU_SEASON=0..3 node sim/… (the game always passes its own)
+const ENV_S = typeof process !== 'undefined' && process.env && /^[0-3]$/.test(process.env.BANMU_SEASON || '') ? +process.env.BANMU_SEASON : 0;
+for (let k = 0; k < VL.specs.length; k++) CFG.levels.push(valleyLevel(k, ENV_S));

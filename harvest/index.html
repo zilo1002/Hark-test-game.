@@ -50,6 +50,7 @@
   <div class="playBox" id="playBox">
     <button class="big playBtn" id="btnPlay"><span>开始游戏</span><small id="playSub">第 1 关</small></button>
     <button class="small lvlBtn" id="btnLevels">选择关卡</button>
+    <button class="small lvlBtn valleyBtn hidden" id="btnValley">四季山谷</button>
   </div>
   <button class="starBtn" id="btnBuild" aria-label="装扮庄园"><svg viewBox="0 0 24 24"><path fill="#FFE14D" stroke="#B87A0A" stroke-width="1.4" stroke-linejoin="round" d="M12 2.6l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17l-5.7 3.1 1.2-6.4-4.7-4.4 6.4-.8z"/></svg><span>装扮</span><em class="dot hidden" id="buildDot"></em></button>
 </div>
@@ -104,14 +105,15 @@
 <div id="pause" class="modal hidden"><div class="card sheet">
   <div class="mhead"><h2>暂停</h2></div>
   <div class="mbody"><div class="note center" id="pauseInfo"></div>
+  <div class="seaRow hidden" id="pSea"><div class="seaBtns" id="pSeaBtns"></div><span class="fnote" id="pSeaNote"></span></div>
   <div class="brow"><button class="small" id="btnPSettings">设置</button><button class="small" id="btnPLevels">选择关卡</button></div>
   <button class="small warm" id="btnHome">回到庄园</button></div>
   <div class="mfoot"><button class="big" id="btnResume">继续</button></div>
 </div></div>
 
 <div id="levels" class="modal hidden"><div class="card sheet wide lvCard">
-  <div class="mhead"><h2>选择关卡</h2><div class="htabs" id="lvTabs"><button data-p="0">花园庄园<em>1–15</em></button><button data-p="1">林场牧场<em>16–30</em></button><button data-p="2">湖畔酒庄<em>31–45</em></button></div><button class="xclose" data-close aria-label="关闭">✕</button></div>
-  <div class="mbody"><div class="grid" id="levelGrid"></div></div>
+  <div class="mhead"><h2>选择关卡</h2><div class="htabs" id="lvTabs"></div><button class="xclose" data-close aria-label="关闭">✕</button></div>
+  <div class="mbody"><div class="seaRow hidden" id="lvSea"><div class="seaBtns" id="lvSeaBtns"></div><span class="fnote" id="lvSeaNote"></span></div><div class="grid" id="levelGrid"></div></div>
   <div class="mfoot"><span class="fnote" id="lvNote">左右滑动换一页</span><button class="small warm" id="lvGo">继续 第 1 关</button></div>
 </div></div>
 

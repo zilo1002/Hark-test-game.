@@ -119,8 +119,8 @@ export function hudOrder(data, levelItems) {
   return list.find((o) => !o.claimed && o.prog < o.n && (o.kind === 'earn' ? false : levelItems.has(o.item)))
       || list.find((o) => !o.claimed && o.prog < o.n && o.kind === 'earn') || null;
 }
-export function levelItems(li) {
-  const s = new Set(), L = CFG.levels[li];
+export function levelItems(li, L = CFG.levels[li]) {   // v4.6: pass the resolved level (四季山谷 crops follow the season)
+  const s = new Set();
   for (const o of L.objects) { if (o.type === 'counter') for (const it of o.items) s.add(it); if (o.type === 'proc') s.add(o.out); }
   return s;
 }

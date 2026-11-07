@@ -11,7 +11,7 @@ import { CFG } from '../js/config.js';
 import { World } from '../js/world.js';
 const only = process.argv.find((a) => a.startsWith('--level='));
 const SECS = +((process.argv.find((a) => a.startsWith('--secs=')) || '--secs=120').split('=')[1]);
-const ONE = ['面包房', '早市面包摊'];
+const ONE = ['面包房', '早市面包摊', '葡萄酒庄'];
 let bad = 0, n = 0;
 const buyAll = (w, skip = () => false) => { let more = true; while (more) { more = false; for (const t of w.tiles) if (t.visible && !t.done && !skip(t)) { w.completeTile(t, true); more = true; } } };
 function run(w, secs, watch) {
@@ -38,6 +38,7 @@ CFG.levels.forEach((L, li) => {
   const errs = [];
   const w = new World(li, { quiet: true, seed: 77 + li });
   const ps = w.objs.PS, one = !!L.oneCounter;
+  const FIN = (() => { const m = L.objects.filter((o) => o.type === 'proc'); const last = m.find((o) => !m.some((q) => q.in === o.out)); return last ? last.out : 'bread'; })();   // the chain's final product
   const sale = one ? w.counters[0] : ps;
   if (!sale) { errs.push('no 加工品 counter'); }
   if (ONE.includes(L.name)) {
@@ -45,7 +46,7 @@ CFG.levels.forEach((L, li) => {
     if (w.counters.length !== 1) errs.push(`${w.counters.length} counters`);
     const clerks = w.tiles.filter((t) => t.effect.cashier).length;
     if (clerks !== 1) errs.push(`${clerks} 店员 tiles`);
-    if (!w.counters[0].items.includes('bread')) errs.push('counter does not sell bread');
+    if (!w.counters[0].items.includes(FIN)) errs.push(`counter does not sell ${FIN}`);
   }
   const free = [];
   if (w.workers.length) free.push(`${w.workers.length} workers`);
@@ -74,7 +75,7 @@ CFG.levels.forEach((L, li) => {
   if (!raw.every((x) => Object.keys(x.drops || {}).some((id) => rawIds.has(id)) && !(x.drops || {}).PS)) errs.push('a raw carrier missed the raw counter');
   // (a porter that is not needed at the tray right now may be out on the farm: at least one must have carried goods)
   if (por.length !== (one ? 1 : 2) || !por.some((x) => (x.drops || {})[sale.id] > 0)) errs.push('porters did not deliver goods');
-  if (one && !(w.stats.sold.bread > 0)) errs.push('no bread sold');
+  if (one && !(w.stats.sold[FIN] > 0)) errs.push(`no ${FIN} sold`);
   const staff = w.workers.filter((x) => x.feedFor || x.porter);
   for (const x of staff) { const s = st.get(x); if (s && s.idle / s.t > 0.25) errs.push(`${x.feedFor ? 'feeder ' + x.feedFor : 'porter'} idle ${Math.round(s.idle / s.t * 100)}%`); }
   const helpedA = staff.filter((x) => x.helpN > 0).length;
@@ -85,8 +86,12 @@ CFG.levels.forEach((L, li) => {
     buyAll(w2, (t) => t.id === 'x_ps');
     run(w2, 300);   // the tray (no porters yet) fills, the machine stops, its input fills up
     const fs = w2.workers.filter((x) => x.feedFor);
-    const ok = fs.some((x) => x.helpN > 0 && Object.keys(x.drops || {}).some((id) => rawIds.has(id)));
-    helpB = ok ? 'feeder farmed' : 'NO';
+    let ok = fs.some((x) => x.helpN > 0 && Object.keys(x.drops || {}).some((id) => rawIds.has(id)));
+    // v4.6 分工 (smartStaff): a feeder only farms when the raw counter runs low; otherwise it waits at its post with a batch
+    const held = L.smartStaff && fs.some((x) => x.holding && x.stack.length > 0 && w2.objs[x.feedFor].buf + w2.objs[x.feedFor].inc >= CFG.proc.inMax);
+    const busy = L.smartStaff && fs.every((x) => (x.drops || {})[x.feedFor] > 0 && w2.objs[x.feedFor].buf + w2.objs[x.feedFor].inc < CFG.proc.inMax);   // its machine never filled: it kept feeding
+    helpB = ok ? 'feeder farmed' : held ? 'feeder waits at its post' : busy ? 'feeder kept feeding' : 'NO';
+    ok = ok || held || busy;
     if (!ok) errs.push('feeders never helped on the farm while the machine was full');
   }
   const fsum = w.workers.filter((x) => x.feedFor).map((x) => `${x.feedFor}:${x._trips || 0}趟≤${x._mx || 0}/${x.cap}`).join(' ');

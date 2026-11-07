@@ -29,8 +29,8 @@ const PROFILES = {
 // v4.3: the bot walks the workers' A* path (World.botWay; the old corner-steer could wedge on a desk corner)
 export function botWay(w, p, target) { return w.botWay(p, target); }
 
-export function playLevel(li, prof, seed) {
-  const w = new World(li, { quiet: true, seed, crew: crewFor(li), ...ENV });
+export function playLevel(li, prof, seed, env = {}) {   // env: per-call override (v4.6: { season } for the 四季山谷)
+  const w = new World(li, { quiet: true, seed, crew: crewFor(li), ...ENV, ...env });
   const p = w.player;
   let target = null, think = 0, ix = 0, iy = 0;
   const unlocks = [];

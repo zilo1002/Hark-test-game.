@@ -55,7 +55,7 @@ export function splitSales(L) {
 }
 const MNAME = { bouquet: '花束机', crate: '蛋箱机', ketchup: '番茄酱机', basket: '花篮机', perfume: '香水机', plank: '锯木机', chair: '木椅机',
   cheese: '奶酪机', icecream: '冰淇淋机', popcorn: '爆米花机', jam: '果酱机', pie: '南瓜派烤炉', yarn: '毛线机', juice: '榨汁机', flour: '磨坊',
-  bread: '面包烤炉', smoked: '熏鱼房', gjuice: '葡萄榨汁机', wine: '橡木酒桶' };
+  bread: '面包烤炉', smoked: '熏鱼房', gjuice: '葡萄榨汁机', wine: '橡木酒桶', chips: '薯条炸锅' };
 const r10 = (v) => Math.max(10, Math.round(v / 10) * 10);
 // nearest free spot for a tile around (px, py): clear of every object, tile, queue lane and wall
 function spot(L, px, py) {

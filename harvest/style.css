@@ -522,3 +522,13 @@ button { font: inherit; cursor: pointer; border: 0; }
 .port #lvTabs em { display: block; margin: 0; }
 .mode-phone-l .estateArea { top: calc(var(--st) + 46px); bottom: calc(var(--sb) + 4px); }
 .land .shopCard .pv { max-height: 300px; }
+/* v4.6 四季山谷: season switcher (level select + pause) and the home entry */
+.seaRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 8px; }
+.seaRow.locked .seaBtns { opacity: .45; pointer-events: none; }
+.seaBtns { display: flex; gap: 6px; }
+.seaBtns button { width: 40px; height: 34px; border-radius: 12px; border: 3px solid #fff; color: #fff; font-weight: 900; font-size: 16px; box-shadow: 0 2px 0 rgba(0,0,0,.18); opacity: .55; }
+.seaBtns button.s0 { background: #FF8FB0; } .seaBtns button.s1 { background: #4CB24E; } .seaBtns button.s2 { background: #E8871E; } .seaBtns button.s3 { background: #6FA8DC; }
+.seaBtns button.on { opacity: 1; outline: 3px solid #FFC21A; outline-offset: 1px; }
+.seaRow .fnote { flex: 1; min-width: 140px; font-size: 12px; font-weight: 800; color: #6A5A3A; }
+.lvb.soon { opacity: .6; }
+.valleyBtn { background: linear-gradient(90deg, #FF8FB0, #4CB24E, #E8871E, #6FA8DC); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.3); }

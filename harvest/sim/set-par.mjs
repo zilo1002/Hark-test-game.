@@ -13,7 +13,9 @@ const only = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7).
 CFG.levels.forEach((L, li) => {
   if (li + 1 < from) return;
   if (only.length && !only.includes(li + 1)) return;
-  const r = [1, 2, 3].map((k) => playLevel(li, { stick: 1, think: 0.1 }, k * 1000 + li).time).sort((a, b) => a - b)[1];
+  // v4.6 四季山谷: one par for all four seasons = the slowest season's median
+  const med = (env) => [1, 2, 3].map((k) => playLevel(li, { stick: 1, think: 0.1 }, k * 1000 + li, env).time).sort((a, b) => a - b)[1];
+  const r = Number.isInteger(L.valley) ? Math.max(...[0, 1, 2, 3].map((season) => med({ season }))) : med({});
   const par = Math.round(r * 1.15 / 10) * 10;
   s = s.replace(new RegExp(`(name: '${L.name}',[^\\n]*?par: )\\d+`), `$1${par}`);
   console.log(L.name, Math.round(r), '→ par', par);

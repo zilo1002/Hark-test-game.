@@ -6,7 +6,7 @@ import { PAGES, pageEntries, pageProgress, pageDone, claimable, bookTotals } fro
 import { festivalInfo, nextFestival } from './festival.js';
 import { ROSTER, TRAITS, traitBonus, xpNeed, CREW } from './crew.js';
 import { orderText, orderDone, TIER_NAME } from './orders.js';
-import { seasonInfo, cropNames } from './seasons.js';
+import { seasonInfo, cropNames, isValleyLi, valleyOpen, valleySeason, valleyCrops } from './seasons.js';
 import { dailyOpen, dailyFor, ensureDay, TIER_LABEL } from './daily.js';
 import { MODES } from './layout.js';
 
@@ -57,9 +57,16 @@ export class UI {
     $('btnPSettings').onclick = () => this.openSettings();
     $('btnPLevels').onclick = () => this.openLevels();
     $('btnLevels').onclick = () => { h.tap(); this.openLevels(); };
+    // v4.1 / v4.6: one tab per area (CFG.areas: 1–15 / 16–30 / 31–45 / 四季山谷 46–60)
+    $('lvTabs').innerHTML = CFG.areas.map((A, i) => `<button data-p="${i}">${A.name}<em>${A.from + 1}–${A.from + A.size}</em></button>`).join('');
     for (const b of $('lvTabs').children) b.onclick = () => { this.lvPage = +b.dataset.p; h.tap(); this.renderLevels(); };
+    // v4.6 四季山谷 season switchers (level select + pause): 春 夏 秋 冬
+    const seaBtns = (el, restart) => { el.innerHTML = CFG.seasons.map((S, i) => `<button data-s="${i}" class="s${i}">${S.name}</button>`).join('');
+      for (const b of el.children) b.onclick = () => { const v = +b.dataset.s; h.valleySeason(v, restart); this.renderSeasonRow(); if (!restart) this.renderLevels(); }; };
+    seaBtns($('lvSeaBtns'), false); seaBtns($('pSeaBtns'), true);
+    $('btnValley').onclick = () => { h.tap(); this.openLevels(CFG.areas.length - 1); };
     $('lvGo').onclick = () => { const li = +$('lvGo').dataset.li; this.closeAll(); h.start(li); };
-    swipe($('levelGrid').parentNode, (d) => { const n = Math.max(0, Math.min(2, this.lvPage + d)); if (n !== this.lvPage) { this.lvPage = n; h.tap(); this.renderLevels(); } });
+    swipe($('levelGrid').parentNode, (d) => { const n = Math.max(0, Math.min(CFG.areas.length - 1, this.lvPage + d)); if (n !== this.lvPage) { this.lvPage = n; h.tap(); this.renderLevels(); } });
     // 商店
     this.el.shop = $('shop'); this.shopTab = 'outfit'; this.shopSel = null;
     for (const b of $('shopTabs').children) b.onclick = () => { this.shopTab = b.dataset.t; this.shopSel = null; this.renderShop(); h.tap(); };
@@ -172,7 +179,7 @@ export class UI {
   banner(world) {
     const b = this.el.banner;
     $('bannerLv').textContent = world.daily ? `每日挑战 · ${world.L.name}` : `等级 ${world.li + 1} · ${world.L.name}`;
-    $('bannerGoal').textContent = world.daily ? `${world.daily.name}：${world.daily.desc} · 3 分钟` : `目标：${goalText(world.L.goal)}${world.rain ? ' · 今天下雨，生长 +25%' : ''}`;
+    $('bannerGoal').textContent = world.daily ? `${world.daily.name}：${world.daily.desc} · 3 分钟` : `目标：${goalText(world.L.goal)}${world.valley ? ` · 四季山谷·${CFG.seasons[world.season].full}` : ''}${world.rain ? ' · 今天下雨，生长 +25%' : ''}`;
     b.classList.add('hidden'); void b.offsetWidth; b.classList.remove('hidden');
     clearTimeout(this._bn); this._bn = setTimeout(() => b.classList.add('hidden'), 2500);
   }
@@ -184,6 +191,8 @@ export class UI {
   openPause() {
     const w = this.h.world();
     $('pauseInfo').textContent = !w ? '' : w.daily ? `每日挑战 · ${w.L.name} — ${w.daily.name}（回到庄园 = 放弃这一局）` : `等级 ${w.li + 1} · ${w.L.name} — ${goalText(w.L.goal)}`;
+    $('pSea').classList.toggle('hidden', !(w && !w.daily && w.valley));
+    this.renderSeasonRow();
     this.openModal(this.el.pause);
   }
 
@@ -210,6 +219,7 @@ export class UI {
     this.el.play.querySelector('span').textContent = data.cur ? '继续游戏' : '开始游戏';
     $('playSub').textContent = allDone ? `全部通关！再玩第 ${L} 关` : `第 ${next + 1} 关 · ${CFG.levels[next].name}`;
     this.el.play.dataset.li = next;
+    $('btnValley').classList.toggle('hidden', !valleyOpen(data));   // v4.6 四季山谷 entry on the home screen
     const restored = new Set(data.restored);
     if (!this.page) this.page = 1;
     if (data.unlocked >= 15 && !this._auto2) { this._auto2 = true; this.page = 2; }   // once past level 15, open on the new farm
@@ -420,16 +430,20 @@ export class UI {
     this.el.dres.classList.remove('hidden');
   }
   shopOpenNow() { return !this.el.shop.classList.contains('hidden'); }
-  openLevels() {
+  openLevels(page) {
     const d = this.h.data(), cur = Math.min(CFG.levels.length - 1, d.cur ? d.cur.li : d.unlocked);
-    this.lvPage = Math.floor(cur / 15);
+    this.lvPage = Number.isInteger(page) ? page : Math.max(0, CFG.areas.findIndex((A) => cur >= A.from && cur < A.from + A.size));
     this.openModal(this.el.levels); this.renderLevels();
   }
   // 45 levels in three pages by estate (1–15 / 16–30 / 31–45): tabs + swipe
   renderLevels() {
     const d = this.h.data(), g = this.el.grid, P = this.lvPage; g.innerHTML = '';
     for (const b of $('lvTabs').children) b.classList.toggle('on', +b.dataset.p === P);
-    for (let i = P * 15; i < Math.min(CFG.levels.length, P * 15 + 15); i++) {
+    const A = CFG.areas[P];
+    for (let i = A.from; i < A.from + A.size; i++) {
+      if (i >= CFG.levels.length) {   // v4.6: planned slots of an area (四季山谷 54–60)
+        const b = document.createElement('button'); b.className = 'lvb lock soon'; b.innerHTML = `<b>${i + 1}</b><em>即将开放</em><small><i class="lk"></i></small>`; g.appendChild(b); continue;
+      }
       const L = CFG.levels[i], b = document.createElement('button');
       const lock = i > d.unlocked && !(d.cur && d.cur.li === i), st = d.stars[i] || 0;
       b.className = 'lvb' + (lock ? ' lock' : '') + (d.cur && d.cur.li === i ? ' cur' : '');
@@ -442,6 +456,18 @@ export class UI {
     go.dataset.li = next; go.textContent = `${d.cur ? '继续' : '开始'} 第 ${next + 1} 关`;
     const got = Object.values(d.stars).reduce((a, x) => a + x, 0);
     $('lvNote').textContent = `已得 ★${got} / ${CFG.levels.length * 3} · 左右滑动换页`;
+    // v4.6 四季山谷: season switcher above the grid (locked until level 45 is cleared)
+    const vr = $('lvSea'); vr.classList.toggle('hidden', !A.seasons);
+    if (A.seasons) { const open = valleyOpen(d); vr.classList.toggle('locked', !open); this.renderSeasonRow(); if (!open) $('lvSeaNote').textContent = `过第 ${CFG.valley.unlockAfter} 关开放 · 在这里可以自由切换春夏秋冬`; }
+  }
+  // the 四季山谷 switchers: highlight the picked season and say what grows in it
+  renderSeasonRow() {
+    const d = this.h.data(), s = valleySeason(d), S = CFG.seasons[s];
+    for (const id of ['lvSeaBtns', 'pSeaBtns']) for (const b of $(id).children) b.classList.toggle('on', +b.dataset.s === s);
+    const txt = `${S.full}：${cropNames(valleyCrops(s)).join(' · ')} 生长 +${Math.round(CFG.season.bonus * 100)}%`;
+    if (valleyOpen(d)) $('lvSeaNote').textContent = `${txt}${d.cur && isValleyLi(d.cur.li) ? ' · 换季后进行中的关卡会重新开始' : ''}`;
+    const w = this.h.world();
+    $('pSeaNote').textContent = w && w.valley && w.season !== s ? `${txt} · 下一局生效` : `${txt} · 点别的季节会换季并重新开始本关`;
   }
   openSettings(focus) {
     this.renderSettings();

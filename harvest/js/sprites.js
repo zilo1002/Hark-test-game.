@@ -294,13 +294,18 @@ function wine(g) {   // a dark green wine bottle, cream label with a grape, red 
   g.fillStyle = '#7A3EA8'; for (const [x, y] of [[-0.9, 2.6], [0.9, 2.6], [0, 4]]) { g.beginPath(); g.arc(x, y, 0.9, 0, TAU); g.fill(); }
   g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(-2.6, -1.6, 1, 8);
 }
+function chips(g) {   // v4.6 薯条: golden fries in a red paper scoop
+  for (const [x, h, r] of [[-3, 6, -0.2], [-1.2, 8, -0.06], [0.6, 7, 0.08], [2.4, 6.4, 0.2], [-0.2, 9, 0]]) { g.save(); g.translate(x, -1); g.rotate(r); ol(g, '#FFD23F', '#C9962A', 0.5); g.fillRect(-0.9, -h, 1.8, h); g.strokeRect(-0.9, -h, 1.8, h); g.restore(); }
+  ol(g, '#E8302C', '#8E1E12', 0.8); g.beginPath(); g.moveTo(-5, -2); g.lineTo(5, -2); g.lineTo(4, 7); g.lineTo(-4, 7); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(0, 2.6, 1.8, 0, TAU); g.fill();
+}
 export const ITEM_DRAW = { egg, potato, tomato, wheat, crate, ketchup, bill, cash, tulip, rose, gold, bouquet, basket, perfume,
   log, plank, chair, milk, cheese, icecream, corn, popcorn, pumpkin, pie, berry, jam, wool, yarn, honey, apple, juice,
-  flour, bread, fish, smoked, grape, gjuice, pepper, wine };
+  flour, bread, fish, smoked, grape, gjuice, pepper, wine, chips };
 const ITEM_SIZE = { egg: [12, 13], potato: [14, 12], tomato: [13, 13], wheat: [18, 12], crate: [18, 15], ketchup: [11, 20], bill: [16, 10], cash: [18, 13],
                     tulip: [18, 12], rose: [18, 12], gold: [14, 10], bouquet: [16, 15], basket: [15, 16], perfume: [12, 16],
                     log: [18, 12], plank: [18, 12], chair: [14, 18], milk: [10, 18], cheese: [16, 12], icecream: [11, 19], corn: [18, 12], popcorn: [13, 17], pumpkin: [16, 14], pie: [17, 11], berry: [12, 14], jam: [12, 16], wool: [16, 15], yarn: [15, 15], honey: [12, 16], apple: [13, 14], juice: [10, 18],
-                    flour: [15, 17], bread: [17, 11], fish: [19, 12], smoked: [19, 12], grape: [12, 17], gjuice: [10, 18], pepper: [14, 15], wine: [9, 19] };
+                    flour: [15, 17], bread: [17, 11], fish: [19, 12], smoked: [19, 12], grape: [12, 17], gjuice: [10, 18], pepper: [14, 15], wine: [9, 19], chips: [13, 17] };
 
 // ---- field plants: (0,0) is the ground point, -y up. stage 0 stubble … 4 in bloom ----------------
 const TULIP_C = [['#F2486E', '#B5183E'], ['#FF6F9C', '#C9356A'], ['#E8243C', '#9E0E22'], ['#FF8FB0', '#D0507A']];
