@@ -1099,6 +1099,11 @@ export class World {
     }
     return this.post({ ...w, feedFor: null }, srcs.filter((o) => o.kind === 'field').concat(srcs));
   }
+  // v4.8 a machine with 3 专员: when it runs dry only one of them rushes over with a part load (the others keep harvesting)
+  mateBrings(w) {
+    const mates = this.workers.filter((o) => o.feedFor === w.feedFor);
+    return mates.length >= 3 && mates.some((o) => o !== w && o.state === 'deliver' && o.stack.length + o.incoming > 0);
+  }
   workerAI(w, dt) {
     const T = this.t;
     // v4.7 fixed roles: everyone only ever works its own sources → its own sinks (no farm help, no assisting machines)
@@ -1125,7 +1130,7 @@ export class World {
       const batch = Math.max(m.ratio, Math.min(Math.ceil(w.cap * CFG.v45.batch), CFG.proc.inMax - m.buf - m.inc));
       let have = w.incoming; for (const t of w.stack) if (t === m.inItem) have++;
       if (have >= batch) { w.state = 'deliver'; w.batch = batch; }
-      else if (this.smart && have >= m.ratio && m.buf + m.inc < m.ratio * 2 && !(m.work > 0)) { w.state = 'deliver'; w.batch = have; }   // v4.6: machine about to run dry → bring what you have
+      else if (this.smart && have >= m.ratio && m.buf + m.inc < m.ratio * 2 && !(m.work > 0) && !this.mateBrings(w)) { w.state = 'deliver'; w.batch = have; }   // v4.6: machine about to run dry → bring what you have
     }
     // v4.7 porter: leave the tray with a fair batch, or at once when the goods counter is running low
     if (w.state === 'collect' && w.porter && this.smart) {

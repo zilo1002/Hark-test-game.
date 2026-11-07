@@ -4,13 +4,14 @@
 //     "dry" wait (front customer at an empty desk), tray peak.
 //  B) the sharp guide bot plays the level: from the moment a counter's supply staff (and its 店员) are hired, the average and
 //     95th-percentile customer wait at that counter and the share of customers who met an empty desk.
-//   node sim/fit-check.mjs [--level=N] [--season=0..3]    (exit code 1 on a failure)
+//   node sim/fit-check.mjs [--level=N] [--season=0..3|all]    (exit code 1 on a failure; all = every season of a valley level)
+// v4.8: machine starved limit 25% → 15% (machines that starved more got a paid 3rd 机器专员, CFG.v48.feed3)
 import { CFG } from '../js/config.js';
 import { World } from '../js/world.js';
 import { playLevel } from './balance.mjs';
 const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.split('=')[1] : d; };
 const only = arg('level', null), seaArg = arg('season', null);
-export const LIM = { starve: 25, idle: 55, waitA: 4, dryA: 1.0, waitB: 6, dryShareB: 0.1, tray: CFG.v47.trayMax };
+export const LIM = { starve: 15, idle: 55, waitA: 4, dryA: 1.0, waitB: 6, dryShareB: 0.1, tray: CFG.v47.trayMax };
 const pct = (a, b) => Math.round(a / Math.max(1, b) * 100);
 const avg = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
 const p95 = (a) => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * 0.95))]; };
@@ -59,9 +60,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let bad = 0, n = 0;
   CFG.levels.forEach((L, li) => {
     if (only && +only !== li + 1) return;
-    const env = Number.isInteger(L.valley) ? { season: seaArg !== null ? +seaArg : L.season } : {};
+    const seas = !Number.isInteger(L.valley) ? [null] : seaArg === 'all' ? [0, 1, 2, 3] : [seaArg !== null ? +seaArg : L.season];
+    for (const sea of seas) {
+    const env = sea === null ? {} : { season: sea };
     const w0 = new World(li, { quiet: true, ...env });
-    if (!w0.procs.length) return;
+    if (!w0.procs.length) continue;
     n++;
     const A = fitA(li, env), B = fitB(li, env), errs = [];
     for (const [id, s] of A.starve) if (s > LIM.starve) errs.push(`${id} starved ${s}%`);
@@ -75,6 +78,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       + ` · 全员时排队 ${A.counters.map((c) => `${c.id} ${c.wait.toFixed(1)}s(空台${c.dry.toFixed(1)}s,${c.n}人)`).join(' ')}`
       + ` · 机器人局 ${B.out.map((c) => c.n ? `${c.id}@${c.from}s 均${c.wait.toFixed(1)}s p95 ${c.p95.toFixed(1)}s 空台${Math.round(c.dryShare * 100)}%(${c.n}人)` : `${c.id} -`).join(' ')}`
       + `${errs.length ? ' · ' + errs.join('; ') : ''}`);
+    }
   });
   console.log(bad ? `${bad} of ${n} machine levels failed` : `all ${n} machine levels: staff fit the workload, customers served without waiting`);
   if (bad) process.exitCode = 1;

@@ -1,6 +1,7 @@
 // v4.7 staff check (fixed roles), every machine level:
 //  · nothing is free at the start (no workers, clerks, machines or 加工品 counter)
-//  · 机器专员: one tile per farm-fed machine plus one paid tile for a 2nd (so 2 with everything bought); a feeder only
+//  · 机器专员: one tile per farm-fed machine plus one paid tile for a 2nd (so 2 with everything bought), v4.8 plus a paid 3rd
+//    tile (x_h<machine>, after the 2nd x_g, pricier) on the machines CFG.v48.feed3 lists; a feeder only
 //    ever holds its machine's crop and only drops into its machine (never a counter); it brings small batches
 //  · 原料搬运工: only hold raw-counter crops and only drop at a raw counter (never a machine, never the 加工品 counter)
 //  · 加工品搬运工: exactly one per finished-goods machine; only ever hold machine goods (never harvest) and only drop at the
@@ -11,6 +12,7 @@
 //   node sim/staff-check.mjs [--level=N] [--secs=120]
 import { CFG } from '../js/config.js';
 import { World } from '../js/world.js';
+import { feed3Of } from '../js/sales.js';
 const only = process.argv.find((a) => a.startsWith('--level='));
 const SECS = +((process.argv.find((a) => a.startsWith('--secs=')) || '--secs=120').split('=')[1]);
 const ONE = ['面包房', '早市面包摊', '葡萄酒庄'];
@@ -71,7 +73,17 @@ CFG.levels.forEach((L0, li) => {
   const farmFed = w.procs.filter((p) => !w.procs.some((q) => q.outObj === p));
   for (const p of farmFed) {
     const f = w.workers.filter((x) => x.feedFor === p.id);
-    if (f.length !== 2) errs.push(`${p.id} has ${f.length} feeders (want 1 + 1 paid)`);
+    const want = feed3Of(L).includes(p.id) ? 3 : 2;
+    if (f.length !== want) errs.push(`${p.id} has ${f.length} feeders (want ${want})`);
+    if (want === 3) {
+      const ids = w.tiles.map((t) => t.id), h = w.tiles.find((t) => t.id === 'x_h' + p.id), g = w.tiles.find((t) => t.id === 'x_g' + p.id);
+      if (!h || !g) errs.push(`${p.id} 3rd feeder tile missing`);
+      else {
+        if (!(h.req || []).includes(g.id)) errs.push(`x_h${p.id} does not wait for x_g${p.id}`);
+        if (ids.indexOf(h.id) < ids.indexOf(g.id)) errs.push(`x_h${p.id} ordered before x_g${p.id}`);
+        if (!(h.price > g.price)) errs.push(`x_h${p.id} price ${h.price} ≤ 2nd ${g.price}`);
+      }
+    } else if (w.tiles.some((t) => t.id === 'x_h' + p.id)) errs.push(`unexpected x_h${p.id}`);
     if (!f.some((x) => (x.drops || {})[p.id] > 0)) errs.push(`${p.id} feeders never delivered`);
     for (const x of f) {
       const s = st.get(x);
@@ -114,5 +126,5 @@ CFG.levels.forEach((L0, li) => {
   const ok = !errs.length; if (!ok) bad++;
   console.log(`${ok ? 'OK  ' : 'FAIL'} 第${li + 1}关 ${L.name}: 专员 ${fsum} · 原料搬运工 ×${raw.length} · 加工品搬运工 ×${por.length}→${sale ? sale.id : '?'} · 出货台最高 ${trayMax}${ps ? ' · 无加工品台时 ' + waitB : ' · 单收银台'}${errs.length ? ' · ' + errs.join('; ') : ''}`);
 });
-console.log(bad ? `${bad} of ${n} machine levels failed` : `all ${n} machine levels: fixed roles (raw carriers → raw counter, 2 feeders per machine → that machine, one porter per tray → goods counter), nothing free at start`);
+console.log(bad ? `${bad} of ${n} machine levels failed` : `all ${n} machine levels: fixed roles (raw carriers → raw counter, 2 (or 3) feeders per machine → that machine, one porter per tray → goods counter), nothing free at start`);
 if (bad) process.exitCode = 1;

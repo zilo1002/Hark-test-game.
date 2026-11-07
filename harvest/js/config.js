@@ -157,6 +157,12 @@ export const CFG = {
   // v4.7 fixed roles in every machine level: feeder2 = price of the 2nd 机器专员 (× median hire), porters leave the tray with
   // ≥ porterGo × stack or as soon as the goods counter runs below porterLow; idle staff walk to their post after idleWait s
   v47: { feeder2: 0.8, porterGo: 0.4, porterLow: 14, porterMin: 5, trayHelp: 16, idleWait: 1.2, trayMax: 40 },
+  // v4.8 a paid 3rd 机器专员 (feeder3 × median hire, after that machine's 2nd) only on the machines feed3[level name] lists:
+  // the ones sim/fit-check.mjs showed starving > 15% with everything else bought. A valley level may list machines per season
+  // ({ season: [ids] }) where one set does not fit all four (the extra goods must not heap the trays past v47.trayMax)
+  v48: { feeder3: 1.2, feed3: { 羊毛牧场: ['M1'], 秋收集市: ['M2'], 半亩大庄园: ['M1', 'M4'], 夜间农场: ['M1'], 早市面包摊: ['M1'],
+                                 湖畔集市: ['M3'], 湖畔酒庄大庄园: ['M1', 'M3'], 山谷小作坊: ['M1'], 溪畔双坊: ['M1'], 山谷集市: ['M1'],
+                                 四季山谷大庄园: { 0: ['M1'], 1: ['M1'], 2: ['M2', 'M3'], 3: ['M1'] } } },
   v46: { rawLow: 30, rawFull: 80, starve: 0.5, holdAt: 0.5 },
   v45: { batch: 0.5, backAt: 0.5, porterBack: 10 },   // v4.5 machine staff: feeder small batch = ≤50% of its stack (and what the machine has room for); help on the farm, back to the machine at ≤50% input / porter at ≥10 on the tray
   v43: { machine: 0.5, machine2: 0.7, sale: 0.35, raw: [0.4, 0.8], porter: [0.4, 0.8], clerk: 0.7,
@@ -630,7 +636,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[400, 360, 440, 100], [520, 190, 90, 170]], hedges: [[740, 600, 90, 22]], trees: [[800, 680, 'round'], [800, 60, 'round']], bushes: [[600, 40], [400, 700]], barn: [600, 100] } },
 
     // 23 — fluffy sheep, wool into yarn
-    { name: '羊毛牧场', W: 800, H: 700, start: [450, 430], par: 250, bill: 20,
+    { name: '羊毛牧场', W: 800, H: 700, start: [450, 430], par: 240, bill: 20,
       goal: { type: 'sell', item: 'yarn', n: 290 },
       objects: [
         { id: 'S1', type: 'coop', item: 'wool', producer: 'sheep', x: 80, y: 80, w: 330, h: 280, n: 4, max: 14, prefill: 900 },
@@ -753,7 +759,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[400, 390, 540, 100], [520, 120, 80, 280]], hedges: [[840, 720, 90, 22]], trees: [[900, 760, 'cone'], [900, 60, 'cone']], bushes: [[720, 40], [900, 600]] } },
 
     // 29 — the harvest fair: corn, pumpkins and apples, three machines
-    { name: '秋收集市', W: 980, H: 820, start: [560, 460], par: 280, bill: 50,
+    { name: '秋收集市', W: 980, H: 820, start: [560, 460], par: 290, bill: 50,
       goal: { type: 'earn', n: 7400 },
       objects: [
         { id: 'F1', type: 'field', crop: 'corn', x: 40, y: 40, w: 300, h: 260, gap: 10 },
@@ -960,7 +966,7 @@ export const CFG = {
       deco: { theme: 'garden', greenhouse: [[38, 38, 314, 304], [38, 408, 314, 324]], paths: [[380, 380, 520, 100], [640, 120, 80, 260]], hedges: [[820, 700, 70, 22]], trees: [[860, 740, 'cone'], [860, 60, 'round']], bushes: [[700, 40], [480, 40]] } },
 
     // 38 — the night farm: lanterns and fireflies; wheat → flour → bread, and greenhouse tomatoes → ketchup
-    { name: '夜间农场', W: 1000, H: 860, start: [560, 500], par: 290, bill: 50,
+    { name: '夜间农场', W: 1000, H: 860, start: [560, 500], par: 280, bill: 50,
       goal: { type: 'earn', n: 10500 },
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 300, h: 300, gap: 9 },
@@ -1082,7 +1088,7 @@ export const CFG = {
               paths: [[400, 380, 500, 100], [540, 120, 80, 260]], hedges: [[740, 740, 80, 20]], trees: [[885, 750, 'cone'], [880, 40, 'round']], bushes: [[600, 40], [480, 40]] } },
 
     // 43 — the morning bread market: wheat → flour → bread (v4.5: one stall + one 店员 sells wheat and bread)
-    { name: '早市面包摊', W: 960, H: 820, start: [540, 450], par: 250, bill: 20, oneCounter: true,
+    { name: '早市面包摊', W: 960, H: 820, start: [540, 450], par: 260, bill: 20, oneCounter: true,
       goal: { type: 'sell', item: 'bread', n: 85 },
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 330, h: 320, gap: 9 },
@@ -1105,7 +1111,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[410, 400, 540, 100], [560, 110, 80, 290]], hedges: [[820, 790, 60, 18]], trees: [[925, 785, 'round'], [920, 40, 'round']], bushes: [[760, 40], [500, 40]] } },
 
     // 44 — the lakeside market: fish → smoked fish, grapes → grape juice, wheat → flour; three machines
-    { name: '湖畔集市', W: 1040, H: 900, start: [600, 480], par: 280, bill: 50,
+    { name: '湖畔集市', W: 1040, H: 900, start: [600, 480], par: 290, bill: 50,
       goal: { type: 'earn', n: 6500 },
       objects: [
         { id: 'P1', type: 'field', crop: 'fish', x: 40, y: 40, w: 300, h: 250, gap: 16 },
@@ -1356,7 +1362,7 @@ const VL = {
       deco: { theme: 'farm', paths: [[440, 360, 500, 100], [740, 220, 80, 300]], hedges: [[800, 760, 50, 18]], trees: [[905, 765, 'round'], [900, 40, 'cone']], bushes: [[560, 40], [460, 40]] } },
 
     // 51 — the valley market: three crops, the middle one through a machine, two raw counters
-    { name: '山谷集市', W: 980, H: 840, start: [560, 460], par: 220, bill: 20,
+    { name: '山谷集市', W: 980, H: 840, start: [560, 460], par: 230, bill: 20,
       goal: { type: 'earn', n: [5250, 5750, 2900, 3200] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 230 },
