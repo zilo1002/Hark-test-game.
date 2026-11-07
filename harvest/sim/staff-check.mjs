@@ -1,11 +1,13 @@
-// v4.3 / v4.5 staff check, every machine level:
+// v4.7 staff check (fixed roles), every machine level:
 //  · nothing is free at the start (no workers, clerks, machines or 加工品 counter)
-//  · v4.5 exactly ONE dedicated feeder per machine fed from the farm; it delivers small batches (never a full stack)
-//  · 原料搬运工 deliver raw crops to the raw counter; 加工品搬运工 carry machine goods to the 「加工品」 counter
-//    (or, in a oneCounter level, to the single counter)
-//  · v4.5 idle staff help on the farm: with no 加工品 counter yet the machine fills up and its feeder brings crops to the
-//    raw counter instead of standing by; nobody (feeder / porter) stands idle for long
-//  · v4.5 levels 32 面包房 / 43 早市面包摊 have ONE counter (raw + bread) with ONE 店员 tile, no 加工品 counter
+//  · 机器专员: one tile per farm-fed machine plus one paid tile for a 2nd (so 2 with everything bought); a feeder only
+//    ever holds its machine's crop and only drops into its machine (never a counter); it brings small batches
+//  · 原料搬运工: only hold raw-counter crops and only drop at a raw counter (never a machine, never the 加工品 counter)
+//  · 加工品搬运工: exactly one per finished-goods machine; only ever hold machine goods (never harvest) and only drop at the
+//    goods counter (the single counter in a oneCounter level); trays stay below CFG.v47.trayMax once porters are hired
+//  · purchase order: the goods counter's porter and 店员 come within the guide window right after the 加工品 counter
+//  · no 加工品 counter yet: the machine fills up and its feeders wait by it (they never carry crops anywhere else)
+//  · levels 32 面包房 / 40 葡萄酒庄 / 43 早市面包摊 have ONE counter with ONE 店员 tile
 //   node sim/staff-check.mjs [--level=N] [--secs=120]
 import { CFG } from '../js/config.js';
 import { World } from '../js/world.js';
@@ -14,33 +16,34 @@ const SECS = +((process.argv.find((a) => a.startsWith('--secs=')) || '--secs=120
 const ONE = ['面包房', '早市面包摊', '葡萄酒庄'];
 let bad = 0, n = 0;
 const buyAll = (w, skip = () => false) => { let more = true; while (more) { more = false; for (const t of w.tiles) if (t.visible && !t.done && !skip(t)) { w.completeTile(t, true); more = true; } } };
-function run(w, secs, watch) {
-  const st = new Map();
+// run, recording what every worker ever held, its feeder batch sizes, and the tray peak
+function run(w, secs) {
+  const st = new Map(); let trayMax = 0;
   for (let i = 0; i < secs * 30; i++) {
-    const before = new Map(w.workers.map((x) => [x, { s: x.state, h: x.helping, x: x.x, y: x.y }]));
+    const before = new Map(w.workers.map((x) => [x, x.state]));
     w.update(1 / 30, 0, 0);
+    if (w.t > 20) for (const p of w.procs) if (p.pile && !p.hidden) trayMax = Math.max(trayMax, p.pile.total);
     for (const x of w.workers) {
-      if (!x.feedFor && !x.porter) continue;
-      let s = st.get(x); if (!s) st.set(x, (s = { loads: [], idle: 0, t: 0, helpDrops: 0 }));
-      const b = before.get(x); if (!b) continue;
-      s.t += 1 / 30;
-      const load = x.stack.length + x.incoming;
-      if (x.feedFor && b.s === 'collect' && x.state === 'deliver' && !x.helping && !b.h) s.loads.push(load);
-      if (load === 0 && Math.hypot(x.x - b.x, x.y - b.y) < 0.05) s.idle += 1 / 30;
+      let s = st.get(x); if (!s) st.set(x, (s = { held: new Set(), loads: [] }));
+      for (const it of x.stack) s.held.add(it);
+      if (x.feedFor && before.get(x) === 'collect' && x.state === 'deliver') s.loads.push(x.stack.length + x.incoming);
     }
   }
-  return st;
+  return { st, trayMax };
 }
-CFG.levels.forEach((L, li) => {
+CFG.levels.forEach((L0, li) => {
   if (only && +only.split('=')[1] !== li + 1) return;
-  if (!L.objects.some((o) => o.type === 'proc')) return;
+  const probe = new World(li, { quiet: true });
+  if (!probe.procs.length) return;
   n++;
-  const errs = [];
+  const L = probe.L, errs = [];
   const w = new World(li, { quiet: true, seed: 77 + li });
   const ps = w.objs.PS, one = !!L.oneCounter;
-  const FIN = (() => { const m = L.objects.filter((o) => o.type === 'proc'); const last = m.find((o) => !m.some((q) => q.in === o.out)); return last ? last.out : 'bread'; })();   // the chain's final product
+  const made = new Set(w.procs.map((p) => p.outItem));
+  const term = w.procs.filter((p) => p.pile);
+  const FIN = term.length ? term[term.length - 1].outItem : null;
   const sale = one ? w.counters[0] : ps;
-  if (!sale) { errs.push('no 加工品 counter'); }
+  if (!sale) errs.push('no 加工品 counter');
   if (ONE.includes(L.name)) {
     if (!one || ps) errs.push('should have ONE counter');
     if (w.counters.length !== 1) errs.push(`${w.counters.length} counters`);
@@ -54,48 +57,62 @@ CFG.levels.forEach((L, li) => {
   if (w.procs.some((p) => !p.hidden)) free.push('a machine');
   if (ps && !ps.hidden) free.push('the 加工品 counter');
   if (free.length) errs.push('FREE AT START: ' + free.join(', '));
+  // purchase order: porter + 店员 right behind the 加工品 counter (the guide looks CFG.guideWindow tiles ahead)
+  if (ps) {
+    const ids = w.tiles.map((t) => t.id), i = ids.indexOf('x_ps'), ip = ids.indexOf('x_p1'), ic = ids.indexOf('x_pc');
+    if (!(ip > i && ip - i <= CFG.guideWindow && ic > i && ic - i <= CFG.guideWindow)) errs.push(`order: 加工品台 #${i}, 搬运工 #${ip}, 店员 #${ic}`);
+  }
   // A) every tile bought
   buyAll(w);
-  const st = run(w, SECS);
+  const { st, trayMax } = run(w, SECS);
+  const rawIds = new Set(w.counters.filter((c) => c !== ps).map((c) => c.id));
+  const rawItems = new Set(w.counters.filter((c) => c !== ps).flatMap((c) => c.items).filter((it) => !made.has(it)));
+  const drops = (x) => Object.keys(x.drops || {});
   const farmFed = w.procs.filter((p) => !w.procs.some((q) => q.outObj === p));
   for (const p of farmFed) {
     const f = w.workers.filter((x) => x.feedFor === p.id);
-    if (f.length !== 1) errs.push(`${p.id} has ${f.length} feeders`);
+    if (f.length !== 2) errs.push(`${p.id} has ${f.length} feeders (want 1 + 1 paid)`);
+    if (!f.some((x) => (x.drops || {})[p.id] > 0)) errs.push(`${p.id} feeders never delivered`);
     for (const x of f) {
-      const s = st.get(x) || { loads: [] };
-      if (!(x.drops || {})[p.id]) errs.push(`${p.id} feeder never delivered`);
+      const s = st.get(x);
+      if (drops(x).some((id) => id !== p.id)) errs.push(`${p.id} feeder dropped at ${drops(x).join(',')}`);
+      if ([...s.held].some((it) => it !== p.inItem)) errs.push(`${p.id} feeder held ${[...s.held].join(',')}`);
       const mx = s.loads.length ? Math.max(...s.loads) : 0;
-      if (s.loads.length && mx >= x.cap) errs.push(`${p.id} feeder waited for a full stack (${mx}/${x.cap})`);
+      if (mx >= x.cap) errs.push(`${p.id} feeder waited for a full stack (${mx}/${x.cap})`);
       x._mx = mx; x._trips = s.loads.length;
     }
   }
-  if (w.workers.some((x) => x.to.some((id) => w.objs[id] && w.objs[id].kind === 'proc') && !x.feedFor)) errs.push('a non-feeder hire feeds a machine');
+  if (w.workers.some((x) => !x.feedFor && x.to.some((id) => w.objs[id] && w.objs[id].kind === 'proc'))) errs.push('a non-feeder hire feeds a machine');
   const raw = w.workers.filter((x) => x.rawCarrier), por = w.workers.filter((x) => x.porter);
-  const rawIds = new Set(w.counters.filter((c) => c !== ps).map((c) => c.id));
-  if (!raw.every((x) => Object.keys(x.drops || {}).some((id) => rawIds.has(id)) && !(x.drops || {}).PS)) errs.push('a raw carrier missed the raw counter');
-  // (a porter that is not needed at the tray right now may be out on the farm: at least one must have carried goods)
-  if (por.length !== (one ? 1 : 2) || !por.some((x) => (x.drops || {})[sale.id] > 0)) errs.push('porters did not deliver goods');
+  if (w.workers.some((x) => !x.rawCarrier && !x.porter && !x.feedFor)) errs.push('a hire without a role');
+  for (const x of raw) {
+    if (drops(x).some((id) => !rawIds.has(id))) errs.push(`raw carrier dropped at ${drops(x).join(',')}`);
+    const h = [...st.get(x).held].filter((it) => !rawItems.has(it)); if (h.length) errs.push(`raw carrier held ${h.join(',')}`);
+  }
+  if (raw.length && !raw.some((x) => drops(x).length)) errs.push('raw carriers never delivered');
+  if (por.length !== term.length) errs.push(`${por.length} porters for ${term.length} trays`);
+  for (const x of por) {
+    if (drops(x).some((id) => id !== sale.id)) errs.push(`porter dropped at ${drops(x).join(',')}`);
+    const h = [...st.get(x).held].filter((it) => !made.has(it)); if (h.length) errs.push(`porter held (harvested?) ${h.join(',')}`);
+  }
+  if (!por.some((x) => (x.drops || {})[sale.id] > 0)) errs.push('porters did not deliver goods');
+  if (trayMax > CFG.v47.trayMax) errs.push(`tray piled up to ${trayMax} (> ${CFG.v47.trayMax})`);
   if (one && !(w.stats.sold[FIN] > 0)) errs.push(`no ${FIN} sold`);
-  const staff = w.workers.filter((x) => x.feedFor || x.porter);
-  for (const x of staff) { const s = st.get(x); if (s && s.idle / s.t > 0.25) errs.push(`${x.feedFor ? 'feeder ' + x.feedFor : 'porter'} idle ${Math.round(s.idle / s.t * 100)}%`); }
-  const helpedA = staff.filter((x) => x.helpN > 0).length;
-  // B) no 加工品 counter yet: tray and input fill up, its feeder must go and farm for the raw counter
-  let helpB = '-';
+  // B) no 加工品 counter yet: the machines fill up, their feeders wait by them and never take crops anywhere else
+  let waitB = '-';
   if (ps) {
     const w2 = new World(li, { quiet: true, seed: 177 + li });
     buyAll(w2, (t) => t.id === 'x_ps');
-    run(w2, 300);   // the tray (no porters yet) fills, the machine stops, its input fills up
+    run(w2, 200);
     const fs = w2.workers.filter((x) => x.feedFor);
-    let ok = fs.some((x) => x.helpN > 0 && Object.keys(x.drops || {}).some((id) => rawIds.has(id)));
-    // v4.6 分工 (smartStaff): a feeder only farms when the raw counter runs low; otherwise it waits at its post with a batch
-    const held = L.smartStaff && fs.some((x) => x.holding && x.stack.length > 0 && w2.objs[x.feedFor].buf + w2.objs[x.feedFor].inc >= CFG.proc.inMax);
-    const busy = L.smartStaff && fs.every((x) => (x.drops || {})[x.feedFor] > 0 && w2.objs[x.feedFor].buf + w2.objs[x.feedFor].inc < CFG.proc.inMax);   // its machine never filled: it kept feeding
-    helpB = ok ? 'feeder farmed' : held ? 'feeder waits at its post' : busy ? 'feeder kept feeding' : 'NO';
-    ok = ok || held || busy;
-    if (!ok) errs.push('feeders never helped on the farm while the machine was full');
+    const wrong = fs.filter((x) => drops(x).some((id) => id !== x.feedFor));
+    const waiting = fs.filter((x) => { const m = w2.objs[x.feedFor]; return m.buf + m.inc >= CFG.proc.inMax || x.holding || x.state === 'collect'; });
+    waitB = wrong.length ? 'NO' : `${waiting.length}/${fs.length} 专员在机器旁等`;
+    if (wrong.length) errs.push('a feeder took crops elsewhere while its machine was full');
   }
   const fsum = w.workers.filter((x) => x.feedFor).map((x) => `${x.feedFor}:${x._trips || 0}趟≤${x._mx || 0}/${x.cap}`).join(' ');
   const ok = !errs.length; if (!ok) bad++;
-  console.log(`${ok ? 'OK  ' : 'FAIL'} 第${li + 1}关 ${L.name}: 专员 ${fsum} · 原料搬运工 ×${raw.length} · 加工品搬运工 ×${por.length}→${sale ? sale.id : '?'} · 帮农活 ${helpedA}/${staff.length}${ps ? ' · 无加工品台时 ' + helpB : ' · 单收银台'}${errs.length ? ' · ' + errs.join('; ') : ''}`);
+  console.log(`${ok ? 'OK  ' : 'FAIL'} 第${li + 1}关 ${L.name}: 专员 ${fsum} · 原料搬运工 ×${raw.length} · 加工品搬运工 ×${por.length}→${sale ? sale.id : '?'} · 出货台最高 ${trayMax}${ps ? ' · 无加工品台时 ' + waitB : ' · 单收银台'}${errs.length ? ' · ' + errs.join('; ') : ''}`);
 });
-console.log(bad ? `${bad} of ${n} machine levels failed` : `all ${n} machine levels: one feeder per machine, small batches, idle staff farm, porters → goods counter, nothing free at start`);
+console.log(bad ? `${bad} of ${n} machine levels failed` : `all ${n} machine levels: fixed roles (raw carriers → raw counter, 2 feeders per machine → that machine, one porter per tray → goods counter), nothing free at start`);
+if (bad) process.exitCode = 1;

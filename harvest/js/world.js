@@ -295,7 +295,8 @@ export class World {
     this.valley = Number.isInteger(L0.valley);
     this.L = splitSales(L0);
     // v4.6 分工 (division of labour), on for levels with smartStaff (the 四季山谷): see sinkOpen / workerAI
-    this.smart = !!this.L.smartStaff;
+    // v4.7: and in every machine level (fixed roles: no idle farm help, no role switching)
+    this.smart = !!this.L.smartStaff || this.L.objects.some((o) => o.type === 'proc');
     this.daily = opts.level ? (opts.daily || {}) : null;
     this.timeLimit = opts.timeLimit || 0;     // 每日挑战: the run ends at this many seconds (score = money earned)
     this.vipMul = opts.vipMul || 1;
@@ -556,7 +557,7 @@ export class World {
     switch (f.kind) {
       case 'stack': r.incoming--; r.stack.push(f.type); break;
       case 'pile': r.pending--; r.add(f.tx, f.ty, this.rnd); break;
-      case 'counter': r.incoming--; r.stock.push(f.type); r.bumpT = 1; break;
+      case 'counter': r.incoming--; if (r.incMade && this._made && this._made.has(f.type)) r.incMade--; r.stock.push(f.type); r.bumpT = 1; break;
       case 'cust': r.incoming--; r.bag.push(f.type); break;
       case 'procIn': r.inc--; r.buf++; break;
     }
@@ -600,7 +601,8 @@ export class World {
       const w = this.addWorker(e.worker.from, e.worker.to, t.x, t.y, t.icon === 'cart' || t.icon === 'milker');
       if (e.worker.porter) w.porter = true;     // v4.3 加工品搬运工 (tray → 加工品 counter)
       if (e.worker.raw) w.rawCarrier = true;    // v4.3 原料搬运工 (fields → raw counter)
-      if (e.worker.feeder) w.feedFor = e.worker.feeder;   // v4.5 the machine's own feeder (small batches, helps on the farm when idle)
+      if (e.worker.feeder) w.feedFor = e.worker.feeder;   // v4.5 the machine's own feeder (small batches; v4.7 never anything else)
+      if (e.worker.tray) w.trayOf = e.worker.tray;        // v4.7 the porter's own machine tray
     }
     if (e.upgradeWorkers === 'loader') {
       this.loaders = true;
@@ -939,7 +941,7 @@ export class World {
           c.stack.splice(idx, 1); c.dropAcc--;
           if (!isPlayer) { c.done = (c.done || 0) + 1; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + 1; }   // 雇工 XP (+ v4.3 where it went)
           const z = 44 + idx * CFG.items[item].step;
-          if (sink.kind === 'counter') { sink.incoming++; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop); }
+          if (sink.kind === 'counter') { sink.incoming++; if ((this._made || (this._made = new Set(this.procs.map((q) => q.outItem)))).has(item)) sink.incMade = (sink.incMade || 0) + 1; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop); }
           else { sink.inc++; this.launch(item, 'procIn', c.x, c.y, z, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop); }
           if (isPlayer) this.emit('drop', { item });
         }
@@ -992,13 +994,18 @@ export class World {
     const C = CFG.customer;
     c.bumpT = Math.max(0, c.bumpT - dt * 4);
     c.spawnT -= dt;
-    if (c.spawnT <= 0 && c.queue.length < C.queue) {
+    // v4.7 不能让客人干等: a customer only comes when the desk holds enough for everyone already queueing plus a small buy
+    let owed = 0; for (const q of c.queue) owed += Math.max(0, q.want - q.bag.length - q.incoming);
+    if (c.nextWant === undefined) c.nextWant = C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)) + (c.buyBonus || 0);
+    const avail = c.stock.length + c.incoming - owed, stocked = avail >= C.buyMin + (c.buyBonus || 0);   // (a customer buys what is there, up to its wish)
+    if (c.spawnT <= 0 && c.queue.length < C.queue && stocked) {
       c.spawnT = c.interval * (0.7 + this.rnd() * 0.6);
       const cu = { x: c.spawn.x + this.rnd() * 30, y: c.spawn.y + (this.rnd() - 0.5) * 20, counter: c, state: 'in',
-                   want: C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)) + (c.buyBonus || 0),
-                   bag: [], incoming: 0, wait: 0, hue: Math.floor(this.rnd() * 8), walk: this.rnd() * 6, face: -1, vx: 0, vy: 0, leg: 0 };
+                   want: Math.min(c.nextWant, avail),
+                   bag: [], incoming: 0, wait: 0, dry: 0, t0: this.t, hue: Math.floor(this.rnd() * 8), walk: this.rnd() * 6, face: -1, vx: 0, vy: 0, leg: 0 };
       if (this.rnd() < CFG.vip.chance * this.vipMul) { cu.vip = true; cu.wish = c.items.reduce((a, b) => (itemPrice(b) > itemPrice(a) ? b : a), c.items[0]); }
       c.queue.push(cu); this.customers.push(cu);
+      c.nextWant = undefined;
     }
     const front = c.queue[0];
     if (front && front.state === 'wait') {
@@ -1009,8 +1016,12 @@ export class World {
       }
       if (c.stock.length <= 0) c.buyAcc = 0;
       const got = front.bag.length;
-      const done = got >= front.want || (front.incoming === 0 && got > 0 && c.stock.length <= 0 && (front.wait += dt) > C.patience);
-      if (done && front.incoming === 0) {
+      if (c.stock.length <= 0 && front.incoming === 0 && got < front.want) front.dry += dt;   // v4.7 metric: standing at an empty desk
+      const done = got >= front.want || (front.incoming === 0 && got > 0 && c.stock.length <= 0 && (front.wait += dt) > C.patience)
+        || (got === 0 && front.incoming === 0 && c.stock.length <= 0 && front.dry > C.patience * 2);   // nothing for them: they leave
+      if (done && front.incoming === 0 && this.quiet) (this.waitLog || (this.waitLog = [])).push({ c: c.id, t: this.t, wait: this.t - (front.tArr ?? front.t0), dry: front.dry, got });
+      if (done && front.incoming === 0 && got === 0) { front.state = 'out'; front.leg = 0; c.queue.shift(); }
+      else if (done && front.incoming === 0) {
         let amount = 0;
         for (const it of front.bag) { amount += itemPrice(it); this.stats.sold[it] = (this.stats.sold[it] || 0) + 1; }
         if (front.vip) { amount *= CFG.vip.mul; this.emit('vipPay', { x: c.x, y: c.y, tx: c.cashPos.x, ty: c.cashPos.y, amount, cashier: c.cashier }); }
@@ -1038,6 +1049,7 @@ export class World {
         const sx = dx - dy; if (Math.abs(sx) > 1) cu.face = sx > 0 ? 1 : -1;
       } else {
         cu.moving = false; cu.vx = cu.vy = 0;
+        if (cu.state === 'in' && cu.tArr === undefined) cu.tArr = this.t;   // v4.7 metric: queue wait starts when it reaches the line
         if (cu.state === 'in' && c.queue[0] === cu) { cu.state = 'wait'; cu.face = -1; }
         if (cu.state === 'out') { if (cu.leg === 0) cu.leg = 1; else this.customers.splice(i, 1); }
       }
@@ -1045,49 +1057,18 @@ export class World {
   }
 
   // ---- gardeners ---------------------------------------------------------------------
-  // v4.5 machine staff (feeder / porter): nothing to do for their machine → help on the farm (harvest the crops the raw
-  // counter sells and bring them there), back to the machine as soon as it needs them again. Nobody stands idle.
-  helpLists() {
-    if (this._help) return this._help;
-    const sell = this.counters.filter((c) => !c.sale2), items = new Set(sell.flatMap((c) => c.items));
-    const from = [...this.fields, ...this.coops, ...this.ponds].filter((o) => items.has(o.item)).map((o) => o.id);
-    return (this._help = { from: [...new Set(from)], to: sell.map((c) => c.id) });
-  }
-  staffMode(w, dt) {
-    const H = this.helpLists(), V = CFG.v45;
-    if (!H.from.length) { w.helping = false; return; }
-    const hasHelpWork = H.from.some((id) => { const o = this.objs[id]; return o && !o.hidden && ((o.pile ? o.pile.total : 0) + (o.ripe || 0)) > 0 && this.hasSink(o.item); });
-    let need;
-    if (w.feedFor) {
-      const m = this.objs[w.feedFor], fill = m.buf + m.inc, cap = CFG.proc.inMax;
-      need = !m.hidden && fill < (w.helping ? cap * V.backAt : cap);
-    } else {
-      let tray = 0; for (const id of w.from) { const p = this.objs[id]; if (p && !p.hidden && p.pile) tray += p.pile.total; }
-      need = w.helping ? tray >= V.porterBack : tray > 0 || w.stack.length + w.incoming > 0;
-    }
-    const load = w.stack.length + w.incoming;
-    if (w.helping && need) {
-      // back to the job: crops in hand that the machine can't use go to the raw counter first
-      const own = w.feedFor ? this.objs[w.feedFor].inItem : null;
-      if (load === 0 || (own && w.stack.every((t) => t === own) && w.incoming === 0)) { w.helping = false; w.state = 'collect'; w.tgt = null; w.wait = 0; }
-      else if (w.state === 'collect') w.state = 'deliver';
-    } else if (!w.helping && !need && hasHelpWork && (!this.smart || this.rawNeedsTopUp())) {
-      const sinks = H.to.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
-      if (w.incoming === 0 && w.stack.every((t) => sinks.some((k) => k.items.includes(t)))) { w.helping = true; w.state = w.stack.length ? 'deliver' : 'collect'; w.tgt = null; w.wait = 0; w.helpN = (w.helpN || 0) + 1; }
-    }
-  }
   // ---- v4.6 分工 -------------------------------------------------------------------------
   // raw items on a counter (machine goods on a one-counter level do not count)
   rawStock(c) {
     if (!this._made) this._made = new Set(this.procs.map((p) => p.outItem));
-    let n = c.incoming; for (const it of c.stock) if (!this._made.has(it)) n++;
+    let n = c.incoming - (c.incMade || 0); for (const it of c.stock) if (!this._made.has(it)) n++;   // (v4.7: goods in flight are not raw)
     return n;
   }
   // a raw counter wants staff deliveries: in a machine level only to top it up (below rawLow → until rawFull)
   rawNeedsTopUp() { return this.counters.some((c) => !c.hidden && !c.sale2 && this.rawStock(c) < CFG.v46.rawLow); }
   sinkOpen(w, s) {
     if (s.kind === 'proc') return !this.procFull(s) && s.buf + s.inc < CFG.proc.inMax;
-    if (s.sale2 || (w.porter && !w.helping)) return s.stock.length + s.incoming < CFG.counter.stockMax;
+    if (s.sale2 || w.porter) return s.stock.length + s.incoming < CFG.counter.stockMax;
     const n = this.rawStock(s);
     if (!this.procs.length) return n < CFG.counter.stockMax;
     const top = w.top || (w.top = {});
@@ -1109,49 +1090,53 @@ export class World {
     const x = o.x + o.w + 22, y = o.y + 24 + ((i * 37) % Math.max(1, o.h - 48));
     return { x: Math.min(this.W - 30, x), y };
   }
+  // v4.7 where a worker with nothing to pick up waits: porters spread round their tray, others along their field's edge
+  idlePost(w, srcs) {
+    if (w.porter) {
+      const p = this.objs[w.trayOf] || srcs[0], tr = p && p.pile; if (!tr) return { x: w.x, y: w.y };
+      const mates = this.workers.filter((o) => o.porter && o.trayOf === w.trayOf), k = Math.max(0, mates.indexOf(w));
+      return { x: tr.x + tr.w / 2 + (k % 2 ? 14 : -14), y: tr.y + tr.h / 2 + (k < 2 ? 0 : 14) };
+    }
+    return this.post({ ...w, feedFor: null }, srcs.filter((o) => o.kind === 'field').concat(srcs));
+  }
   workerAI(w, dt) {
     const T = this.t;
-    if (w.feedFor || w.porter) this.staffMode(w, dt);
-    const fromIds = w.helping ? this._help.from : w.from, toIds = w.helping ? this._help.to : w.to;
-    let srcs = fromIds.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
-    let sinks = toIds.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
-    // v4.6 分工: a raw-counter carrier's job is to top its counter up when it runs low. While the counter is stocked and
-    // its hands are empty it helps a starving machine instead (harvests that machine's crop and feeds it), and goes back
-    // to the counter once that machine is well stocked or the counter runs low again.
-    if (this.smart && !w.feedFor && !w.porter) {
-      const mine = sinks.filter((k) => k.kind === 'counter' && !k.sale2);
-      const low = mine.some((c) => this.rawStock(c) < CFG.v46.rawLow);
-      const empty = w.stack.length === 0 && w.incoming === 0, inMax = CFG.proc.inMax;
-      if (w.assist && empty && (w.assist.hidden || low || w.assist.buf + w.assist.inc >= inMax * 0.9)) w.assist = null;
-      if (!w.assist && empty && !low && mine.length) {
-        let bd = 1e18;
-        for (const p of this.procs) {
-          if (p.hidden || !this.procSells(p) || this.procs.some((q) => q.outObj === p) || p.buf + p.inc >= inMax * CFG.v46.starve) continue;
-          if (!this.fields.concat(this.ponds, this.coops).some((o) => !o.hidden && o.item === p.inItem)) continue;
-          const dd = d2(p.x, p.y, w.x, w.y); if (dd < bd) { bd = dd; w.assist = p; }
-        }
+    // v4.7 fixed roles: everyone only ever works its own sources → its own sinks (no farm help, no assisting machines)
+    let srcs = w.from.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
+    // a porter works its own tray; when that one is empty and another tray of the same counter is heaping up, it fetches
+    // from there (still tray → goods counter, sticky until that load is delivered)
+    if (w.porter && w.trayOf && this.smart) {
+      const own = this.objs[w.trayOf], tot = (o) => (o.pile ? o.pile.total : 0);
+      if (w.state === 'collect' && !w.otherTray && own && tot(own) === 0) {
+        let best = null; for (const o of srcs) if (o !== own && tot(o) >= CFG.v47.trayHelp && (!best || tot(o) > tot(best))) best = o;
+        if (best) w.otherTray = best;
       }
-      if (w.assist) { const m = w.assist; srcs = this.fields.concat(this.ponds, this.coops).filter((o) => !o.hidden && o.item === m.inItem); sinks = [m, ...mine]; }
+      if (w.otherTray && (w.otherTray.hidden || (w.state === 'collect' && tot(w.otherTray) === 0 && w.stack.length === 0))) w.otherTray = null;
+      srcs = w.otherTray ? [w.otherTray] : own && !own.hidden ? [own] : srcs;
     }
-    // v4.6: anyone but a feeder who already holds a starving machine's crop may drop it there (e.g. a porter helping on the farm)
-    if (this.smart && !w.feedFor && w.stack.length) for (const p of this.procs) {
-      if (p.hidden || sinks.includes(p) || !this.procSells(p) || this.procs.some((q) => q.outObj === p)) continue;
-      if (p.buf + p.inc < CFG.proc.inMax * CFG.v46.starve && w.stack.includes(p.inItem)) sinks.push(p);
-    }
+    const sinks = w.to.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
     w.sources = srcs; w.toObjs = sinks;
     w.holding = false;
     const space = w.cap - w.stack.length - w.incoming;
     if (w.state === 'collect' && space <= 0) w.state = 'deliver';
     // v4.5 一次一送: the feeder goes as soon as it holds a small batch the machine can take (≤ half its stack), never a full load
-    if (w.state === 'collect' && w.feedFor && !w.helping) {
+    if (w.state === 'collect' && w.feedFor) {
       const m = this.objs[w.feedFor];
       const batch = Math.max(m.ratio, Math.min(Math.ceil(w.cap * CFG.v45.batch), CFG.proc.inMax - m.buf - m.inc));
       let have = w.incoming; for (const t of w.stack) if (t === m.inItem) have++;
       if (have >= batch) { w.state = 'deliver'; w.batch = batch; }
       else if (this.smart && have >= m.ratio && m.buf + m.inc < m.ratio * 2 && !(m.work > 0)) { w.state = 'deliver'; w.batch = have; }   // v4.6: machine about to run dry → bring what you have
     }
+    // v4.7 porter: leave the tray with a fair batch, or at once when the goods counter is running low
+    if (w.state === 'collect' && w.porter && this.smart) {
+      // it keeps loading while its tray has goods (a full stack goes anyway), and leaves an emptied tray with a fair batch,
+      // or with a few as soon as the goods counter runs low
+      const have = w.stack.length + w.incoming, sale = sinks[0], left = srcs.reduce((n, o) => n + (o.pile ? o.pile.total : 0), 0);
+      const low = sale && sale.stock.length + sale.incoming < CFG.v47.porterLow;
+      if (left === 0 && w.incoming === 0 && (have >= Math.ceil(w.cap * CFG.v47.porterGo) || (low && have >= CFG.v47.porterMin))) w.state = 'deliver';
+    }
     if (w.state === 'deliver' && w.stack.length === 0 && w.incoming === 0) {
-      w.state = 'collect'; w.wait = 0;
+      w.state = 'collect'; w.wait = 0; w.otherTray = null;
       // 园丁成长: level up every few delivery trips
       w.trips++;
       const Lv = CFG.workerLv, nl = Math.min(Lv.max, 1 + Math.floor(w.trips / Lv.per));
@@ -1171,9 +1156,12 @@ export class World {
         if (v > bv) { bv = v; best = s; }
       }
       if (!best) {
-        w.wait += dt;
+        w.wait += dt; w.idleT = (w.idleT || 0) + dt;
         if (w.stack.length > 0 && w.wait > 1.5) w.state = 'deliver';
+        // v4.7 nothing to pick up: wait at its own post (porter by its tray, others at the edge of their field)
+        else if (this.smart && w.idleT > CFG.v47.idleWait) { const o = this.idlePost(w, srcs); tx = o.x; ty = o.y; }
       } else {
+        w.idleT = 0;
         w.retarget -= dt;
         if (best.kind === 'pond') {   // 渔夫 chase the nearest school (re-aimed often: fish move)
           if (w.retarget <= 0 || !w.tgt) {
@@ -1208,7 +1196,7 @@ export class World {
         const z = s.kind === 'counter' ? s.zone : s.inZone; let dd = d2(z.cx, z.cy, w.x, w.y);
         // v4.6: a raw counter that is being topped up (it ran low) comes first, then a machine that needs crops
         // order: a raw counter that ran low → a starving machine → a counter being topped up / a machine with input
-        if (this.smart) dd *= s.kind === 'counter' && !s.sale2 && !(w.porter && !w.helping) && this.rawStock(s) < CFG.v46.rawLow ? 0.004   // (weights on squared distance)
+        if (this.smart) dd *= s.kind === 'counter' && !s.sale2 && !w.porter && this.rawStock(s) < CFG.v46.rawLow ? 0.004   // (weights on squared distance)
           : s.kind === 'proc' && s.buf + s.inc < CFG.proc.inMax * CFG.v46.starve ? 0.02 : 1;
         if (this.smart && w.pick === s) dd *= 0.05;   // v4.6: stick with the sink already chosen (no dithering between two)
         if (dd < bd) { bd = dd; bs = z; bo = s; }

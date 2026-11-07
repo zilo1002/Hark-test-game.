@@ -54,7 +54,7 @@ export function playLevel(li, prof, seed, env = {}) {   // env: per-call overrid
       unlocks.push({ t: w.t, id: t.id, label: t.label, n: t.bought, price: t.repeat ? Math.round(t.price0 * Math.pow(t.repeat.mul, t.bought - 1)) : t.price0 });
     }
   }
-  return { won: w.won, time: w.won ? w.winT : w.t, stars: w.stars(), unlocks, money: w.money, workers: w.workers.length, vehicle: p.vehicle };
+  return { won: w.won, time: w.won ? w.winT : w.t, stars: w.stars(), unlocks, money: w.money, workers: w.workers.length, vehicle: p.vehicle, world: env.keepWorld ? w : undefined };
 }
 
 const fmt = (s) => { s = Math.round(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };

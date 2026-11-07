@@ -12,6 +12,10 @@
 // hire that used to feed the same machine becomes a farm hand for the raw counter (so fewer generated raw carriers).
 // A level with `oneCounter: true` (32 面包房, 43 早市面包摊) gets no 「加工品」 counter: its goods sell from the raw counter,
 // carried there from the tray by ONE porter (no second register, no 加工品店员).
+// v4.7 FIXED ROLES (user's design after the 熏鱼房 phone video): 原料搬运工 only fields → raw counter; 机器专员 only that
+// machine's crop → that machine (one tile, plus a paid tile for a 2nd per machine); 加工品搬运工 only tray → goods counter,
+// one per machine (at least two on a single-machine 加工品 counter). The goods counter's porter + 店员 come right after
+// its machine in the purchase order, so customers there never stand at an empty desk for long.
 import { CFG } from './config.js';
 
 const cache = new WeakMap();
@@ -144,11 +148,12 @@ function splitSales0(L0) {
   // 2b) v4.5 one dedicated feeder per machine fed from the farm (a machine fed by another machine needs none)
   const srcOf = (item) => L.objects.filter((o) => (o.type === 'field' && o.crop === item) || (o.type === 'coop' && o.item === item)).map((o) => o.id);
   const chained = new Set(procs.filter((p) => procs.some((q) => q.outTo === p.id)).map((p) => p.id));
-  const needFeeder = [];
+  const needFeeder = [], feedTile = {};
   for (const p of procs) {
     if (chained.has(p.id)) continue;
     const hires = L.tiles.filter((t) => t.effect.worker && t.effect.worker.to.includes(p.id));
     const src = srcOf(p.in);
+    if (hires.length) feedTile[p.id] = hires[0];
     hires.forEach((t, k) => {
       const w0 = t.effect.worker;
       t.effect = { ...t.effect, worker: k === 0 ? { from: src.length ? src : w0.from, to: [p.id], feeder: p.id }
@@ -170,8 +175,23 @@ function splitSales0(L0) {
   for (const p of procs) p.hidden = true;
   for (const [p, src] of needFeeder) {
     const sp = spot(L, p.x - 90, p.y + 60);
-    add({ id: 'x_f' + p.id, x: sp[0], y: sp[1], price: r10(s * V.raw[0]), icon: 'worker', label: '机器专员', req: [mTile[p.id].id],
+    feedTile[p.id] = add({ id: 'x_f' + p.id, x: sp[0], y: sp[1], price: r10(s * V.raw[0]), icon: 'worker', label: '机器专员', req: [mTile[p.id].id],
           effect: { worker: { from: src, to: [p.id], feeder: p.id } } });
+  }
+  // v4.7 every other farm hire is a 原料搬运工: it only harvests what the raw counter sells and only drops there
+  const rawIds = rawC.map((c) => c.id);
+  for (const t of L.tiles) {
+    const wk = t.effect.worker; if (!wk || wk.feeder || wk.porter) continue;
+    const from = wk.from.filter((id) => rawSrc.includes(id));
+    t.effect = { ...t.effect, worker: { from: from.length ? from : rawSrc.length ? rawSrc : wk.from, to: rawIds, raw: true } };
+  }
+  // v4.7 a paid tile for a 2nd 机器专员 per farm-fed machine (waits for the first)
+  const feed2 = [];
+  for (const p of procs) {
+    const ft = feedTile[p.id]; if (!ft) continue;
+    const sp = spot(L, p.x - 90, p.y + 100);
+    feed2.push(add({ id: 'x_g' + p.id, x: sp[0], y: sp[1], price: r10(s * CFG.v47.feeder2), icon: 'worker', label: '机器专员',
+                     req: [ft.id], effect: { worker: { ...ft.effect.worker, to: [p.id], feeder: p.id } } }));
   }
   // hires feeding a machine, and every upgrade of it, wait for that machine
   const needM = (t, ids) => { for (const id of ids) { const mt = mTile[id]; if (mt && mt !== t && !(t.req || []).includes(mt.id)) t.req = [...(t.req || []), mt.id]; } };
@@ -204,9 +224,15 @@ function splitSales0(L0) {
                       req: rawT.length ? [rawT[rawT.length - 1].id] : [first.id], effect: { worker: { from: rawSrc, to: rawC.map((c) => c.id), raw: true } } }));
     }
   }
-  const spP = one ? spot(L, T[0].tray[0] - 40, T[0].tray[1] + 70) : spot(L, sale.x - 110, sale.y + 50);
-  const por = (one ? [0] : [0, 1]).map((k) => add({ id: 'x_p' + (k + 1), x: spP[0], y: spP[1], price: r10(s * V.porter[k]), icon: 'porter', label: '加工品搬运工',
-                                      req: [k ? 'x_p1' : one ? termTiles[0] : 'x_ps'], effect: { worker: { from: T.map((p) => p.id), to: [sale.id], porter: true } } }));
+  // v4.7 人员适配: exactly one 加工品搬运工 per finished-goods machine, tied to its own tray (it helps a heaping tray of the same counter when its own is empty)
+  const nP = T.length;
+  const por = [];
+  for (let k = 0; k < nP; k++) {
+    const p = T[k % T.length], sp = spot(L, p.tray[0] + p.tray[2] / 2 + 10, p.tray[1] + p.tray[3] + 40);
+    const req = k >= T.length ? [por[k - T.length].id] : [mTile[p.id].id, ...(one ? [] : ['x_ps'])];
+    por.push(add({ id: 'x_p' + (k + 1), x: sp[0], y: sp[1], price: r10(s * V.porter[k < T.length ? 0 : 1]), icon: 'porter', label: '加工品搬运工',
+                   req, effect: { worker: { from: [p.id, ...T.filter((q) => q !== p).map((q) => q.id)], to: [sale.id], porter: true, tray: p.id } } }));
+  }
   // 6) 店员 + 收银升级 (the upgrade waits on the clerk, on the same spot)
   const cup = (id, at, ids, clerk) => add({ id, x: at.x, y: at.y, price: r10(s * V.cup.base), icon: 'register', label: '收银升级', req: [clerk],
                                             repeat: { times: V.cup.times, mul: V.cup.mul }, effect: { counterUp: ids } });
@@ -233,8 +259,11 @@ function splitSales0(L0) {
   const mGen = gen.filter((t) => t.id.startsWith('m_'));
   let order = [orig[0], ...mGen, ...orig.slice(1)];
   const firstTerm = order.findIndex((t) => termTiles.includes(t.id));
-  order.splice(firstTerm + 1, 0, ...(ps ? [ps] : []), ...(rawT[0] ? [rawT[0]] : []), por[0]);
-  order.push(...(pc ? [pc] : []), ...gen.filter((t) => t.id.startsWith('x_f')), ...rawT.slice(1), ...(por[1] ? [por[1]] : []), ...(pu ? [pu] : []), ...ups, ...gen.filter((t) => t.id.startsWith('u_')));
+  // v4.7: right after the first finished-goods machine: [加工品 counter, its porter, its 店员, raw carrier 1]; every later
+  // finished-goods machine is followed by its own porter
+  order.splice(firstTerm + 1, 0, ...(ps ? [ps] : []), por[0], ...(pc ? [pc] : []), ...(rawT[0] ? [rawT[0]] : []));
+  T.forEach((p, k) => { if (!k) return; const i = order.indexOf(mTile[p.id]); if (i >= 0) order.splice(i + 1, 0, por[k]); else order.push(por[k]); });
+  order.push(...gen.filter((t) => t.id.startsWith('x_f')), ...rawT.slice(1), ...por.slice(T.length), ...feed2, ...(pu ? [pu] : []), ...ups, ...gen.filter((t) => t.id.startsWith('u_')));
   const seen = new Set(); L.tiles = order.filter((t) => t && !seen.has(t) && seen.add(t));
   for (const t of gen) if (!seen.has(t)) L.tiles.push(t);
   L.sale2 = one ? null : 'PS';
