@@ -594,6 +594,7 @@ export class World {
       const w = this.addWorker(e.worker.from, e.worker.to, t.x, t.y, t.icon === 'cart' || t.icon === 'milker');
       if (e.worker.porter) w.porter = true;     // v4.3 加工品搬运工 (tray → 加工品 counter)
       if (e.worker.raw) w.rawCarrier = true;    // v4.3 原料搬运工 (fields → raw counter)
+      if (e.worker.feeder) w.feedFor = e.worker.feeder;   // v4.5 the machine's own feeder (small batches, helps on the farm when idle)
     }
     if (e.upgradeWorkers === 'loader') {
       this.loaders = true;
@@ -1036,13 +1037,53 @@ export class World {
   }
 
   // ---- gardeners ---------------------------------------------------------------------
+  // v4.5 machine staff (feeder / porter): nothing to do for their machine → help on the farm (harvest the crops the raw
+  // counter sells and bring them there), back to the machine as soon as it needs them again. Nobody stands idle.
+  helpLists() {
+    if (this._help) return this._help;
+    const sell = this.counters.filter((c) => !c.sale2), items = new Set(sell.flatMap((c) => c.items));
+    const from = [...this.fields, ...this.coops, ...this.ponds].filter((o) => items.has(o.item)).map((o) => o.id);
+    return (this._help = { from: [...new Set(from)], to: sell.map((c) => c.id) });
+  }
+  staffMode(w, dt) {
+    const H = this.helpLists(), V = CFG.v45;
+    if (!H.from.length) { w.helping = false; return; }
+    const hasHelpWork = H.from.some((id) => { const o = this.objs[id]; return o && !o.hidden && ((o.pile ? o.pile.total : 0) + (o.ripe || 0)) > 0 && this.hasSink(o.item); });
+    let need;
+    if (w.feedFor) {
+      const m = this.objs[w.feedFor], fill = m.buf + m.inc, cap = CFG.proc.inMax;
+      need = !m.hidden && fill < (w.helping ? cap * V.backAt : cap);
+    } else {
+      let tray = 0; for (const id of w.from) { const p = this.objs[id]; if (p && !p.hidden && p.pile) tray += p.pile.total; }
+      need = w.helping ? tray >= V.porterBack : tray > 0 || w.stack.length + w.incoming > 0;
+    }
+    const load = w.stack.length + w.incoming;
+    if (w.helping && need) {
+      // back to the job: crops in hand that the machine can't use go to the raw counter first
+      const own = w.feedFor ? this.objs[w.feedFor].inItem : null;
+      if (load === 0 || (own && w.stack.every((t) => t === own) && w.incoming === 0)) { w.helping = false; w.state = 'collect'; w.tgt = null; w.wait = 0; }
+      else if (w.state === 'collect') w.state = 'deliver';
+    } else if (!w.helping && !need && hasHelpWork) {
+      const sinks = H.to.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
+      if (w.incoming === 0 && w.stack.every((t) => sinks.some((k) => k.items.includes(t)))) { w.helping = true; w.state = w.stack.length ? 'deliver' : 'collect'; w.tgt = null; w.wait = 0; w.helpN = (w.helpN || 0) + 1; }
+    }
+  }
   workerAI(w, dt) {
     const T = this.t;
-    const srcs = w.from.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
-    const sinks = w.to.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
+    if (w.feedFor || w.porter) this.staffMode(w, dt);
+    const fromIds = w.helping ? this._help.from : w.from, toIds = w.helping ? this._help.to : w.to;
+    const srcs = fromIds.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
+    const sinks = toIds.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
     w.sources = srcs; w.toObjs = sinks;
     const space = w.cap - w.stack.length - w.incoming;
     if (w.state === 'collect' && space <= 0) w.state = 'deliver';
+    // v4.5 一次一送: the feeder goes as soon as it holds a small batch the machine can take (≤ half its stack), never a full load
+    if (w.state === 'collect' && w.feedFor && !w.helping) {
+      const m = this.objs[w.feedFor];
+      const batch = Math.max(m.ratio, Math.min(Math.ceil(w.cap * CFG.v45.batch), CFG.proc.inMax - m.buf - m.inc));
+      let have = w.incoming; for (const t of w.stack) if (t === m.inItem) have++;
+      if (have >= batch) { w.state = 'deliver'; w.batch = batch; }
+    }
     if (w.state === 'deliver' && w.stack.length === 0 && w.incoming === 0) {
       w.state = 'collect'; w.wait = 0;
       // 园丁成长: level up every few delivery trips
