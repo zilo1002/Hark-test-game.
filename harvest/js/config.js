@@ -160,9 +160,17 @@ export const CFG = {
   // v4.8 a paid 3rd 机器专员 (feeder3 × median hire, after that machine's 2nd) only on the machines feed3[level name] lists:
   // the ones sim/fit-check.mjs showed starving > 15% with everything else bought. A valley level may list machines per season
   // ({ season: [ids] }) where one set does not fit all four (the extra goods must not heap the trays past v47.trayMax)
-  v48: { feeder3: 1.2, feed3: { 羊毛牧场: ['M1'], 秋收集市: ['M2'], 半亩大庄园: ['M1', 'M4'], 夜间农场: ['M1'], 早市面包摊: ['M1'],
-                                 湖畔集市: ['M3'], 湖畔酒庄大庄园: ['M1', 'M3'], 山谷小作坊: ['M1'], 溪畔双坊: ['M1'], 山谷集市: ['M1'],
-                                 四季山谷大庄园: { 0: ['M1'], 1: ['M1'], 2: ['M2', 'M3'], 3: ['M1'] } } },
+  // v4.9: with the line kept full (customers walk up all the time) goods sell faster, so 7, 13, 15, 26, 40, 42, 溪畔双坊 秋 and 四季山谷大庄园 秋 M1 joined
+  v48: { feeder3: 1.2, feed3: { 蛋箱工坊: ['M1'], 麦田番茄: ['M1'], 青青大庄园: ['M2'], 木椅工坊: ['M1', 'M2'], 葡萄酒庄: ['M1'], 夜钓: ['M1', 'M2'],
+                                 羊毛牧场: ['M1'], 秋收集市: ['M2'], 半亩大庄园: ['M1', 'M4'], 夜间农场: ['M1'], 早市面包摊: ['M1'],
+                                 湖畔集市: ['M3'], 湖畔酒庄大庄园: ['M1', 'M3'], 山谷小作坊: ['M1'], 溪畔双坊: { 0: ['M1'], 1: ['M1'], 2: ['M1', 'M2'], 3: ['M1'] }, 山谷集市: ['M1'],
+                                 四季山谷大庄园: { 0: ['M1'], 1: ['M1'], 2: ['M1', 'M2', 'M3'], 3: ['M1'] } } },
+  // v4.9 全建好才过关: from level `from` (45) on, a level clears only once essentially everything is built (every plot, machine,
+  // staff tile and upgrade). sim/hard-tune.mjs sets each goal n = max(the goal's measure when the sharp bot has made `share` of
+  // all purchases × (1 + margin), min(the measure at the target time, old n × maxMul), old n × minMul); target time = time[0] +
+  // time[1] s per level after `from`, at most time[2] (sharp bot). The user's rule (2026-11-07): goals ×3–4, aim 6–9 min; sim/balance.mjs checks the bot has bought
+  // ≥ checkShare of them at the clear. Levels 54–60: add them to VL.specs, then node sim/hard-tune.mjs --level=N --write, set-par.
+  v49: { fullBuild: { from: 45, share: 1.0, margin: 0.1, minMul: 3, maxMul: 4, time: [360, 15, 540], checkShare: 0.9 } },
   v46: { rawLow: 30, rawFull: 80, starve: 0.5, holdAt: 0.5 },
   v45: { batch: 0.5, backAt: 0.5, porterBack: 10 },   // v4.5 machine staff: feeder small batch = ≤50% of its stack (and what the machine has room for); help on the farm, back to the machine at ≤50% input / porter at ≥10 on the tray
   v43: { machine: 0.5, machine2: 0.7, sale: 0.35, raw: [0.4, 0.8], porter: [0.4, 0.8], clerk: 0.7,
@@ -1138,8 +1146,8 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[440, 520, 560, 100], [740, 220, 80, 320]], hedges: [[900, 820, 100, 22]], trees: [[1000, 860, 'round'], [1000, 50, 'cone']], bushes: [[560, 40], [1000, 720]], barn: [500, 70] } },
 
     // 45 — the grand lakeside winery estate: grapes → juice → wine, fish → smoked fish, greenhouse tomatoes → ketchup
-    { name: '湖畔酒庄大庄园', W: 1120, H: 960, start: [640, 520], par: 280, bill: 50,
-      goal: { type: 'earn', n: 7200 },
+    { name: '湖畔酒庄大庄园', W: 1120, H: 960, start: [640, 520], par: 410, bill: 50,
+      goal: { type: 'earn', n: 26500 },
       objects: [
         { id: 'G1', type: 'field', crop: 'grape', x: 40, y: 40, w: 300, h: 270, gap: 9, gapY: 24 },
         { id: 'P1', type: 'field', crop: 'fish', x: 400, y: 60, w: 260, h: 210, gap: 16, hidden: true },
@@ -1251,8 +1259,8 @@ const VL = {
   ],
   specs: [
     // 46 — one crop, two plots: the valley's tutorial for switching seasons
-    { name: '山谷溪田', W: 760, H: 620, start: [430, 320], par: 170, bill: 10,
-      goal: { type: 'earn', n: [1500, 1500, 1500, 2400] },
+    { name: '山谷溪田', W: 760, H: 620, start: [430, 320], par: 480, bill: 10,
+      goal: { type: 'earn', n: [4500, 4500, 4500, 7250] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 280, h: 240 },
         { id: 'F2', type: 'field', crop: 'A', x: 40, y: 330, w: 280, h: 250, hidden: true },
@@ -1272,8 +1280,8 @@ const VL = {
       deco: { theme: 'garden', paths: [[350, 270, 410, 100], [470, 370, 90, 250]], hedges: [[660, 480, 90, 22]], trees: [[720, 580, 'cone'], [700, 60, 'round']], bushes: [[600, 40], [720, 200], [640, 580]] } },
 
     // 47 — two crops, two counters
-    { name: '坡上双田', W: 900, H: 780, start: [520, 430], par: 190, bill: 20,
-      goal: { type: 'earn', n: [3700, 5250, 3300, 3200] },
+    { name: '坡上双田', W: 900, H: 780, start: [520, 430], par: 450, bill: 20,
+      goal: { type: 'earn', n: [12750, 18250, 12000, 12750] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 50, y: 50, w: 290, h: 280 },
         { id: 'F2', type: 'field', crop: 'B', x: 50, y: 420, w: 290, h: 300, hidden: true },
@@ -1294,8 +1302,8 @@ const VL = {
       deco: { theme: 'farm', paths: [[380, 380, 520, 100], [640, 120, 80, 260]], hedges: [[820, 700, 70, 22]], trees: [[860, 740, 'round'], [860, 60, 'cone']], bushes: [[700, 40], [480, 40]] } },
 
     // 48 — the first valley machine: crop B into its product
-    { name: '山谷小作坊', W: 820, H: 680, start: [460, 400], par: 220, bill: 20,
-      goal: { type: 'produce', item: 'B+', n: [390, 430, 260, 170] },
+    { name: '山谷小作坊', W: 820, H: 680, start: [460, 400], par: 470, bill: 20,
+      goal: { type: 'produce', item: 'B+', n: [1500, 1700, 1000, 680] },
       objects: [
         { id: 'F1', type: 'field', crop: 'B', x: 40, y: 40, w: 320, h: 300 },
         { id: 'F2', type: 'field', crop: 'B', x: 40, y: 390, w: 300, h: 250, hidden: true },
@@ -1315,8 +1323,8 @@ const VL = {
       deco: { theme: 'farm', paths: [[380, 350, 440, 100], [500, 180, 90, 170]], hedges: [[700, 560, 100, 22]], trees: [[780, 640, 'round'], [780, 280, 'cone']], bushes: [[400, 40], [780, 40]] } },
 
     // 49 — three terraces, all three crops of the season
-    { name: '三色梯田', W: 920, H: 820, start: [530, 420], par: 210, bill: 20,
-      goal: { type: 'earn', n: [3600, 3900, 3500, 3800] },
+    { name: '三色梯田', W: 920, H: 820, start: [530, 420], par: 480, bill: 20,
+      goal: { type: 'earn', n: [13000, 15250, 14000, 15250] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 220 },
         { id: 'F2', type: 'field', crop: 'B', x: 40, y: 300, w: 300, h: 220, hidden: true },
@@ -1339,8 +1347,8 @@ const VL = {
       deco: { theme: 'garden', paths: [[380, 380, 540, 100], [640, 120, 80, 260]], hedges: [[780, 770, 60, 18]], trees: [[880, 780, 'cone'], [880, 60, 'round']], bushes: [[700, 40], [480, 40]] } },
 
     // 50 — two machines by the stream: A and C each into their product, one counter
-    { name: '溪畔双坊', W: 940, H: 800, start: [540, 600], par: 230, bill: 20,
-      goal: { type: 'earn', n: [3000, 2800, 2200, 3000] },
+    { name: '溪畔双坊', W: 940, H: 800, start: [540, 600], par: 370, bill: 20,
+      goal: { type: 'earn', n: [12000, 11250, 8750, 12000] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 300 },
         { id: 'F2', type: 'field', crop: 'C', x: 40, y: 420, w: 300, h: 300, hidden: true },
@@ -1362,8 +1370,8 @@ const VL = {
       deco: { theme: 'farm', paths: [[440, 360, 500, 100], [740, 220, 80, 300]], hedges: [[800, 760, 50, 18]], trees: [[905, 765, 'round'], [900, 40, 'cone']], bushes: [[560, 40], [460, 40]] } },
 
     // 51 — the valley market: three crops, the middle one through a machine, two raw counters
-    { name: '山谷集市', W: 980, H: 840, start: [560, 460], par: 230, bill: 20,
-      goal: { type: 'earn', n: [5250, 5750, 2900, 3200] },
+    { name: '山谷集市', W: 980, H: 840, start: [560, 460], par: 380, bill: 20,
+      goal: { type: 'earn', n: [21000, 23000, 11500, 12750] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 230 },
         { id: 'F2', type: 'field', crop: 'B', x: 40, y: 310, w: 300, h: 230 },
@@ -1385,8 +1393,8 @@ const VL = {
       deco: { theme: 'garden', paths: [[460, 500, 520, 100], [640, 120, 80, 300]], hedges: [[820, 800, 70, 18]], trees: [[945, 805, 'cone'], [940, 40, 'round']], bushes: [[560, 40], [940, 640]] } },
 
     // 52 — the four-season workshop: all three crops of the season, each through its own machine
-    { name: '四季工坊', W: 1040, H: 900, start: [600, 480], par: 220, bill: 50,
-      goal: { type: 'earn', n: [2600, 2300, 2100, 2900] },
+    { name: '四季工坊', W: 1040, H: 900, start: [600, 480], par: 390, bill: 50,
+      goal: { type: 'earn', n: [10500, 9250, 8500, 11500] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 250 },
         { id: 'F2', type: 'field', crop: 'B', x: 40, y: 340, w: 300, h: 250, hidden: true },
@@ -1412,8 +1420,8 @@ const VL = {
       deco: { theme: 'farm', paths: [[440, 520, 560, 100], [740, 220, 80, 320]], hedges: [[860, 850, 90, 22]], trees: [[1000, 860, 'round'], [1000, 50, 'cone']], bushes: [[560, 40], [1000, 720]], barn: [500, 70] } },
 
     // 53 — the grand valley estate: four plots and three machines
-    { name: '四季山谷大庄园', W: 1120, H: 960, start: [640, 520], par: 250, bill: 50,
-      goal: { type: 'earn', n: [2700, 2600, 2600, 2800] },
+    { name: '四季山谷大庄园', W: 1120, H: 960, start: [640, 520], par: 380, bill: 50,
+      goal: { type: 'earn', n: [10750, 10500, 10500, 11250] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 270 },
         { id: 'F2', type: 'field', crop: 'B', x: 400, y: 60, w: 260, h: 210, hidden: true },

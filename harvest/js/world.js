@@ -994,19 +994,18 @@ export class World {
     const C = CFG.customer;
     c.bumpT = Math.max(0, c.bumpT - dt * 4);
     c.spawnT -= dt;
-    // v4.7 不能让客人干等: a customer only comes when the desk holds enough for everyone already queueing plus a small buy
-    let owed = 0; for (const q of c.queue) owed += Math.max(0, q.want - q.bag.length - q.incoming);
-    if (c.nextWant === undefined) c.nextWant = C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)) + (c.buyBonus || 0);
-    const avail = c.stock.length + c.incoming - owed, stocked = avail >= C.buyMin + (c.buyBonus || 0);   // (a customer buys what is there, up to its wish)
-    if (c.spawnT <= 0 && c.queue.length < C.queue && stocked) {
+    // v4.9 排队不断: a customer walks up whenever the line has room (the walk takes time, so the line never looks empty);
+    // the desk staying stocked once its staff are hired (v4.7) is what keeps the front customer from waiting.
+    // A front customer who finds the desk empty leaves after patience × 2 (see below), the next one steps up.
+    if (c.spawnT <= 0 && c.queue.length < C.queue) {
       c.spawnT = c.interval * (0.7 + this.rnd() * 0.6);
       const cu = { x: c.spawn.x + this.rnd() * 30, y: c.spawn.y + (this.rnd() - 0.5) * 20, counter: c, state: 'in',
-                   want: Math.min(c.nextWant, avail),
+                   want: C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)) + (c.buyBonus || 0),
                    bag: [], incoming: 0, wait: 0, dry: 0, t0: this.t, hue: Math.floor(this.rnd() * 8), walk: this.rnd() * 6, face: -1, vx: 0, vy: 0, leg: 0 };
       if (this.rnd() < CFG.vip.chance * this.vipMul) { cu.vip = true; cu.wish = c.items.reduce((a, b) => (itemPrice(b) > itemPrice(a) ? b : a), c.items[0]); }
       c.queue.push(cu); this.customers.push(cu);
-      c.nextWant = undefined;
     }
+    if (this.quiet) { const k = Math.floor(this.t), q = c.qEmpty || (c.qEmpty = []); q[k] = (q[k] || 0) + (c.queue.some((x) => x.tArr !== undefined) ? 0 : dt); }   // v4.9 metric: nobody standing in line
     const front = c.queue[0];
     if (front && front.state === 'wait') {
       c.buyAcc = Math.min(c.buyAcc + c.serveRate * dt, 2);
@@ -1019,7 +1018,7 @@ export class World {
       if (c.stock.length <= 0 && front.incoming === 0 && got < front.want) front.dry += dt;   // v4.7 metric: standing at an empty desk
       const done = got >= front.want || (front.incoming === 0 && got > 0 && c.stock.length <= 0 && (front.wait += dt) > C.patience)
         || (got === 0 && front.incoming === 0 && c.stock.length <= 0 && front.dry > C.patience * 2);   // nothing for them: they leave
-      if (done && front.incoming === 0 && this.quiet) (this.waitLog || (this.waitLog = [])).push({ c: c.id, t: this.t, wait: this.t - (front.tArr ?? front.t0), dry: front.dry, got });
+      if (done && front.incoming === 0 && this.quiet) (this.waitLog || (this.waitLog = [])).push({ c: c.id, t: this.t, wait: this.t - (front.tArr ?? front.t0), svc: this.t - (front.tFront ?? this.t), dry: front.dry, got });
       if (done && front.incoming === 0 && got === 0) { front.state = 'out'; front.leg = 0; c.queue.shift(); }
       else if (done && front.incoming === 0) {
         let amount = 0;
@@ -1050,7 +1049,7 @@ export class World {
       } else {
         cu.moving = false; cu.vx = cu.vy = 0;
         if (cu.state === 'in' && cu.tArr === undefined) cu.tArr = this.t;   // v4.7 metric: queue wait starts when it reaches the line
-        if (cu.state === 'in' && c.queue[0] === cu) { cu.state = 'wait'; cu.face = -1; }
+        if (cu.state === 'in' && c.queue[0] === cu) { cu.state = 'wait'; cu.face = -1; cu.tFront = this.t; }   // (v4.9 metric: front service wait)
         if (cu.state === 'out') { if (cu.leg === 0) cu.leg = 1; else this.customers.splice(i, 1); }
       }
     }

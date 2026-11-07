@@ -54,12 +54,14 @@ export function playLevel(li, prof, seed, env = {}) {   // env: per-call overrid
       unlocks.push({ t: w.t, id: t.id, label: t.label, n: t.bought, price: t.repeat ? Math.round(t.price0 * Math.pow(t.repeat.mul, t.bought - 1)) : t.price0 });
     }
   }
-  return { won: w.won, time: w.won ? w.winT : w.t, stars: w.stars(), unlocks, money: w.money, workers: w.workers.length, vehicle: p.vehicle, world: env.keepWorld ? w : undefined };
+  const total = w.tiles.reduce((n, t) => n + (t.repeat ? t.repeat.times : 1), 0);   // v4.9: share of all purchases made at the clear
+  return { won: w.won, time: w.won ? w.winT : w.t, stars: w.stars(), unlocks, built: unlocks.length / Math.max(1, total), money: w.money, workers: w.workers.length, vehicle: p.vehicle, world: env.keepWorld ? w : undefined };
 }
 
 const fmt = (s) => { s = Math.round(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+  let bad = 0;
   for (const [key, prof] of Object.entries(PROFILES)) {
     console.log(`\n=== ${prof.label} ===`);
     let cum = 0; const ms = {};
@@ -75,11 +77,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       if (wk && ms.firstWorker === undefined) { ms.firstWorker = cum + wk.t; ms.firstWorkerRel = `${L.name} +${fmt(wk.t)}`; }
       const veh = r.unlocks.find((u) => u.label === '割草机');
       if (veh && ms.vehicle === undefined) { ms.vehicle = cum + veh.t; ms.vehicleRel = `${L.name} +${fmt(veh.t)}`; }
-      console.log(`第${li + 1}关 ${L.name.padEnd(5, '　')} 「${goalText(L.goal)}」 ${r.won ? '完成' : '未完成'} ${fmt(r.time)} (3 seeds: ${runs.map((x) => fmt(x.time)).join(' / ')})  par ${fmt(L.par)} → ${r.stars}★  解锁 ${r.unlocks.length} 次  首次解锁 ${first ? fmt(first.t) : '-'}`);
+      // v4.9 全建好才过关 (CFG.v49.fullBuild): from level `from` on the sharp bot must have made ≥ checkShare of all purchases
+      const FB = CFG.v49.fullBuild, fb = key === 'sharp' && li + 1 >= FB.from, built = Math.min(...runs.map((x) => x.built));
+      if (!r.won || (fb && built < FB.checkShare)) bad++;
+      console.log(`第${li + 1}关 ${L.name.padEnd(5, '　')} 「${goalText(L.goal)}」 ${r.won ? '完成' : '未完成'} ${fmt(r.time)} (3 seeds: ${runs.map((x) => fmt(x.time)).join(' / ')})  par ${fmt(L.par)} → ${r.stars}★  解锁 ${r.unlocks.length} 次  首次解锁 ${first ? fmt(first.t) : '-'}${li + 1 >= FB.from ? `  过关时已建 ${runs.map((x) => Math.round(x.built * 100) + '%').join(' / ')}${fb && built < FB.checkShare ? ' ← 不到 ' + Math.round(FB.checkShare * 100) + '%!' : ''}` : ''}`);
       if (verbose) for (const u of r.unlocks) console.log(`     ${fmt(u.t).padStart(5)}  ${u.id} ${u.label}${u.n > 1 ? ' #' + u.n : ''}  $${u.price}`);
       cum += r.time;
     }
     console.log(`--- 总时长 ${fmt(cum)}`);
     console.log(`--- 第一次解锁 ${fmt(ms.firstUnlock ?? -1)}（第1关） | 第一个园丁 ${ms.firstWorkerRel ?? '-'}（累计 ${fmt(ms.firstWorker ?? 0)}） | 割草机 ${ms.vehicleRel ?? '-'}（累计 ${fmt(ms.vehicle ?? 0)}）`);
   }
+  if (bad) { console.log(`--- ${bad} 个关卡没通关或过关时没建好`); process.exitCode = 1; }
 }
