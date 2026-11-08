@@ -587,12 +587,13 @@ export const HAIR_GEO = new THREE.SphereGeometry(7.9, 12, 6, 0, Math.PI * 2, 0, 
 export const BLOB_GEO = new THREE.CircleGeometry(1, 14);
 export const BLOB_MAT = new THREE.MeshBasicMaterial({ color: 0x1E4A10, transparent: true, opacity: 0.22, depthWrite: false });
 
-// pose a person: walk phase, moving, carrying, cutting (sickle sweep), time for idle breathing
+// pose a person: walk phase, moving, carrying, harvesting, fishing cast-and-pull, time for idle breathing
 export function posePerson(pp, s) {
   const { legs, arms, body, torso, head, axe } = pp;
   // tool = the sickle, or the axe when the last swing was at a tree
   const tool = s.net ? pp.net : s.axe ? axe : pp.tool;
   for (const tl of [pp.tool, axe, pp.net]) if (tl && tl !== tool) tl.visible = false;
+  if (s.net && !s.fishing) tool.rotation.set(H, 0, 0); // return the net to its resting pose after a cast
   const sw = s.moving ? Math.sin(s.walk) : 0;
   const bob = s.moving ? Math.abs(Math.sin(s.walk)) * 1.6 : Math.sin(s.t * 3 + (s.seed || 0)) * 0.3;
   body.position.y = bob;
@@ -601,8 +602,22 @@ export function posePerson(pp, s) {
   torso.rotation.x = s.carry ? -0.06 : (s.moving ? 0.08 : 0);
   head.rotation.x = s.carry ? -0.1 : 0;
   head.rotation.z = s.moving ? -Math.sin(s.walk) * 0.04 : Math.sin(s.t * 1.3 + (s.seed || 0)) * 0.04;
-  if (s.cutting) {
-    // fast horizontal sickle sweep with the right arm; the left keeps hold of the stack
+  if (s.fishing) {
+    // A readable, eased cast-and-pull: reach out, sweep the net, then draw the catch in.
+    const p = Math.max(0, Math.min(1, s.actionProgress || 0));
+    const cast = p < 0.42 ? p / 0.42 : 1;
+    const pull = p < 0.42 ? 0 : (p - 0.42) / 0.58;
+    const easeOut = 1 - Math.pow(1 - cast, 3), easeInOut = pull * pull * (3 - 2 * pull);
+    const sweep = Math.sin(easeOut * Math.PI) * 0.72 - easeInOut * 0.28;
+    arms[1].rotation.set(-1.05 - easeOut * 0.22 + easeInOut * 0.48, 0, -0.45 - sweep);
+    arms[0].rotation.set(-0.55 - easeOut * 0.5 + easeInOut * 0.35, 0, 0.28);
+    tool.visible = true;
+    tool.rotation.set(H - sweep * 0.9, 0, -0.18 + easeInOut * 0.34);
+    torso.rotation.x = -0.04 - easeOut * 0.08 + easeInOut * 0.12;
+    torso.rotation.y = -sweep * 0.12;
+    head.rotation.x = -easeInOut * 0.12;
+  } else if (s.cutting) {
+    // quick, lively harvest swing; the left keeps hold of the stack
     const k = Math.sin(s.t * 22);
     arms[1].rotation.set(-1.25, 0, -0.2 + k * 0.9);
     arms[0].rotation.set(s.carry ? -1.45 : -sw * 0.8, 0, s.carry ? 0.25 : 0.1);

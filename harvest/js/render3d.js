@@ -739,14 +739,17 @@ export class Renderer {
     const app = c.appearT !== undefined ? elastic((this.wt - c.appearT) / 0.6) : 1;
     o.root.visible = app > 0;
     o.root.position.set(c.x, 0, c.y); o.root.rotation.y = o.ang; o.root.scale.setScalar(Math.max(0.001, app) * 1.15);
-    const cutting = this.wt - c.cutT < 0.22;
+    const actionAge = this.wt - c.cutT;
+    const fishing = c.cutItem === 'fish' && actionAge >= 0 && actionAge < 0.72;
+    const cutting = fishing || actionAge < 0.22;
+    const actionProgress = fishing ? actionAge / 0.72 : 0;
     const carry = c.stack.length + c.incoming > 0;
     if (c.kind === 'player') {
       const veh = c.vehicle;
       o.mow.root.children[0].visible = veh; for (const wl of o.mow.wheels) { wl.visible = veh; if (veh && c.moving) wl.rotation.x += dt * sp * 0.2; }
       o.pp.root.position.set(0, veh ? 9 : 0, veh ? -4 : 0);
       o.pp.blob.visible = !veh;
-      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving && !veh, carry: carry && !veh, cutting: cutting && !veh, seated: veh, seed: 1, axe: c.cutItem === 'log', net: c.cutItem === 'fish' });
+      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving && !veh, carry: carry && !veh, cutting: cutting && !veh, fishing: fishing && !veh, actionProgress, seated: veh, seed: 1, axe: c.cutItem === 'log', net: c.cutItem === 'fish' });
       if (veh) { o.pp.arms[0].rotation.set(-1.2, 0, 0.3); o.pp.arms[1].rotation.set(-1.2, 0, -0.3); o.pp.tool.visible = false; }
     } else if (o.loader) {
       M.posePerson(o.pp, { t, walk: c.walk, moving: false, carry: false, cutting: false, seated: true, seed: c.seed + 2 });
@@ -755,7 +758,7 @@ export class Renderer {
       o.ld.body.position.y = c.moving ? Math.abs(Math.sin(c.walk * 1.5)) * 0.6 : 0;
       o.ld.root.rotation.x = cutting ? Math.sin(t * 30) * 0.015 : 0;
     } else {
-      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving, carry: carry && !c.cart && !cutting, cutting: cutting && !c.cart, seed: c.seed + 2, showTool: !c.cart && !carry, axe: !!c.lumber, net: !!c.fisher });
+      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving, carry: carry && !c.cart && !cutting, cutting: cutting && !c.cart, fishing: fishing && !c.cart, actionProgress, seed: c.seed + 2, showTool: !c.cart && !carry, axe: !!c.lumber, net: !!c.fisher });
       if (o.cart) for (const wl of o.cart.wheels) if (c.moving) wl.rotation.x += dt * sp * 0.3;
     }
   }

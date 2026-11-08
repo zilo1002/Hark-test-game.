@@ -1383,8 +1383,9 @@ const VL = {
         { id: 'a', x: 560, y: 600, price: 60, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
         { id: 'b', x: 420, y: 330, price: 180, icon: '$hire', ln: 'B', req: ['a'], effect: { worker: { from: ['F2'], to: ['M1'] } } },
         { id: 'c', x: 420, y: 620, price: 160, icon: '$plot', ln: 'C', req: ['a'], effect: { show: ['F3'] } },
-        { id: 'd', x: 440, y: 760, price: 240, icon: '$hire', ln: 'C', req: ['c'], effect: { worker: { from: ['F3', 'F1'], to: ['C1'] } } },
-        { id: 'e', x: 420, y: 120, price: 220, icon: '$hire', ln: 'A', req: ['b'], effect: { worker: { from: ['F1', 'F3'], to: ['C1'] } } },
+        // Keep the two raw-field crews separate in every season; in winter C is the fish pond.
+        { id: 'd', x: 440, y: 760, price: 240, icon: '$hire', ln: 'C', req: ['c'], effect: { worker: { from: ['F3'], to: ['C1'] } } },
+        { id: 'e', x: 420, y: 120, price: 220, icon: '$hire', ln: 'A', req: ['b'], effect: { worker: { from: ['F1'], to: ['C1'] } } },
         { id: 'f', x: 930, y: 260, price: 300, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1'] } },
         { id: 'g', x: 560, y: 260, price: 340, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
         { id: 'h', x: 580, y: 760, price: 160, icon: 'speed', label: '跑鞋', req: ['c'], effect: { up: { key: 'speed', v: 25 } } },
@@ -1448,7 +1449,7 @@ const VL = {
       deco: { theme: 'garden', paths: [[480, 580, 580, 100], [800, 220, 80, 360]], hedges: [[960, 880, 120, 22]], trees: [[1080, 920, 'round'], [1080, 60, 'cone']], bushes: [[700, 40], [1080, 780]] } },
   ],
 };
-const HIRE = { log: ['lumber', '雇伐木工'], fish: ['fisher', '雇渔夫'] };
+const HIRE = { log: ['lumber', '雇伐木工'], fish: ['fisher', '拉网捕鱼'] };
 const PLOT = { log: '种树林', fish: '挖鱼塘', grape: '种葡萄', rose: '种玫瑰', tulip: '种花圃', gold: '种花圃', berry: '种草莓' };
 const MACH = { basket: '花篮机', perfume: '香水机', jam: '果酱机', popcorn: '爆米花机', ketchup: '番茄酱机', bouquet: '花束机', flour: '磨坊',
   gjuice: '葡萄榨汁机', pie: '南瓜派烤炉', chips: '薯条炸锅', plank: '锯木机', smoked: '熏鱼房' };
