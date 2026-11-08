@@ -631,7 +631,7 @@ export class World {
       w.from = from; w.to = to; w.state = 'collect'; w.wait = 0; w.tgt = null; w.retarget = 0;
       w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = cart;
       w.lumber = w.from.some((id) => this.objs[id] && this.objs[id].item === 'log');
-      w.fisher = w.from.some((id) => this.objs[id] && this.objs[id].item === 'fish' && this.objs[id].kind === 'pond');   // v3.7 渔夫 (render: net + rain hat)
+      w.fisher = w.from.some((id) => this.objs[id] && this.objs[id].item === 'fish');   // Fisher look applies to ponds and the valley's winter fish field.
       w.lv = 1; w.trips = 0; w.lvT = -9; w.loader = this.loaders && !w.cart;
       w.done = 0; const cm = this.crew && this.crew[this.workers.length];
       if (cm) { w.crewId = cm.id; w.crewName = cm.name; w.crewMul = cm.mul; }

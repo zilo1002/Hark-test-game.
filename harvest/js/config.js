@@ -1322,7 +1322,7 @@ const VL = {
       ],
       deco: { theme: 'farm', paths: [[380, 350, 440, 100], [500, 180, 90, 170]], hedges: [[700, 560, 100, 22]], trees: [[780, 640, 'round'], [780, 280, 'cone']], bushes: [[400, 40], [780, 40]] } },
 
-    // 49 — three terraces, all three crops of the season
+    // 49 — three terraces, all three crops of the season; each crew owns one crop and one counter
     { name: '三色梯田', W: 920, H: 820, start: [530, 420], par: 480, bill: 20,
       goal: { type: 'earn', n: [13000, 15250, 14000, 15250] },
       objects: [
@@ -1338,8 +1338,8 @@ const VL = {
         { id: 'c', x: 420, y: 120, price: 160, icon: '$hire', ln: 'A', req: ['a'], effect: { worker: { from: ['F1'], to: ['C1'] } } },
         { id: 'd', x: 400, y: 640, price: 180, icon: '$plot', ln: 'C', req: ['b'], effect: { show: ['F3'] } },
         { id: 'e', x: 760, y: 560, price: 160, icon: 'counter', label: '出售台', req: ['b'], effect: { show: ['C2'] } },
-        { id: 'f', x: 460, y: 740, price: 240, icon: '$hire', ln: 'C', req: ['d'], effect: { worker: { from: ['F3', 'F2'], to: ['C2', 'C1'] } } },
-        { id: 'g', x: 560, y: 120, price: 220, icon: '$hire', ln: 'B', req: ['b'], effect: { worker: { from: ['F2', 'F1'], to: ['C1', 'C2'] } } },
+        { id: 'f', x: 460, y: 740, price: 240, icon: '$hire', ln: 'C', req: ['d'], effect: { worker: { from: ['F3'], to: ['C2'] } } },
+        { id: 'g', x: 560, y: 120, price: 220, icon: '$hire', ln: 'B', req: ['b'], effect: { worker: { from: ['F2'], to: ['C1'] } } },
         { id: 'h', x: 870, y: 420, price: 260, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1', 'C2'] } },
         { id: 'i', x: 580, y: 240, price: 320, icon: 'loader', label: '园丁换铲车', req: ['g'], effect: { upgradeWorkers: 'loader' } },
         { id: 'j', x: 560, y: 680, price: 140, icon: 'speed', label: '跑鞋', req: ['c'], effect: { up: { key: 'speed', v: 25 } } },
@@ -1383,7 +1383,7 @@ const VL = {
         { id: 'a', x: 560, y: 600, price: 60, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
         { id: 'b', x: 420, y: 330, price: 180, icon: '$hire', ln: 'B', req: ['a'], effect: { worker: { from: ['F2'], to: ['M1'] } } },
         { id: 'c', x: 420, y: 620, price: 160, icon: '$plot', ln: 'C', req: ['a'], effect: { show: ['F3'] } },
-        // Keep the two raw-field crews separate in every season; in winter C is the fish pond.
+        // Keep each crop crew separate in every season; C uses its own counter.
         { id: 'd', x: 440, y: 760, price: 240, icon: '$hire', ln: 'C', req: ['c'], effect: { worker: { from: ['F3'], to: ['C1'] } } },
         { id: 'e', x: 420, y: 120, price: 220, icon: '$hire', ln: 'A', req: ['b'], effect: { worker: { from: ['F1'], to: ['C1'] } } },
         { id: 'f', x: 930, y: 260, price: 300, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1'] } },
