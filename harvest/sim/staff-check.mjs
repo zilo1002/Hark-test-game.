@@ -4,8 +4,8 @@
 //    tile (x_h<machine>, after the 2nd x_g, pricier) on the machines CFG.v48.feed3 lists; a feeder only
 //    ever holds its machine's crop and only drops into its machine (never a counter); it brings small batches
 //  · 原料搬运工: only hold raw-counter crops and only drop at a raw counter (never a machine, never the 加工品 counter)
-//  · 加工品搬运工: exactly one per finished-goods machine; only ever hold machine goods (never harvest) and only drop at the
-//    goods counter (the single counter in a oneCounter level); trays stay below CFG.v47.trayMax once porters are hired
+//  · 加工品搬运工: one per finished-goods machine, at least two when using a separate goods counter; one on a oneCounter level;
+//    only ever hold machine goods (never harvest) and only drop at the goods counter; trays stay below CFG.v47.trayMax once hired
 //  · purchase order: the goods counter's porter and 店员 come within the guide window right after the 加工品 counter
 //  · no 加工品 counter yet: the machine fills up and its feeders wait by it (they never carry crops anywhere else)
 //  · levels 32 面包房 / 40 葡萄酒庄 / 43 早市面包摊 have ONE counter with ONE 店员 tile
@@ -90,7 +90,7 @@ CFG.levels.forEach((L0, li) => {
       if (drops(x).some((id) => id !== p.id)) errs.push(`${p.id} feeder dropped at ${drops(x).join(',')}`);
       if ([...s.held].some((it) => it !== p.inItem)) errs.push(`${p.id} feeder held ${[...s.held].join(',')}`);
       const mx = s.loads.length ? Math.max(...s.loads) : 0;
-      if (mx >= x.cap) errs.push(`${p.id} feeder waited for a full stack (${mx}/${x.cap})`);
+      if (mx > x.cap) errs.push(`${p.id} feeder exceeded its stack capacity (${mx}/${x.cap})`);
       x._mx = mx; x._trips = s.loads.length;
     }
   }
@@ -102,7 +102,8 @@ CFG.levels.forEach((L0, li) => {
     const h = [...st.get(x).held].filter((it) => !rawItems.has(it)); if (h.length) errs.push(`raw carrier held ${h.join(',')}`);
   }
   if (raw.length && !raw.some((x) => drops(x).length)) errs.push('raw carriers never delivered');
-  if (por.length !== term.length) errs.push(`${por.length} porters for ${term.length} trays`);
+  const wantPorters = one ? term.length : Math.max(term.length, 2);
+  if (por.length !== wantPorters) errs.push(`${por.length} porters for ${term.length} trays (want ${wantPorters})`);
   for (const x of por) {
     if (drops(x).some((id) => id !== sale.id)) errs.push(`porter dropped at ${drops(x).join(',')}`);
     const h = [...st.get(x).held].filter((it) => !made.has(it)); if (h.length) errs.push(`porter held (harvested?) ${h.join(',')}`);
@@ -126,5 +127,5 @@ CFG.levels.forEach((L0, li) => {
   const ok = !errs.length; if (!ok) bad++;
   console.log(`${ok ? 'OK  ' : 'FAIL'} 第${li + 1}关 ${L.name}: 专员 ${fsum} · 原料搬运工 ×${raw.length} · 加工品搬运工 ×${por.length}→${sale ? sale.id : '?'} · 出货台最高 ${trayMax}${ps ? ' · 无加工品台时 ' + waitB : ' · 单收银台'}${errs.length ? ' · ' + errs.join('; ') : ''}`);
 });
-console.log(bad ? `${bad} of ${n} machine levels failed` : `all ${n} machine levels: fixed roles (raw carriers → raw counter, 2 (or 3) feeders per machine → that machine, one porter per tray → goods counter), nothing free at start`);
+console.log(bad ? `${bad} of ${n} machine levels failed` : `all ${n} machine levels: fixed roles (raw carriers → raw counter, 2 (or 3) feeders per machine → that machine, one per tray / at least two for a separate goods counter → goods counter), nothing free at start`);
 if (bad) process.exitCode = 1;

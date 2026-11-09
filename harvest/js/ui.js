@@ -53,9 +53,8 @@ export class UI {
     $('mSave').onclick = tapped(() => this.openSettings());
     $('btnPause').onclick = () => this.openPause();
     $('btnResume').onclick = () => this.closeModal(this.el.pause);
-    $('btnHome').onclick = () => { this.closeAll(); h.home(); };
+    $('btnPRestart').onclick = () => { h.restart(); };
     $('btnPSettings').onclick = () => this.openSettings();
-    $('btnPLevels').onclick = () => this.openLevels();
     $('btnLevels').onclick = () => { h.tap(); this.openLevels(); };
     // v4.1 / v4.6: one tab per area (CFG.areas: 1–15 / 16–30 / 31–45 / 四季山谷 46–60)
     $('lvTabs').innerHTML = CFG.areas.map((A, i) => `<button data-p="${i}">${A.name}<em>${A.from + 1}–${A.from + A.size}</em></button>`).join('');
@@ -190,7 +189,7 @@ export class UI {
   }
   openPause() {
     const w = this.h.world();
-    $('pauseInfo').textContent = !w ? '' : w.daily ? `每日挑战 · ${w.L.name} — ${w.daily.name}（回到庄园 = 放弃这一局）` : `等级 ${w.li + 1} · ${w.L.name} — ${goalText(w.L.goal)}`;
+    $('pauseInfo').textContent = !w ? '' : w.daily ? `每日挑战 · ${w.L.name} — ${w.daily.name}（重新开始会重开本局）` : `等级 ${w.li + 1} · ${w.L.name} — ${goalText(w.L.goal)}`;
     $('pSea').classList.toggle('hidden', !(w && !w.daily && w.valley));
     this.renderSeasonRow();
     this.openModal(this.el.pause);

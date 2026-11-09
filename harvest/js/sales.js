@@ -236,12 +236,31 @@ function splitSales0(L0) {
     const c0 = rawC[0], sp = spot(L, c0.x - 120, c0.y + 40);
     const coop = rawSrc.every((id) => obj[id].type === 'coop');
     for (let k = rawHires; k < 2; k++) {
-      rawT.push(add({ id: 'x_r' + (k + 1), x: sp[0], y: sp[1], price: r10(s * V.raw[k - rawHires]), icon: coop ? 'cart' : 'worker', label: '原料搬运工',
+      rawT.push(add({ id: 'x_r' + (k + 1), x: sp[0], y: sp[1], price: r10(s * V.raw[Math.min(k - rawHires, V.raw.length - 1)]), icon: coop ? 'cart' : 'worker', label: '原料搬运工',
                       req: rawT.length ? [rawT[rawT.length - 1].id] : [first.id], effect: { worker: { from: rawSrc, to: rawC.map((c) => c.id), raw: true } } }));
     }
   }
-  // v4.7 人员适配: exactly one 加工品搬运工 per finished-goods machine, tied to its own tray (it helps a heaping tray of the same counter when its own is empty)
-  const nP = T.length;
+  // A raw item can also feed a processor and be sold unchanged (e.g. winter logs in 山谷集市).
+  // General raw hires may cover all fields, but existing hires can already be fully assigned to other crops.
+  // Add one dedicated carrier for each raw counter item with no source coverage; never leave it machine-only.
+  const rawCovered = new Set(L.tiles.filter(isRawHire).flatMap((t) => t.effect.worker.from)
+    .map((id) => obj[id]).filter(Boolean).map((o) => o.type === 'field' ? o.crop : o.item));
+  const rawKinds = [...new Set(rawSrc.map((id) => { const o = obj[id]; return o.type === 'field' ? o.crop : o.item; }))];
+  let rawSeq = Math.max(rawT.length, ...L.tiles.map((t) => /^x_r(\d+)$/.test(t.id) ? +t.id.slice(3) : 0));
+  for (const item of rawKinds) {
+    if (rawCovered.has(item)) continue;
+    const from = rawSrc.filter((id) => { const o = obj[id]; return (o.type === 'field' ? o.crop : o.item) === item; });
+    const c0 = rawC.find((c) => c.items.includes(item)) || rawC[0];
+    const sp = spot(L, c0.x - 120, c0.y + 40);
+    const id = 'x_r' + (++rawSeq), hires = L.tiles.filter(isRawHire), prev = rawT[rawT.length - 1] || hires[hires.length - 1];
+    const coop = from.every((src) => obj[src].type === 'coop');
+    const tile = add({ id, x: sp[0], y: sp[1], price: r10(s * V.raw[Math.min(rawSeq - 1, V.raw.length - 1)]), icon: coop ? 'cart' : 'worker', label: '原料搬运工',
+      req: [prev ? prev.id : first.id], effect: { worker: { from, to: rawC.map((c) => c.id), raw: true } } });
+    rawT.push(tile); rawCovered.add(item);
+  }
+  // v4.7 人员适配: one 加工品搬运工 per finished-goods machine, with at least two for a separate goods counter.
+  // A one-counter level needs only one porter because its raw and processed goods share the same sale desk.
+  const nP = one ? T.length : Math.max(T.length, 2);
   const por = [];
   for (let k = 0; k < nP; k++) {
     const p = T[k % T.length], sp = spot(L, p.tray[0] + p.tray[2] / 2 + 10, p.tray[1] + p.tray[3] + 40);

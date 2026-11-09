@@ -162,7 +162,7 @@ export const CFG = {
   // ({ season: [ids] }) where one set does not fit all four (the extra goods must not heap the trays past v47.trayMax)
   // v4.9: with the line kept full (customers walk up all the time) goods sell faster, so 7, 13, 15, 26, 40, 42, 溪畔双坊 秋 and 四季山谷大庄园 秋 M1 joined
   v48: { feeder3: 1.2, feed3: { 蛋箱工坊: ['M1'], 麦田番茄: ['M1'], 青青大庄园: ['M2'], 木椅工坊: ['M1', 'M2'], 葡萄酒庄: ['M1'], 夜钓: ['M1', 'M2'],
-                                 羊毛牧场: ['M1'], 秋收集市: ['M2'], 半亩大庄园: ['M1', 'M4'], 夜间农场: ['M1'], 早市面包摊: ['M1'],
+                                 羊毛牧场: ['M1'], 湖畔渔村: ['M1'], 秋收集市: ['M2'], 半亩大庄园: ['M1', 'M4'], 夜间农场: ['M1'], 早市面包摊: ['M1'],
                                  湖畔集市: ['M3'], 湖畔酒庄大庄园: ['M1', 'M3'], 山谷小作坊: ['M1'], 溪畔双坊: { 0: ['M1'], 1: ['M1'], 2: ['M1', 'M2'], 3: ['M1'] }, 山谷集市: ['M1'],
                                  四季山谷大庄园: { 0: ['M1'], 1: ['M1'], 2: ['M1', 'M2', 'M3'], 3: ['M1'] } } },
   // v4.9 全建好才过关: from level `from` (45) on, a level clears only once essentially everything is built (every plot, machine,
@@ -172,11 +172,11 @@ export const CFG = {
   // ≥ checkShare of them at the clear. Levels 54–60: add them to VL.specs, then node sim/hard-tune.mjs --level=N --write, set-par.
   v49: { fullBuild: { from: 45, share: 1.0, margin: 0.1, minMul: 3, maxMul: 4, time: [360, 15, 540], checkShare: 0.9 } },
   v46: { rawLow: 30, rawFull: 80, starve: 0.5, holdAt: 0.5 },
-  v45: { batch: 0.5, backAt: 0.5, porterBack: 10 },   // v4.5 machine staff: feeder small batch = ≤50% of its stack (and what the machine has room for); help on the farm, back to the machine at ≤50% input / porter at ≥10 on the tray
+  v45: { batch: 1, backAt: 0.5, porterBack: 10 },   // v4.5: feeders fill a worker load before a machine trip when input space allows; return early only for a near-empty machine or limited sink room
   v43: { machine: 0.5, machine2: 0.7, sale: 0.35, raw: [0.4, 0.8], porter: [0.4, 0.8], clerk: 0.7,
          cup: { base: 0.5, mul: 1.6, times: 2, serve: 1.6, interval: 0.75, buy: 4 },
          mup: { base: 0.45, mul: 1.7, times: 2 } },
-  customer: { speed: 120, interval: 0.8, buyMin: 4, buyMax: 12, serveRate: 14, queue: 5, patience: 1.0 },
+  customer: { speed: 120, interval: 0.8, buyMin: 4, buyMax: 12, serveRate: 14, queue: 5, patience: 1.0, emptyPatience: 12, unstaffedPatience: 90, partialPatience: 30 },
   tile: { size: 42 },
   guideWindow: 3,   // v4.3: the guide arrow buys the first affordable of the next N visible tiles (in level order)
   fly: { pick: 0.30, drop: 0.24, lay: 0.5, harvest: 0.42, serve: 0.22, produce: 0.5 },

@@ -390,7 +390,7 @@ export class World {
       this.piles.push(c.pile); this.coops.push(c); this.objs[o.id] = c;
     } else if (o.type === 'counter') {
       const K = CFG.counter, cu = CFG.customer;
-      const c = { ...base, kind: 'counter', stock: [], incoming: 0, queue: [], cash: 0, cashier: false, clerks: 1, upLv: 0, buyBonus: 0,   // v4.3: every 店员 is a tile (none free)
+      const c = { ...base, kind: 'counter', stock: [], incoming: 0, everStocked: false, queue: [], cash: 0, cashier: false, clerks: 1, upLv: 0, buyBonus: 0,   // v4.3: every 店员 is a tile (none free)
                   spawnT: 0.5,
                   interval: cu.interval, serveRate: cu.serveRate, buyAcc: 0,
                   desk: rectAt(o.x, o.y, K.deskW, K.deskD),
@@ -557,7 +557,7 @@ export class World {
     switch (f.kind) {
       case 'stack': r.incoming--; r.stack.push(f.type); break;
       case 'pile': r.pending--; r.add(f.tx, f.ty, this.rnd); break;
-      case 'counter': r.incoming--; if (r.incMade && this._made && this._made.has(f.type)) r.incMade--; r.stock.push(f.type); r.bumpT = 1; break;
+      case 'counter': r.incoming--; if (r.incMade && this._made && this._made.has(f.type)) r.incMade--; r.stock.push(f.type); r.everStocked = true; r.bumpT = 1; break;
       case 'cust': r.incoming--; r.bag.push(f.type); break;
       case 'procIn': r.inc--; r.buf++; break;
     }
@@ -990,6 +990,73 @@ export class World {
     }
   }
 
+  counterSupplyInTransit(c) {
+    // Goods already launched toward the counter no longer belong to a worker's stack;
+    // keep buyers waiting for that final flight as well.
+    if (c.incoming > 0) return true;
+    for (const w of this.workers) {
+      if (!w.to || !w.to.includes(c.id)) continue;
+      const cargo = w.stack.slice();
+      for (const f of this.fly) if (f.active && f.kind === 'stack' && f.ref === w) cargo.push(f.type);
+      if (cargo.some((item) => c.items.includes(item))) return true;
+      // A worker on its collection leg is committed supply when its assigned source
+      // already has sellable stock; without this, buyers can time out while the worker
+      // is visibly harvesting a crop that will go to this counter.
+      if (w.state === 'collect') {
+        const sources = w.sources || (w.from || []).map((id) => this.objs[id]).filter(Boolean);
+        if (sources.some((o) => !o.hidden && c.items.includes(o.item) &&
+          ((o.ripe || 0) > 0 || (o.pile && o.pile.total + o.pile.pending > 0) ||
+           (o.kind === 'field' && o.ripe < o.n) || (o.kind === 'pond' && o.ripe < o.N)))) return true;
+      }
+    }
+    // Direct-to-counter machines can have an active/ready batch before it becomes c.incoming.
+    for (const p of this.procs) if (!p.hidden && p.outObj === c && !p.pile && (p.work > 0 || p.buf >= p.ratio)) return true;
+    // A processed-goods counter is supplied in two legs: machine → tray → porter → counter.
+    // While the porter is empty, the tray or an active/ready machine output is still real supply
+    // in the delivery pipeline. Don't let the front customer time out during that hand-off.
+    if (c.sale2) for (const p of this.procs) {
+      if (p.hidden || p.outObj !== c || !p.pile) continue;
+      const porter = this.workers.some((w) => w.porter && w.trayOf === p.id && w.to && w.to.includes(c.id));
+      if (!porter) continue;
+      if (p.pile.total + p.pile.pending > 0 || p.work > 0 || p.buf + p.inc >= p.ratio) return true;
+      // During startup the machine may still be empty while its feeder is carrying the first
+      // batch of raw input. That load is committed supply too; don't abandon buyers mid-handoff.
+      const feederCargo = this.workers.some((w) => w.feedFor === p.id && w.to && w.to.includes(p.id) &&
+        (w.stack.includes(p.inItem) || this.fly.some((f) => f.active && f.kind === 'stack' && f.ref === w && f.type === p.inItem)));
+      if (feederCargo) return true;
+      // The feeder's collection leg is part of this same production route. Count its assigned
+      // visible source (including normal crop regrowth) so the line does not empty-timeout while
+      // the worker is doing the first useful step toward the machine.
+      const feederCollecting = this.workers.some((w) => {
+        if (w.feedFor !== p.id || !w.to || !w.to.includes(p.id) || w.state !== 'collect') return false;
+        const sources = w.sources || (w.from || []).map((id) => this.objs[id]).filter(Boolean);
+        return sources.some((o) => !o.hidden && o.item === p.inItem &&
+          ((o.ripe || 0) > 0 || (o.pile && o.pile.total + o.pile.pending > 0) ||
+           (o.kind === 'field' && o.ripe < o.n) || (o.kind === 'pond' && o.ripe < o.N)));
+      });
+      if (feederCollecting) return true;
+    }
+    return false;
+  }
+
+  // A customer may arrive before the player buys the counter's configured supplier.
+  // Give that upgrade path a finite setup window; counters with no matching hire route
+  // must use the short genuine-stockout timeout instead of waiting forever.
+  counterHasPlannedSupply(c) {
+    return this.tiles.some((t) => {
+      const w = t.effect && t.effect.worker;
+      if (!w || !w.to || !w.to.includes(c.id)) return false;
+      if (w.porter) {
+        const p = this.objs[w.tray];
+        return !!p && c.items.includes(p.outItem);
+      }
+      return (w.from || []).some((id) => {
+        const o = this.objs[id];
+        return !!o && c.items.includes(o.item || o.crop);
+      });
+    });
+  }
+
   updateCounter(c, dt) {
     const C = CFG.customer;
     c.bumpT = Math.max(0, c.bumpT - dt * 4);
@@ -1001,7 +1068,7 @@ export class World {
       c.spawnT = c.interval * (0.7 + this.rnd() * 0.6);
       const cu = { x: c.spawn.x + this.rnd() * 30, y: c.spawn.y + (this.rnd() - 0.5) * 20, counter: c, state: 'in',
                    want: C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)) + (c.buyBonus || 0),
-                   bag: [], incoming: 0, wait: 0, dry: 0, t0: this.t, hue: Math.floor(this.rnd() * 8), walk: this.rnd() * 6, face: -1, vx: 0, vy: 0, leg: 0 };
+                   bag: [], incoming: 0, wait: 0, dry: 0, stockoutWait: 0, t0: this.t, hue: Math.floor(this.rnd() * 8), walk: this.rnd() * 6, face: -1, vx: 0, vy: 0, leg: 0 };
       if (this.rnd() < CFG.vip.chance * this.vipMul) { cu.vip = true; cu.wish = c.items.reduce((a, b) => (itemPrice(b) > itemPrice(a) ? b : a), c.items[0]); }
       c.queue.push(cu); this.customers.push(cu);
     }
@@ -1009,16 +1076,34 @@ export class World {
     const front = c.queue[0];
     if (front && front.state === 'wait') {
       c.buyAcc = Math.min(c.buyAcc + c.serveRate * dt, 2);
+      const previousGot = front.stockoutGot ?? front.bag.length;
       while (c.buyAcc >= 1 && c.stock.length > 0 && front.bag.length + front.incoming < front.want) {
         c.buyAcc--; const it = c.stock.pop(); front.incoming++;
         this.launch(it, 'cust', c.x, c.y, CFG.counter.deskH + 4, front, 0, 0, 0, CFG.fly.serve);
       }
       if (c.stock.length <= 0) c.buyAcc = 0;
       const got = front.bag.length;
-      if (c.stock.length <= 0 && front.incoming === 0 && got < front.want) front.dry += dt;   // v4.7 metric: standing at an empty desk
-      const done = got >= front.want || (front.incoming === 0 && got > 0 && c.stock.length <= 0 && (front.wait += dt) > C.patience)
-        || (got === 0 && front.incoming === 0 && c.stock.length <= 0 && front.dry > C.patience * 2);   // nothing for them: they leave
-      if (done && front.incoming === 0 && this.quiet) (this.waitLog || (this.waitLog = [])).push({ c: c.id, t: this.t, wait: this.t - (front.tArr ?? front.t0), svc: this.t - (front.tFront ?? this.t), dry: front.dry, got });
+      // A real delivery or active production route keeps an empty-counter buyer waiting. If staff
+      // have not been hired yet, a matching configured hire gets a finite setup window;
+      // with no feasible route, the ordinary empty-counter patience applies even on first use.
+      const inbound = c.stock.length <= 0 && front.incoming === 0 && this.counterSupplyInTransit(c);
+      const plannedSupply = !inbound && this.counterHasPlannedSupply(c);
+      const short = got < front.want && c.stock.length <= 0 && front.incoming === 0;
+      if (inbound) { front.dry = 0; }
+      // Measure the partial order's time between actual replenishments, including travel
+      // time; a stalled delivery must not keep a customer indefinitely. Progress resets it.
+      if (got > previousGot) front.stockoutWait = 0;
+      else if (got > 0 && got < front.want) front.stockoutWait = (front.stockoutWait || 0) + dt;
+      front.stockoutGot = got;
+      if (!inbound && short) front.dry += dt;   // empty desk with no carrier on the way
+      const emptyLimit = plannedSupply ? (C.unstaffedPatience || C.emptyPatience || C.patience * 2) : (C.emptyPatience || C.patience * 2);
+      // A partially served buyer gets a bounded restock window if goods are in stock,
+      // in transit or still have a real/configured supply route; no route keeps normal patience.
+      const partialSupply = inbound || plannedSupply || c.stock.length > 0 || c.incoming > 0 || front.incoming > 0;
+      const partialLimit = partialSupply ? (C.partialPatience || C.emptyPatience || C.patience * 2) : C.patience;
+      const done = got >= front.want || (short && got > 0 && front.incoming === 0 && front.stockoutWait > partialLimit)
+        || (got === 0 && front.incoming === 0 && c.stock.length <= 0 && !inbound && front.dry > emptyLimit);   // no stock for a full supply cycle: they leave
+      if (done && front.incoming === 0 && this.quiet) (this.waitLog || (this.waitLog = [])).push({ c: c.id, t: this.t, arrived: front.tArr ?? front.t0, frontAt: front.tFront ?? this.t, wait: this.t - (front.tArr ?? front.t0), svc: this.t - (front.tFront ?? this.t), dry: front.dry, got, want: front.want });
       if (done && front.incoming === 0 && got === 0) { front.state = 'out'; front.leg = 0; c.queue.shift(); }
       else if (done && front.incoming === 0) {
         let amount = 0;
@@ -1123,7 +1208,7 @@ export class World {
     w.holding = false;
     const space = w.cap - w.stack.length - w.incoming;
     if (w.state === 'collect' && space <= 0) w.state = 'deliver';
-    // v4.5 一次一送: the feeder goes as soon as it holds a small batch the machine can take (≤ half its stack), never a full load
+    // Feeders make one trip with the fullest load the machine can accept; near-empty machines still get emergency partial loads
     if (w.state === 'collect' && w.feedFor) {
       const m = this.objs[w.feedFor];
       const batch = Math.max(m.ratio, Math.min(Math.ceil(w.cap * CFG.v45.batch), CFG.proc.inMax - m.buf - m.inc));
@@ -1213,7 +1298,7 @@ export class World {
       }
       else if (this.smart && anyTakes) { const o = this.post(w, srcs); tx = o.x; ty = o.y; w.holding = true; w.blocked = null; }
       else if (w.blocked && !w.blocked.hidden) { const z = w.blocked.inZone, k = w.seed | 0; tx = z.cx - 30 + (k % 3) * 8; ty = z.cy + 34 + (k % 2) * 8; w.blocked = null; }
-      else if (w.stack.length) w.stack.length = 0;   // nothing takes these any more
+      else if (w.stack.length) { const o = this.post(w, srcs); tx = o.x; ty = o.y; w.holding = true; w.blocked = null; } // preserve cargo until a compatible sink is available
     }
     const goal = Math.hypot(tx - w.x, ty - w.y), body = w.loader ? CFG.loader.body : 9;
     // stuck detection: no real progress for a while while trying to move → force a fresh
@@ -1418,7 +1503,7 @@ export class World {
     if (!this.stats.golden) this.stats.golden = {};
     if (Array.isArray(s.stack)) this.player.stack = s.stack.filter((x) => CFG.items[x]).slice(0, this.player.cap);
     (s.cash || []).forEach((v, i) => { if (this.counters[i]) this.counters[i].cash = v || 0; });
-    (s.stock || []).forEach((v, i) => { if (this.counters[i] && Array.isArray(v)) this.counters[i].stock = v.filter((x) => CFG.items[x]); });
+    (s.stock || []).forEach((v, i) => { if (this.counters[i] && Array.isArray(v)) { this.counters[i].stock = v.filter((x) => CFG.items[x]); this.counters[i].everStocked = this.counters[i].stock.length > 0; } });
     (s.buf || []).forEach((v, i) => { if (this.procs[i]) this.procs[i].buf = v || 0; });
     (s.ponds || []).forEach((v, i) => { const pd = this.ponds[i]; if (!pd) return; pd.caught = v || 0; const L = CFG.pond.levels; while (pd.lv < L.length && pd.caught >= L[pd.lv].at) pd.setLevel(pd.lv + 1); if (!pd.hidden) pd.fill(1); });
     this.updateTileVis(true);

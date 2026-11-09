@@ -61,7 +61,7 @@ export function fitB(li, env = {}) {
     const tiles = w.tiles.filter((t) => (t.effect.cashier || []).includes(c.id) || (t.effect.worker && t.effect.worker.to.includes(c.id)));
     if (!tiles.length || tiles.some((t) => !t.bought)) { out.push({ id: c.id, n: 0, note: 'staff not all hired' }); continue; }
     const at = Math.max(...tiles.map((t) => r.unlocks.find((u) => u.id === t.id && u.n === 1)?.t ?? 0));
-    const e = (w.waitLog || []).filter((x) => x.c === c.id && x.t - x.wait > at);
+    const e = (w.waitLog || []).filter((x) => x.c === c.id && x.frontAt > at);
     out.push({ id: c.id, n: e.length, from: Math.round(at), wait: avg(e.map((x) => x.wait)), svc: avg(e.map((x) => x.svc)), p95: p95(e.map((x) => x.svc)), empty: qEmptyPct(c, at + 3, w.t) });
   }
   return { out, time: r.time };

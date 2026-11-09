@@ -43,6 +43,16 @@ const ui = new UI({
   play: () => { snd.unlock(); snd.play('tap'); const li = +ui.el.play.dataset.li || 0; start(li); },
   next: () => goHome(true),
   start: (li) => { snd.unlock(); start(li); },
+  restart: () => {
+    if (!world) return;
+    snd.unlock(); snd.play('tap');
+    if (world.daily) { startDaily(); return; }
+    const li = world.li, rain = world.rain, season = world.season;
+    data.cur = null;
+    if (Seasons.isValleyLi(li) && Number.isInteger(season)) data.valley = { season };
+    forceRain = rain;
+    start(li);
+  },
   restore: (id) => restore(id),
   modal: (on) => { modalOpen = on; input.enabled = !on; if (on) snapshot(); },
   world: () => world,
