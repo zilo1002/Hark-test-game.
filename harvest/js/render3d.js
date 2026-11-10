@@ -768,10 +768,13 @@ export class Renderer {
     if (c.kind === 'player' && c.vehicle) return { x: c.x - fx * 17, y: c.y - fz * 17, z: 16, cols: 3, spread: 7.5, fx, fz };
     if (c.kind === 'worker' && c.loader) return { x: c.x - fx * 17.8 * 1.15, y: c.y - fz * 17.8 * 1.15, z: 21.5, cols: 3, deep: 3, spread: 6.6, fx, fz };
     if (c.kind === 'worker' && c.cart) return { x: c.x - fx * 23, y: c.y - fz * 23, z: 15, cols: 2, spread: 7.5, fx, fz };
-    const bob = c.moving ? Math.abs(Math.sin(c.walk)) * 1.8 : 0;
+    // A stacked load has a little weight: vertical bounce follows the gait while its base
+    // sways against the carrier's turn, making the layers read as physical objects in 3D.
+    const bob = c.moving ? 1.15 + Math.abs(Math.sin(c.walk)) * 2.1 : Math.sin(this.time * 2.1 + (c.seed || 0)) * 0.16;
+    const sway = c.moving ? Math.sin(c.walk * 0.5) * 1.25 : Math.sin(this.time * 1.7 + (c.seed || 0)) * 0.25;
     // bigger loads hug a wider tower so a full 100+ stack stays a readable height
     const cols = c.cap > 220 ? 3 : c.cap > 70 ? 2 : 1, deep = c.cap > 70 ? 2 : 1;
-    return { x: c.x + fx * (12 + (deep - 1) * 3), y: c.y + fz * (12 + (deep - 1) * 3), z: 22 + bob, cols, deep, spread: 6.5, fx, fz };
+    return { x: c.x + fx * (12 + (deep - 1) * 3) + fz * sway, y: c.y + fz * (12 + (deep - 1) * 3) - fx * sway, z: 22 + bob, cols, deep, spread: 6.5, fx, fz, sway };
   }
 
   // ---------------------------------------------------------------- dynamic items
@@ -806,8 +809,10 @@ export class Renderer {
       const h = hts[cell]; hts[cell] += step;
       const bend = Math.pow(h, 1.35) * 0.018, wob = Math.sin(t * 2.4 + h * 0.02) * h * 0.01;
       const off = (col - (b.cols - 1) / 2) * b.spread + wob, dep = (row - (deep - 1) / 2) * b.spread;
-      const x = b.x + rx * off + b.fx * (o.lean * bend * 2 + dep), y = b.y + rz * off + b.fz * (o.lean * bend * 2 + dep), z = b.z + h + (M.ITEM_HALF[type] || 2);
-      this.item(type, x, y, z, o.ang + Math.PI / 2 + (hash(i) - 0.5) * 0.25, b.cols > 1 ? 1.0 : 1.15);
+      const layerSway = c.moving ? Math.sin(c.walk * 0.5 + h * 0.018) * Math.min(1.2, h * 0.008) : 0;
+      const x = b.x + rx * (off + layerSway) + b.fx * (o.lean * bend * 2 + dep), y = b.y + rz * (off + layerSway) + b.fz * (o.lean * bend * 2 + dep), z = b.z + h + (M.ITEM_HALF[type] || 2);
+      const headingSway = c.moving ? Math.sin(c.walk + i * 0.12) * 0.025 : 0;
+      this.item(type, x, y, z, o.ang + Math.PI / 2 + headingSway + (hash(i) - 0.5) * 0.25, b.cols > 1 ? 1.0 : 1.15);
       if (i >= n - per) top = { x: b.x, y: b.y, z: Math.max(top.z, z + step) };
     }
     o.top = top;

@@ -661,7 +661,7 @@ export const CFG = {
       ],
       deco: { theme: 'farm', paths: [[430, 370, 370, 100], [520, 190, 80, 180]], hedges: [[40, 640, 180, 22]], trees: [[60, 480, 'round'], [760, 330, 'round']], bushes: [[200, 490], [560, 660]] } },
 
-    // 24 — beehives beside the tulips: honey jars
+    // 24 — beehives beside the tulips: preserve the goal-focused honey expansion counter
     { name: '蜂蜜花田', W: 820, H: 700, start: [460, 420], par: 180, bill: 20,
       goal: { type: 'sell', item: 'honey', n: 950 },
       objects: [
@@ -673,7 +673,7 @@ export const CFG = {
       tiles: [
         { id: 'a', x: 460, y: 560, price: 40, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 40 } } },
         { id: 'b', x: 450, y: 90, price: 90, icon: 'hive', label: '添蜂箱', buy: 3, req: ['a'], repeat: { times: 3, mul: 1.6 }, effect: { hens: { coop: 'H1', n: 3 } } },
-        { id: 'c', x: 660, y: 520, price: 100, icon: 'counter', label: '出售台', req: ['a'], effect: { show: ['C2'] } },
+        { id: 'c', x: 660, y: 520, price: 100, icon: 'counter', label: '蜂蜜出售台', req: ['a'], effect: { show: ['C2'] } },
         { id: 'd', x: 440, y: 300, price: 140, icon: 'cart', label: '雇小车', req: ['a'], effect: { worker: { from: ['H1'], to: ['C1', 'C2'] } } },
         { id: 'e', x: 430, y: 650, price: 160, icon: 'worker', label: '雇园丁', req: ['b'], effect: { worker: { from: ['F1'], to: ['C1'] } } },
         { id: 'f', x: 560, y: 180, price: 180, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1', 'C2'] } },
@@ -843,7 +843,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[380, 350, 440, 100], [500, 180, 90, 170]], hedges: [[700, 560, 100, 22]], trees: [[780, 640, 'round'], [780, 280, 'round']], bushes: [[400, 40], [780, 40]] } },
 
     // 32 — the bakery: wheat → flour → bread, two machines in a row
-    { name: '面包房', W: 880, H: 740, start: [500, 420], par: 260, bill: 20, oneCounter: true,   // v4.5: one register sells wheat + bread
+    { name: '面包房', W: 880, H: 740, start: [500, 420], par: 260, bill: 20,
       goal: { type: 'produce', item: 'bread', n: 130 },
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 330, h: 300, gap: 9 },
@@ -1024,7 +1024,7 @@ export const CFG = {
       deco: { theme: 'farm', paths: [[400, 360, 480, 100], [520, 130, 90, 230]], hedges: [[780, 660, 90, 22]], trees: [[840, 700, 'cone'], [840, 60, 'round']], bushes: [[420, 40], [840, 440]] } },
 
     // 40 — the winery: grapes → grape juice → wine, aged in big oak barrels
-    { name: '葡萄酒庄', W: 900, H: 760, start: [500, 420], par: 260, bill: 20, oneCounter: true, smartStaff: true,
+    { name: '葡萄酒庄', W: 900, H: 760, start: [500, 420], par: 260, bill: 20, smartStaff: true,
       goal: { type: 'produce', item: 'wine', n: 130 },
       objects: [
         { id: 'G1', type: 'field', crop: 'grape', x: 40, y: 40, w: 330, h: 300, gap: 9, gapY: 24 },
@@ -1052,18 +1052,16 @@ export const CFG = {
         { id: 'T1', type: 'field', crop: 'tomato', x: 50, y: 50, w: 300, h: 290, gap: 11 },
         { id: 'P1', type: 'field', crop: 'pepper', x: 50, y: 430, w: 300, h: 310, gap: 11, hidden: true },
         { id: 'M1', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 5, time: 0.45, x: 680, y: 170, outTo: 'C1' },
-        { id: 'C1', type: 'counter', items: ['tomato', 'ketchup', 'pepper'], x: 780, y: 420 },
-        { id: 'C2', type: 'counter', items: ['pepper', 'tomato'], x: 780, y: 640, hidden: true },
+        { id: 'C1', type: 'counter', items: ['tomato', 'ketchup', 'pepper'], x: 780, y: 420},
       ],
       tiles: [
         { id: 'a', x: 500, y: 580, price: 50, icon: 'cap', label: '大果篮', effect: { up: { key: 'cap', v: 50 } } },
         { id: 'b', x: 450, y: 150, price: 170, icon: 'worker', label: '雇园丁', req: ['a'], effect: { worker: { from: ['T1'], to: ['M1'] } } },
         { id: 'c', x: 430, y: 490, price: 120, icon: 'pepper', label: '种甜椒', req: ['a'], effect: { show: ['P1'] } },
-        { id: 'd', x: 450, y: 710, price: 230, icon: 'worker', label: '雇园丁', req: ['c'], effect: { worker: { from: ['P1'], to: ['C2', 'C1'] } } },
-        { id: 'e', x: 780, y: 640, price: 160, icon: 'counter', label: '出售台', req: ['c'], effect: { show: ['C2'] } },
+        { id: 'd', x: 450, y: 710, price: 230, icon: 'worker', label: '雇园丁', req: ['c'], effect: { worker: { from: ['P1'], to: ['C1'] } } },
         { id: 'f', x: 560, y: 290, price: 290, icon: 'worker', label: '雇园丁', req: ['b'], effect: { worker: { from: ['T1'], to: ['M1'] } } },
         { id: 'g', x: 880, y: 180, price: 260, icon: 'gear', label: '快酱机', req: ['b'], effect: { proc: [{ id: 'M1', mul: 0.6 }] } },
-        { id: 'h', x: 890, y: 540, price: 280, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1', 'C2'] } },
+        { id: 'h', x: 890, y: 540, price: 280, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1'] } },
         { id: 'i', x: 440, y: 370, price: 200, icon: 'sprinkler', label: '洒水器', req: ['c'], effect: { sprinkler: ['T1', 'P1'] } },
         { id: 'j', x: 600, y: 700, price: 340, icon: 'loader', label: '园丁换铲车', req: ['d'], effect: { upgradeWorkers: 'loader' } },
       ],
@@ -1096,7 +1094,7 @@ export const CFG = {
               paths: [[400, 380, 500, 100], [540, 120, 80, 260]], hedges: [[740, 740, 80, 20]], trees: [[885, 750, 'cone'], [880, 40, 'round']], bushes: [[600, 40], [480, 40]] } },
 
     // 43 — the morning bread market: wheat → flour → bread (v4.5: one stall + one 店员 sells wheat and bread)
-    { name: '早市面包摊', W: 960, H: 820, start: [540, 450], par: 260, bill: 20, oneCounter: true,
+    { name: '早市面包摊', W: 960, H: 820, start: [540, 450], par: 260, bill: 20,
       goal: { type: 'sell', item: 'bread', n: 85 },
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 330, h: 320, gap: 9 },
@@ -1279,7 +1277,7 @@ const VL = {
       ],
       deco: { theme: 'garden', paths: [[350, 270, 410, 100], [470, 370, 90, 250]], hedges: [[660, 480, 90, 22]], trees: [[720, 580, 'cone'], [700, 60, 'round']], bushes: [[600, 40], [720, 200], [640, 580]] } },
 
-    // 47 — two crops, two counters
+    // 47 — two ordinary counters preserve throughput for both crops
     { name: '坡上双田', W: 900, H: 780, start: [520, 430], par: 450, bill: 20,
       goal: { type: 'earn', n: [12750, 18250, 12000, 12750] },
       objects: [
@@ -1322,15 +1320,15 @@ const VL = {
       ],
       deco: { theme: 'farm', paths: [[380, 350, 440, 100], [500, 180, 90, 170]], hedges: [[700, 560, 100, 22]], trees: [[780, 640, 'round'], [780, 280, 'cone']], bushes: [[400, 40], [780, 40]] } },
 
-    // 49 — three terraces, all three crops of the season; each crew owns one crop and one counter
+    // 49 — three terraces use an ordinary counter and a dedicated C-crop counter
     { name: '三色梯田', W: 920, H: 820, start: [530, 420], par: 480, bill: 20,
       goal: { type: 'earn', n: [13000, 15250, 14000, 15250] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 220 },
         { id: 'F2', type: 'field', crop: 'B', x: 40, y: 300, w: 300, h: 220, hidden: true },
         { id: 'F3', type: 'field', crop: 'C', x: 40, y: 560, w: 300, h: 220, hidden: true },
-        { id: 'C1', type: 'counter', items: ['A', 'B', 'C'], x: 760, y: 300 },
-        { id: 'C2', type: 'counter', items: ['C', 'B', 'A'], x: 760, y: 560, hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B'], x: 760, y: 300 },
+        { id: 'C2', type: 'counter', items: ['C'], x: 760, y: 560, hidden: true },
       ],
       tiles: [
         { id: 'a', x: 480, y: 560, price: 50, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 50 } } },
@@ -1369,7 +1367,7 @@ const VL = {
       ],
       deco: { theme: 'farm', paths: [[440, 360, 500, 100], [740, 220, 80, 300]], hedges: [[800, 760, 50, 18]], trees: [[905, 765, 'round'], [900, 40, 'cone']], bushes: [[560, 40], [460, 40]] } },
 
-    // 51 — the valley market: three crops, the middle one through a machine, two raw counters
+    // 51 — the valley market: three crops, the middle one through a machine, one ordinary counter
     { name: '山谷集市', W: 980, H: 840, start: [560, 460], par: 380, bill: 20,
       goal: { type: 'earn', n: [21000, 23000, 11500, 12750] },
       objects: [

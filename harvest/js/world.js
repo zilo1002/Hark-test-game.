@@ -1078,7 +1078,8 @@ export class World {
       c.buyAcc = Math.min(c.buyAcc + c.serveRate * dt, 2);
       const previousGot = front.stockoutGot ?? front.bag.length;
       while (c.buyAcc >= 1 && c.stock.length > 0 && front.bag.length + front.incoming < front.want) {
-        c.buyAcc--; const it = c.stock.pop(); front.incoming++;
+        c.buyAcc--;
+        const it = c.stock.pop(); front.incoming++;
         this.launch(it, 'cust', c.x, c.y, CFG.counter.deskH + 4, front, 0, 0, 0, CFG.fly.serve);
       }
       if (c.stock.length <= 0) c.buyAcc = 0;
@@ -1489,6 +1490,7 @@ export class World {
     return { li: this.li, t: this.t, money: this.money, stats: this.stats, env: { season: this.season, rain: this.rain },
              tiles: this.tiles.map((t) => ({ id: t.id, paid: t.paid, bought: t.bought })),
              stack: this.player.stack.slice(0, 600),
+             counterIds: this.counters.map((c) => c.id), counterItems: this.counters.map((c) => c.items.slice()),
              cash: this.counters.map((c) => c.cash), stock: this.counters.map((c) => c.stock.slice(0, 300)),
              buf: this.procs.map((p) => p.buf), ponds: this.ponds.map((p) => p.caught) };
   }
@@ -1502,8 +1504,27 @@ export class World {
     if (s.stats) this.stats = { collected: {}, sold: {}, produced: {}, golden: {}, earned: 0, unlocks: 0, ...s.stats };
     if (!this.stats.golden) this.stats.golden = {};
     if (Array.isArray(s.stack)) this.player.stack = s.stack.filter((x) => CFG.items[x]).slice(0, this.player.cap);
-    (s.cash || []).forEach((v, i) => { if (this.counters[i]) this.counters[i].cash = v || 0; });
-    (s.stock || []).forEach((v, i) => { if (this.counters[i] && Array.isArray(v)) { this.counters[i].stock = v.filter((x) => CFG.items[x]); this.counters[i].everStocked = this.counters[i].stock.length > 0; } });
+    // Counter inventories were historically saved by array position. As levels move to one
+    // ordinary counter plus a separately unlocked processed counter, map each saved item by
+    // its current destination so older saves keep both raw and processed stock.
+    const oldIds = Array.isArray(s.counterIds) ? s.counterIds : [];
+    const oldItems = Array.isArray(s.counterItems) ? s.counterItems : [];
+    (s.cash || []).forEach((v, i) => {
+      if (!v) return;
+      const target = this.counters.find((c) => c.id === oldIds[i]) ||
+        this.counters.find((c) => oldItems[i] && oldItems[i].some((it) => c.items.includes(it))) ||
+        this.counters[0];
+      if (target) target.cash += v;
+    });
+    for (let i = 0; i < (s.stock || []).length; i++) {
+      const saved = s.stock[i]; if (!Array.isArray(saved)) continue;
+      for (const item of saved) {
+        if (!CFG.items[item]) continue;
+        const target = this.counters.find((c) => c.id === oldIds[i] && c.items.includes(item)) ||
+          this.counters.find((c) => c.items.includes(item));
+        if (target && target.stock.length < CFG.counter.stockMax) { target.stock.push(item); target.everStocked = true; }
+      }
+    }
     (s.buf || []).forEach((v, i) => { if (this.procs[i]) this.procs[i].buf = v || 0; });
     (s.ponds || []).forEach((v, i) => { const pd = this.ponds[i]; if (!pd) return; pd.caught = v || 0; const L = CFG.pond.levels; while (pd.lv < L.length && pd.caught >= L[pd.lv].at) pd.setLevel(pd.lv + 1); if (!pd.hidden) pd.fill(1); });
     this.updateTileVis(true);

@@ -10,9 +10,8 @@
 // with `sale2: [x, y]` and a machine may pin its tray with `tray: [x, y, w, h]`.
 // v4.5: ONE dedicated feeder per machine (the first hire that fed it; it carries small batches, see world.js), any further
 // hire that used to feed the same machine becomes a farm hand for the raw counter (so fewer generated raw carriers).
-// A level with `oneCounter: true` (32 面包房, 43 早市面包摊) gets no 「加工品」 counter: its goods sell from the raw counter,
-// carried there from the tray by ONE porter (no second register, no 加工品店员).
-// v4.7 FIXED ROLES (user's design after the 熏鱼房 phone video): 原料搬运工 only fields → raw counter; 机器专员 only that
+// Every processing level follows the same unlock: one raw counter at start; after buying a processor, a second processed-goods counter becomes available.
+// v4.7 FIXED ROLES:  原料搬运工 only fields → raw counter; 机器专员 only that
 // machine's crop → that machine (one tile, plus a paid tile for a 2nd per machine); 加工品搬运工 only tray → goods counter,
 // one per machine (at least two on a single-machine 加工品 counter). The goods counter's porter + 店员 come right after
 // its machine in the purchase order, so customers there never stand at an empty desk for long.
@@ -110,10 +109,9 @@ function splitSales0(L0) {
     p.tray = pick || cand[0];
   }
   // 2) the 「加工品」 counter PS: not built at the start, bought from a tile once a machine is there
-  const one = !!L0.oneCounter;
+  // Processing levels always get a separate processed-goods counter after the first machine is unlocked.
   let pos = L0.sale2;
-  if (one) { for (const it of made) if (!main.items.includes(it)) main.items.push(it); for (const p of T) p.outTo = main.id; pos = [main.x, main.y]; }
-  else if (!pos) {
+  if (!pos) {
     const bl = blockers(L, null), K = CFG.counter;
     let best = null, bs = 1e18;
     for (const gap of [34, 22, 12]) { if (best) break;
@@ -130,12 +128,10 @@ function splitSales0(L0) {
     pos = best;
   }
   if (!pos) { console.warn(`[sales] ${L0.name}: no room for a second counter`); return L0; }
-  const sale = one ? main : { id: 'PS', type: 'counter', items: [...made], x: pos[0], y: pos[1], hidden: true, sale2: true };
-  if (!one) {
-    L.objects.push(sale); obj.PS = sale;
-    for (const c of L.objects) if (c.type === 'counter' && c !== sale) c.items = c.items.filter((it) => !made.has(it));
-    for (const p of T) p.outTo = 'PS';
-  }
+  const sale = { id: 'PS', type: 'counter', items: [...made], x: pos[0], y: pos[1], hidden: true, sale2: true };
+  L.objects.push(sale); obj.PS = sale;
+  for (const c of L.objects) if (c.type === 'counter' && c !== sale) c.items = c.items.filter((it) => !made.has(it));
+  for (const p of T) p.outTo = 'PS';
   const dead = new Set(L.objects.filter((c) => c.type === 'counter' && !c.items.length).map((c) => c.id));
   if (dead.size) {
     L.objects = L.objects.filter((o) => !dead.has(o.id));
@@ -146,7 +142,7 @@ function splitSales0(L0) {
       if (e.worker) e.worker = { ...e.worker, to: e.worker.to.filter((id) => !dead.has(id)) };
     }
   }
-  const rawC = L.objects.filter((o) => o.type === 'counter' && (one || o !== sale));
+  const rawC = L.objects.filter((o) => o.type === 'counter' && o !== sale);
   const rawItems = new Set(rawC.flatMap((c) => c.items));
   const rawSrc = L.objects.filter((o) => (o.type === 'field' || o.type === 'coop') && rawItems.has(o.type === 'field' ? o.crop : o.item)).map((o) => o.id);
   const first = L.tiles[0];
@@ -180,6 +176,9 @@ function splitSales0(L0) {
                         req: feeder ? [mTile[feeder.id].id] : [first.id], effect: { show: [p.id] } });
   }
   for (const p of procs) p.hidden = true;
+  // Keep the processed counter hidden until its first delivery route is staffed.
+  // The first porter hire reveals it, avoiding customers queueing at an empty new desk.
+  const firstMachineTile = mTile[T[0].id];
   for (const [p, src] of needFeeder) {
     const sp = spot(L, p.x - 90, p.y + 60);
     feedTile[p.id] = add({ id: 'x_f' + p.id, x: sp[0], y: sp[1], price: r10(s * V.raw[0]), icon: 'worker', label: '机器专员', req: [mTile[p.id].id],
@@ -228,7 +227,7 @@ function splitSales0(L0) {
   }
   // 5) the 加工品 counter tile, raw carriers, porters
   const termTiles = T.map((p) => mTile[p.id].id);
-  const ps = one ? null : add({ id: 'x_ps', x: sale.x, y: sale.y, price: r10(s * V.sale), icon: 'counter', label: '加工品出售台', reqAny: termTiles, effect: { show: ['PS'] } });
+  const ps = null; // counter is revealed by the first processing-machine unlock above
   const isRawHire = (t) => t.effect.worker && t.effect.worker.to.length && t.effect.worker.to.every((id) => rawC.some((c) => c.id === id));
   const rawHires = L.tiles.filter(isRawHire).length;
   const rawT = [];
@@ -259,23 +258,27 @@ function splitSales0(L0) {
     rawT.push(tile); rawCovered.add(item);
   }
   // v4.7 人员适配: one 加工品搬运工 per finished-goods machine, with at least two for a separate goods counter.
-  // A one-counter level needs only one porter because its raw and processed goods share the same sale desk.
-  const nP = one ? T.length : Math.max(T.length, 2);
+  const nP = Math.max(T.length, 2);
   const por = [];
   for (let k = 0; k < nP; k++) {
     const p = T[k % T.length], sp = spot(L, p.tray[0] + p.tray[2] / 2 + 10, p.tray[1] + p.tray[3] + 40);
-    const req = k >= T.length ? [por[k - T.length].id] : [mTile[p.id].id, ...(one ? [] : ['x_ps'])];
+    const req = k >= T.length ? [por[k - T.length].id] : [mTile[p.id].id];
     por.push(add({ id: 'x_p' + (k + 1), x: sp[0], y: sp[1], price: r10(s * V.porter[k < T.length ? 0 : 1]), icon: 'porter', label: '加工品搬运工',
-                   req, effect: { worker: { from: [p.id, ...T.filter((q) => q !== p).map((q) => q.id)], to: [sale.id], porter: true, tray: p.id } } }));
+                   req, effect: { worker: { from: [p.id, ...T.filter((q) => q !== p).map((q) => q.id)], to: [sale.id], porter: true, tray: p.id }, ...(k === 0 ? { show: [sale.id] } : {}) } }));
   }
   // 6) 店员 + 收银升级 (the upgrade waits on the clerk, on the same spot)
   const cup = (id, at, ids, clerk) => add({ id, x: at.x, y: at.y, price: r10(s * V.cup.base), icon: 'register', label: '收银升级', req: [clerk],
                                             repeat: { times: V.cup.times, mul: V.cup.mul }, effect: { counterUp: ids } });
   let pc = null, pu = null;
-  if (!one) {
+  const existingCashiers = L.tiles.filter((t) => t.effect.cashier && t.effect.cashier.length);
+  if (existingCashiers.length) {
+    // One cashier can serve the paired counters; keep the new desk usable without adding a
+    // second paid cashier that competes with the level's original upgrades and objectives.
+    for (const t of existingCashiers) t.effect = { ...t.effect, cashier: [...new Set([...t.effect.cashier, sale.id])] };
+  } else {
     const spC = spot(L, sale.x + CFG.counter.cashDx - 30, sale.y + CFG.counter.cashDy + 50);
-    pc = add({ id: 'x_pc', x: spC[0], y: spC[1], price: r10(s * V.clerk), icon: 'cashier', label: '加工品店员', req: ['x_ps'], effect: { cashier: ['PS'] } });
-    pu = cup('x_pu', pc, ['PS'], 'x_pc');
+    pc = add({ id: 'x_pc', x: spC[0], y: spC[1], price: r10(s * V.clerk), icon: 'cashier', label: '加工品店员', req: [firstMachineTile.id], effect: { cashier: [sale.id] } });
+    pu = cup('x_pu', pc, [sale.id], 'x_pc');
   }
   const ups = [];
   for (const t of L.tiles.slice()) if (t.effect.cashier && t !== pc && t.effect.cashier.length) ups.push(cup('x_cu' + t.id, t, t.effect.cashier.slice(), t.id));
@@ -287,20 +290,19 @@ function splitSales0(L0) {
                     req: [mTile[p.id].id], repeat: { times: V.mup.times, mul: V.mup.mul }, effect: { procUp: p.id } }));
   }
   // 8) purchase order (the guide arrow / balance bot buys the first affordable tile in this order):
-  //    first tile → machines without a tile of their own → [加工品 counter, raw carrier 1, porter 1] right after the first
+  //    first tile → machines without a tile of their own → [processed porter 1, raw carrier 1] after the first processing machine
   //    finished-goods machine → the level's own tiles → clerk, 2nd carrier, 2nd porter → 收银升级 → new machine upgrades
   const genSet = new Set(gen);
   const orig = L.tiles.filter((t) => !genSet.has(t));
   const mGen = gen.filter((t) => t.id.startsWith('m_'));
   let order = [orig[0], ...mGen, ...orig.slice(1)];
   const firstTerm = order.findIndex((t) => termTiles.includes(t.id));
-  // v4.7: right after the first finished-goods machine: [加工品 counter, its porter, its 店员, raw carrier 1]; every later
-  // finished-goods machine is followed by its own porter
-  order.splice(firstTerm + 1, 0, ...(ps ? [ps] : []), por[0], ...(pc ? [pc] : []), ...(rawT[0] ? [rawT[0]] : []));
+  // Hire the first porter before enabling processed-counter customers; this prevents premature empty-desk waits.
+  order.splice(firstTerm + 1, 0, por[0], ...(pc ? [pc] : []), ...(rawT[0] ? [rawT[0]] : []));
   T.forEach((p, k) => { if (!k) return; const i = order.indexOf(mTile[p.id]); if (i >= 0) order.splice(i + 1, 0, por[k]); else order.push(por[k]); });
   order.push(...gen.filter((t) => t.id.startsWith('x_f')), ...rawT.slice(1), ...por.slice(T.length), ...feed2, ...feed3, ...(pu ? [pu] : []), ...ups, ...gen.filter((t) => t.id.startsWith('u_')));
   const seen = new Set(); L.tiles = order.filter((t) => t && !seen.has(t) && seen.add(t));
   for (const t of gen) if (!seen.has(t)) L.tiles.push(t);
-  L.sale2 = one ? null : 'PS';
+  L.sale2 = 'PS';
   return L;
 }

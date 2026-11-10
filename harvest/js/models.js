@@ -598,8 +598,9 @@ export function posePerson(pp, s) {
   const bob = s.moving ? Math.abs(Math.sin(s.walk)) * 1.6 : Math.sin(s.t * 3 + (s.seed || 0)) * 0.3;
   body.position.y = bob;
   legs[0].rotation.x = sw * 0.75; legs[1].rotation.x = -sw * 0.75;
-  torso.rotation.z = s.moving ? Math.sin(s.walk) * 0.05 : 0;
-  torso.rotation.x = s.carry ? -0.06 : (s.moving ? 0.08 : 0);
+  const carrySway = s.carry && s.moving ? Math.sin(s.walk * 0.5) : 0;
+  torso.rotation.z = s.carry ? carrySway * 0.075 : (s.moving ? Math.sin(s.walk) * 0.05 : 0);
+  torso.rotation.x = s.carry ? -0.09 + (s.moving ? Math.abs(Math.sin(s.walk)) * 0.025 : 0) : (s.moving ? 0.08 : 0);
   head.rotation.x = s.carry ? -0.1 : 0;
   head.rotation.z = s.moving ? -Math.sin(s.walk) * 0.04 : Math.sin(s.t * 1.3 + (s.seed || 0)) * 0.04;
   if (s.fishing) {
@@ -624,8 +625,9 @@ export function posePerson(pp, s) {
     tool.visible = true;
     torso.rotation.y = k * 0.18;
   } else if (s.carry) {
-    // both arms forward and up, hugging the stack
-    arms[0].rotation.set(-1.5, 0, 0.32); arms[1].rotation.set(-1.5, 0, -0.32);
+    // Both arms cradle the load; the small alternating lift makes its weight read in 3D.
+    const lift = s.moving ? Math.abs(Math.sin(s.walk)) * 0.045 : 0;
+    arms[0].rotation.set(-1.5 - lift, 0, 0.32 + carrySway * 0.06); arms[1].rotation.set(-1.5 - lift, 0, -0.32 + carrySway * 0.06);
     tool.visible = false; torso.rotation.y = 0;
   } else {
     arms[0].rotation.set(-sw * 0.85, 0, 0.12); arms[1].rotation.set(sw * 0.85, 0, -0.12);

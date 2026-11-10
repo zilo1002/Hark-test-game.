@@ -251,3 +251,11 @@ node harvest/sim/swath-check.mjs        # 27 条割痕全部 0 遗漏；背满�
 
 - 奶牛、绵羊 3D 模型：**Farm Animal Pack by Quaternius**（https://quaternius.com/packs/farmanimal.html ），CC0 1.0 公有领域，无需署名，这里仍致谢。
 - three.js r170（MIT）。
+
+### v4.7.5：统一各关卡的原料 / 加工品柜台，并加深搬运动效
+
+- **柜台进度统一覆盖全部已开放关卡**：未解锁加工时只有一个普通货物台；加工机器解锁后才开放独立的加工品台。37 个加工关卡中，普通原料与加工成品不再混售；只有普通货物的另外 16 关也统一为一个柜台，多作物共用。
+- **雇工自动归台**：原料搬运工只送普通货台；加工品搬运工从机器出货堆把成品送到加工品台；机器专员仍只喂自己的机器。旧存档的柜台货物会按商品类型迁移到新柜台布局，拆分或合并时不丢库存和现金。
+- **参考实机视频强化 3D 动势**：保留现有低多边形农场风格，搬运时加入身体承重前倾、手臂托举、货堆随步伐轻摆和分层晃动；动效用于所有关卡。
+- **回归检查**：新增 `sim/counter-progression-check.mjs`，覆盖全部 53 个已开放关卡及旧存档迁移；`sim/staff-check.mjs`、`sim/customer-check.mjs`、`sim/labour-check.mjs` 与 `sim/layout-check.mjs` 验证工人分工、顾客等待、供料和布局。
+- Android 4.7.5（versionCode 22）。
