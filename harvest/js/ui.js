@@ -3,7 +3,7 @@ import { CFG, goalText } from './config.js';
 import { starsLeft, storageAvailable } from './save.js';
 import { OUTFITS, DECOS, UNIFORMS, PETS, SLOTS, itemById, isOn, onSale, festName } from './shop.js';
 import { PAGES, pageEntries, pageProgress, pageDone, claimable, bookTotals } from './book.js';
-import { festivalInfo, nextFestival } from './festival.js';
+import { festivalInfo, nextFestival, FESTIVALS, FEST_IDS } from './festival.js';
 import { ROSTER, TRAITS, traitBonus, xpNeed, CREW } from './crew.js';
 import { orderText, orderDone, TIER_NAME } from './orders.js';
 import { seasonInfo, cropNames, isValleyLi, valleyOpen, valleySeason, valleyCrops } from './seasons.js';
@@ -237,9 +237,11 @@ export class UI {
       : locked3 ? '过第 38 关开放' : left >= cheapest ? '点卡片或庄园上的虚线圈，用星星建造' : page === 2 && data.unlocked < 15 ? '第 16 关起拿星星' : '过关拿星星';
     $('buildHint').textContent = `${doneN}/${metas.length}`;
     // 季节 / 节日: a tiny badge by the title (tap for details)
-    const si = seasonInfo(), fi = festivalInfo();
-    for (const id of ['seasonBadge', 'seasonBadge2']) { const sb = $(id); sb.textContent = si.name; sb.className = `sbadge s${si.i}`; }
-    const fb = $('festBadge'); if (fi) { fb.className = `fbadge ${fi.id}`; fb.textContent = fi.name.slice(0, 1); } else fb.className = 'fbadge hidden';
+    const hm = data.homeMap || { mode: 'calendar', season: null, festival: null };
+    const chosenSeason = hm.mode === 'season' && Number.isInteger(hm.season) ? hm.season : seasonInfo().i;
+    const shownFestival = hm.mode === 'festival' && FEST_IDS.includes(hm.festival) && (data.festivalMaps || []).includes(hm.festival) ? FESTIVALS[hm.festival] : (hm.mode === 'calendar' ? festivalInfo() : null);
+    for (const id of ['seasonBadge', 'seasonBadge2']) { const sb = $(id); sb.textContent = CFG.seasons[chosenSeason].name; sb.className = `sbadge s${chosenSeason}`; }
+    const fb = $('festBadge'); if (shownFestival) { fb.className = `fbadge ${shownFestival.id}`; fb.textContent = shownFestival.name.slice(0, 1); } else fb.className = 'fbadge hidden';
     // red dots: 订单 ready / 图鉴 reward → their tile, and the 设置 icon; a spot you can afford → the ★ button
     const O = data.orders, ordReady = !!(O && O.list.some((o) => !o.claimed && orderDone(o))), bookReady = claimable(data).length > 0;
     $('ordDot').classList.toggle('hidden', !ordReady); $('bookDot').classList.toggle('hidden', !bookReady);
@@ -290,7 +292,36 @@ export class UI {
     $('mSaveSub').textContent = `震动${d.settings.vib ? '开' : '关'} · 重置进度`;
   }
   openEnv() {
-    const si = seasonInfo(), fi = festivalInfo(), nf = nextFestival();
+    const si = seasonInfo(), fi = festivalInfo(), nf = nextFestival(), data = this.h.data();
+    const hm = data.homeMap || { mode: 'calendar', season: null, festival: null };
+    const modes = [
+      ['calendar', '跟随日历'],
+      ...CFG.seasons.map((S, i) => [`season:${i}`, S.full]),
+    ];
+    const modeRoot = $('homeMapModes');
+    modeRoot.innerHTML = modes.map(([key, label]) => {
+      const active = key === 'calendar' ? hm.mode === 'calendar' : hm.mode === 'season' && hm.season === Number(key.split(':')[1]);
+      return `<button class="${active ? 'on' : ''}" data-home-map="${key}">${label}</button>`;
+    }).join('');
+    for (const b of modeRoot.children) b.onclick = () => {
+      const key = b.dataset.homeMap;
+      if (key === 'calendar') this.h.homeMap('calendar');
+      else this.h.homeMap('season', +key.split(':')[1]);
+      this.closeAll(); this.renderHome(this.h.data());
+    };
+    const owned = (data.festivalMaps || []).filter((id) => FEST_IDS.includes(id));
+    const festRoot = $('festivalMapChoices');
+    $('festivalMapTitle').classList.toggle('hidden', !owned.length);
+    festRoot.classList.toggle('hidden', !owned.length);
+    festRoot.innerHTML = owned.map((id) => {
+      const f = FESTIVALS[id], active = hm.mode === 'festival' && hm.festival === id;
+      return `<button class="${active ? 'on' : ''}" data-festival-map="${id}">${f.icon} ${f.name}</button>`;
+    }).join('');
+    for (const b of festRoot.children) b.onclick = () => {
+      this.h.homeMap('festival', b.dataset.festivalMap);
+      this.closeAll(); this.renderHome(this.h.data());
+    };
+    $('homeMapNote').textContent = owned.length ? '节日地图解锁后会一直保留；主页地图只改变庄园外观，不影响关卡效果。' : '先在节日活动期间进入游戏，即可永久收藏该节日地图。切换只影响庄园外观，不影响关卡效果。';
     $('seasonText').textContent = `${si.full}（第 ${si.day} 天）· 当季 ${cropNames(si.crops).join(' ')} 生长 +${Math.round(CFG.season.bonus * 100)}% · ${si.left <= 1 ? '明天换季' : `${si.left} 天后换季`}`;
     const fb = $('festBanner');
     if (fi) { fb.className = `fest ${fi.id}`; $('festBadge2').textContent = fi.name.slice(0, 1); $('festText').textContent = `${fi.name}活动 · ${fi.desc} · ${fi.left <= 1 ? '今天最后一天' : `还剩 ${fi.left} 天`} · 商店有限定`; }

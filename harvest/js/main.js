@@ -98,6 +98,13 @@ const ui = new UI({
     Save.save(data); snd.play('appear'); hap.tick(14, 0);
     if (restart && world && Seasons.isValleyLi(world.li) && world.season !== s) { const li = world.li; world = null; start(li); }
   },
+  homeMap: (mode, value = null) => {
+    if (mode === 'calendar') data.homeMap = { mode: 'calendar', season: null, festival: null };
+    else if (mode === 'season' && Number.isInteger(value) && value >= 0 && value < 4) data.homeMap = { mode: 'season', season: value, festival: null };
+    else if (mode === 'festival' && Fest.FEST_IDS.includes(value) && (data.festivalMaps || []).includes(value)) data.homeMap = { mode: 'festival', season: null, festival: value };
+    else return false;
+    Save.save(data); snd.play('appear'); hap.tick(14, 0); return true;
+  },
   dailyStart: () => { snd.unlock(); snd.play('tap'); startDaily(); },
   locked: () => { snd.play('full'); hap.tick(30, 0); },
   save: () => Save.save(data),
@@ -110,6 +117,12 @@ function ensurePreview() { if (!preview) { preview = new Preview(document.getEle
 function applyLook() {
   R.setOutfit(Shop.heroStyle(data.shop.eq)); R.setDecos(data.shop.deco); R.setUniform(Shop.uniformStyle(data.shop.uni));
   const dog = Shop.petById(data.shop.pet.dog); R.setPet(dog ? dog.col : null); R.setFestival(Fest.currentFestival());
+}
+function rememberFestivalMap() {
+  const id = Fest.currentFestival();
+  if (!id || !Fest.FEST_IDS.includes(id)) return;
+  if (!Array.isArray(data.festivalMaps)) data.festivalMaps = [];
+  if (!data.festivalMaps.includes(id)) { data.festivalMaps.push(id); Save.save(data); }
 }
 const petOpt = () => (data.shop.pet.dog ? 'dog' : null);
 applyLook();
@@ -339,6 +352,7 @@ function handleEvents() {
 
 // ---------------------------------------------------------------- loop
 function frame(now) {
+  rememberFestivalMap();
   const rawDt = (now - last) / 1000;
   let dt = Math.min(0.05, rawDt); last = now; time += dt;
   // adaptive detail: on a slow device, draw fewer plants per frame (fields switch to LOD)
@@ -365,7 +379,10 @@ function frame(now) {
     saveT += dt; if (saveT > 5) { saveT = 0; snapshot(); }
   } else {
     fx.update(dt);
-    drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: Seasons.currentSeason(), fest: Fest.currentFestival(), build: ui.build }, time, R.dpr, areaRect(), ui.page || 1);
+    const hm = data.homeMap || { mode: 'calendar', season: null, festival: null };
+    const homeSeason = hm.mode === 'season' && Number.isInteger(hm.season) ? hm.season : Seasons.currentSeason();
+    const homeFestival = hm.mode === 'festival' && (data.festivalMaps || []).includes(hm.festival) ? hm.festival : (hm.mode === 'calendar' ? Fest.currentFestival() : null);
+    drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: homeSeason, fest: homeFestival, build: ui.build }, time, R.dpr, areaRect(), ui.page || 1);
     R.g.setTransform(R.dpr, 0, 0, R.dpr, 0, 0); R.fxScreen(fx);
     if (preview && ui.shopOpenNow()) {   // turntable preview inside the shop
       const c = preview.cv, w = c.clientWidth, h = c.clientHeight;
