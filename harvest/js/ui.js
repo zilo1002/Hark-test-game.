@@ -55,6 +55,11 @@ export class UI {
     $('btnResume').onclick = () => this.closeModal(this.el.pause);
     $('btnPRestart').onclick = () => { h.restart(); };
     $('btnPSettings').onclick = () => this.openSettings();
+    $('btnPSave').onclick = () => {
+      h.tap(); const result = h.save(); const status = $('pauseSaveInfo');
+      status.textContent = !result || !result.saved ? '当前没有可保存的关卡' : !result.persisted ? '浏览器本机存储不可用，刷新后可能无法续玩' : result.resumable ? '存档已保存，可继续本局' : result.reason === 'daily-run' ? '每日挑战不支持中途续存' : '本局已结束';
+      status.classList.remove('hidden');
+    };
     $('btnLevels').onclick = () => { h.tap(); this.openLevels(); };
     // v4.1 / v4.6: one tab per area (CFG.areas: 1–15 / 16–30 / 31–45 / 四季山谷 46–60)
     $('lvTabs').innerHTML = CFG.areas.map((A, i) => `<button data-p="${i}">${A.name}<em>${A.from + 1}–${A.from + A.size}</em></button>`).join('');
@@ -189,6 +194,8 @@ export class UI {
   }
   openPause() {
     const w = this.h.world();
+    $('pauseSaveInfo').classList.add('hidden');
+    $('pauseSaveInfo').textContent = '';
     $('pauseInfo').textContent = !w ? '' : w.daily ? `每日挑战 · ${w.L.name} — ${w.daily.name}（重新开始会重开本局）` : `等级 ${w.li + 1} · ${w.L.name} — ${goalText(w.L.goal)}`;
     $('pSea').classList.toggle('hidden', !(w && !w.daily && w.valley));
     this.renderSeasonRow();

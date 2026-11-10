@@ -12,6 +12,7 @@ import { FONT, elastic, hash } from './util.js';
 import { customerStyle } from './chars.js';
 import * as M from './models.js';
 import * as A from './animals3d.js';
+import { makeWoodCrate, makeCargoCrateStack, updateCargoCrateStack, hasPackableCargo, isPackableCargo } from './cargo-crate.js';
 
 const H2 = Math.PI / 2, TAU = Math.PI * 2, PITCH = 0.84, SINP = Math.sin(PITCH), COSP = Math.cos(PITCH), R2 = Math.SQRT1_2;
 const VIEW = { landW: 620, landH: 350, portW: 380, portH: 600, fov: 30 };
@@ -608,13 +609,22 @@ export class Renderer {
       const m = new THREE.Mesh(M.merge(out), M.vcMat()); m.castShadow = true; m.receiveShadow = true; m.userData.own = true; grp.add(m);
       const zone = this.decal(c.zone.w, c.zone.h, (g, W, H) => this.paintZone(g, W, H, c.sale2 ? '加工品' : '出售', null));
       zone.position.set(c.zone.cx, 0.3, c.zone.cy); this.levelRoot.add(zone);
+      // Six small open crates fit the blue counter top; they appear only when it holds
+      // boxable harvest, so the crop stays visible and retains its real item identity.
+      const crateSlots = [];
+      const crateScale = 0.30;
+      for (const x of [-7.5, 7.5]) for (const z of [-21, 0, 21]) {
+        const crate = makeWoodCrate(); crate.scale.setScalar(crateScale);
+        crate.position.set(x, CFG.counter.deskH, z);
+        crate.visible = false; grp.add(crate); crateSlots.push(crate);
+      }
       const cash = this.decal(42, 42, (g, W, H) => {
         g.fillStyle = 'rgba(40,52,60,0.55)'; g.beginPath(); g.roundRect(4, 4, W - 8, H - 8, 10); g.fill();
         g.setLineDash([12, 8]); g.strokeStyle = 'rgba(120,230,240,0.9)'; g.lineWidth = 4; g.beginPath(); g.roundRect(8, 8, W - 16, H - 16, 8); g.stroke();
       });
       cash.position.set(c.cashPos.x, 0.3, c.cashPos.y); this.levelRoot.add(cash);
       let cashier = null;
-      return { c, grp, zone, cash, cashier };
+      return { c, grp, zone, cash, cashier, crateSlots };
     });
   }
   buildProcs(w) {
@@ -730,6 +740,13 @@ export class Renderer {
       this.levelRoot.add(root);
       o = { c, pp, cart, ang: 0.8, root };
     }
+    if (o && o.root) {
+      o.crate = makeCargoCrateStack();
+      const rear = c.kind === 'player' ? -17 : c.loader || c.cart ? -19 : 12;
+      const y = c.kind === 'player' && c.vehicle ? 5 : c.loader ? 7 : c.cart ? 2 : 8;
+      o.crate.position.set(0, y, rear); o.crate.visible = false;
+      o.root.add(o.crate);
+    }
     this.chars.set(c, o);
     return o;
   }
@@ -744,6 +761,19 @@ export class Renderer {
     const cutting = fishing || actionAge < 0.22;
     const actionProgress = fishing ? actionAge / 0.72 : 0;
     const carry = c.stack.length + c.incoming > 0;
+    const packed = hasPackableCargo(c.stack, c.incomingItems);
+    if (o.crate) {
+      const packCount = c.stack.reduce((n, item) => n + (isPackableCargo(item) ? 1 : 0), 0)
+        + Object.entries(c.incomingItems || {}).reduce((n, [item, count]) => n + (isPackableCargo(item) ? count : 0), 0);
+      updateCargoCrateStack(o.crate, packCount);
+      o.crate.visible = packed;
+      const pulse = Math.max(0, Math.min(1, c.packPulse || 0));
+      const flourish = pulse > 0 ? 1 + Math.sin((1 - pulse) * Math.PI * 5) * 0.08 * pulse : 1;
+      // Keep freshly packed harvest visually legible at normal camera distance; the
+      // player's crate should read as a real basket, while worker stacks remain compact.
+      o.crate.scale.setScalar((c.kind === 'player' ? 0.74 : 0.62) * flourish);
+      if (pulse > 0) c.packPulse = Math.max(0, pulse - dt * 2.8);
+    }
     if (c.kind === 'player') {
       const veh = c.vehicle;
       o.mow.root.children[0].visible = veh; for (const wl of o.mow.wheels) { wl.visible = veh; if (veh && c.moving) wl.rotation.x += dt * sp * 0.2; }
@@ -797,15 +827,36 @@ export class Renderer {
       if (n) { im.instanceMatrix.clearUpdateRanges(); im.instanceMatrix.addUpdateRange(0, n * 16); im.instanceMatrix.needsUpdate = true; }
     }
   }
+  crateCargoPoint(o, slot) {
+    const crate = o && o.crate;
+    if (!crate) return null;
+    // Each small crate neatly holds 24 goods (12 per layer); loaded boxes stack in
+    // a 2×2 tower instead of silently overlapping once a carrier has a full batch.
+    const box = Math.floor(slot / 24), tier = Math.floor(box / 4), cell = box % 4;
+    const cx = cell % 2 ? 17.5 : -17.5, cz = cell < 2 ? -14.5 : 14.5;
+    const item = slot % 24, pos = item % 12, row = Math.floor(pos / 4), col = pos % 4;
+    const x = cx + [-11, -3.5, 3.5, 11][col], z = cz + [-8, -2.7, 2.7, 8][row];
+    const y = tier * 18 + 4.5 + Math.floor(item / 12) * 5.0;
+    crate.updateWorldMatrix(true, false);
+    const p = crate.localToWorld(_v.set(x, y, z));
+    return { x: p.x, y: p.z, z: p.y };
+  }
   drawStack(c, o, labels, isPlayer) {
-    const n = c.stack.length, b = this.stackFrame(c, o), deep = b.deep || 1, per = b.cols * deep;
+    const n = c.stack.length, base = this.stackFrame(c, o), packed = hasPackableCargo(c.stack, c.incomingItems);
+    const b = base, deep = b.deep || 1, per = b.cols * deep;
     const hts = this._hts || (this._hts = new Float32Array(12)); hts.fill(0);
     const t = this.time, sp = Math.hypot(c.vx, c.vy);
     const rx = b.fz, rz = -b.fx;          // right vector
     o.lean = (o.lean || 0) + ((c.moving ? -sp / 160 : 0) - (o.lean || 0)) * 0.12;
-    let top = { x: b.x, y: b.y, z: b.z };
+    let top = { x: b.x, y: b.y, z: b.z }, packedIndex = 0;
     for (let i = 0; i < n; i++) {
-      const cell = i % per, col = cell % b.cols, row = (cell / b.cols) | 0, type = c.stack[i], step = CFG.items[type].step;
+      const type = c.stack[i], step = CFG.items[type].step;
+      if (packed && isPackableCargo(type)) {
+        const pos = this.crateCargoPoint(o, packedIndex++);
+        if (pos) this.item(type, pos.x, pos.y, pos.z + (M.ITEM_HALF[type] || 2), o.ang + Math.PI / 2, 0.42);
+        continue;
+      }
+      const cell = i % per, col = cell % b.cols, row = (cell / b.cols) | 0;
       const h = hts[cell]; hts[cell] += step;
       const bend = Math.pow(h, 1.35) * 0.018, wob = Math.sin(t * 2.4 + h * 0.02) * h * 0.01;
       const off = (col - (b.cols - 1) / 2) * b.spread + wob, dep = (row - (deep - 1) / 2) * b.spread;
@@ -828,7 +879,13 @@ export class Renderer {
   flyItem(f) {
     const p = Math.min(1, f.t / f.dur), e = p * p * (3 - 2 * p);
     let tx = f.tx, ty = f.ty, tz = f.tz;
-    if (f.kind === 'stack') { const o = this.chars.get(f.ref); const s = o && o.top ? o.top : { x: f.ref.x, y: f.ref.y, z: 30 }; tx = s.x; ty = s.y; tz = s.z; }
+    if (f.kind === 'stack') {
+      const o = this.chars.get(f.ref);
+      if (isPackableCargo(f.type) && o && o.crate) {
+        const target = this.crateCargoPoint(o, f.crateSlot || 0);
+        if (target) { tx = target.x; ty = target.y; tz = target.z; }
+      } else { const s = o && o.top ? o.top : { x: f.ref.x, y: f.ref.y, z: 30 }; tx = s.x; ty = s.y; tz = s.z; }
+    }
     else if (f.kind === 'cust') { tx = f.ref.x; ty = f.ref.y; tz = 26 + f.ref.bag.length * 4; }
     const mx = (f.x0 + tx) / 2 + f.sx, my = (f.y0 + ty) / 2 + f.sy, u = 1 - e;
     const x = u * u * f.x0 + 2 * u * e * mx + e * e * tx, y = u * u * f.y0 + 2 * u * e * my + e * e * ty;
@@ -874,9 +931,20 @@ export class Renderer {
       const c = o.c, a = c.hidden ? 0 : elastic((this.wt - c.appearT) / 0.6);
       o.grp.visible = o.zone.visible = o.cash.visible = a > 0; if (a <= 0) continue;
       const sq = 1 + c.bumpT * 0.05; o.grp.scale.set(a, a * sq, a); o.zone.scale.setScalar(a); o.cash.scale.setScalar(a);
-      const K = CFG.counter, dsk = c.desk, n = Math.min(c.stock.length, 120);
-      for (let k = 0; k < n; k++) {
-        const col = k % 6, lay = (k / 6) | 0, type = c.stock[k], ix = col % 2, iy = (col / 2) | 0;
+      const K = CFG.counter, dsk = c.desk;
+      const boxed = c.stock.filter((type) => isPackableCargo(type)).slice(0, 24);
+      const loose = c.stock.filter((type) => !isPackableCargo(type)).concat(c.stock.filter((type) => isPackableCargo(type)).slice(24));
+      for (let i = 0; i < o.crateSlots.length; i++) o.crateSlots[i].visible = i < Math.ceil(boxed.length / 4);
+      // Four actual goods per open crate, in small layers so apples, tomatoes and fish remain
+      // individually recognizable above the warm slatted sides. This changes no stock/count.
+      const crateCenters = [[-7.5, -21], [7.5, -21], [-7.5, 0], [7.5, 0], [-7.5, 21], [7.5, 21]];
+      for (let k = 0; k < boxed.length; k++) {
+        const crate = (k / 4) | 0, cell = k % 4, [cx, cz] = crateCenters[crate];
+        const type = boxed[k], ix = cell % 2, iz = (cell / 2) | 0;
+        this.item(type, c.x + cx + (ix ? 2.1 : -2.1), c.y + cz + (iz ? 1.8 : -1.8), K.deskH + 2.2 + (M.ITEM_HALF[type] || 2), (k % 3) * 0.2 + 0.785, 0.55);
+      }
+      for (let k = 0; k < Math.min(loose.length, 120); k++) {
+        const col = k % 6, lay = (k / 6) | 0, type = loose[k], ix = col % 2, iy = (col / 2) | 0;
         this.item(type, dsk.x + 8 + ix * 14, dsk.y + 26 + iy * 12, K.deskH + 1 + lay * CFG.items[type].step * 0.8 + (M.ITEM_HALF[type] || 2), (k % 3) * 0.2 + 0.785, 0.85);
       }
       if (c.cash > 0.01) {

@@ -59,7 +59,9 @@ export function load() {
 export function save(data) {
   const raw = JSON.stringify(data);
   memory = raw;
-  try { if (storage) storage.setItem(CFG.saveKey, raw); } catch (_) { /* quota or blocked: keep memory copy */ }
+  if (!storage) return { persisted: false, reason: 'storage-unavailable' };
+  try { storage.setItem(CFG.saveKey, raw); return { persisted: true }; }
+  catch (_) { return { persisted: false, reason: 'storage-write-failed' }; }
 }
 
 export function wipe() {

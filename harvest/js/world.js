@@ -2,6 +2,8 @@
 // headless balance sim (sim/balance.mjs) both run exactly this code.
 import { CFG, valleyLevel } from './config.js';
 import { splitSales } from './sales.js';
+import { collectWaitLimit } from './worker-policy.js';
+import { isPackableCargo } from './cargo-crate.js';
 
 export function rng32(seed) {
   let a = (seed >>> 0) || 1;
@@ -279,7 +281,7 @@ export class Pond {
 function makeCollector(kind, x, y) {
   return { kind, x, y, vx: 0, vy: 0, face: 1, moving: false, walk: 0, dirY: 0,
            speed: 0, cap: 0, pickR: 0, harvestR: 0, cutRate: 0, pickRate: 0, dropRate: 0,
-           stack: [], incoming: 0, pickAcc: 0, dropAcc: 0, cutAcc: 0, cutT: -9, sway: 0, fullFlag: false, vehicle: false,
+           stack: [], incoming: 0, incomingItems: {}, packPulse: 0, pickAcc: 0, dropAcc: 0, cutAcc: 0, cutT: -9, sway: 0, fullFlag: false, vehicle: false,
            sources: null, canPick: true, canDrop: true, only: null };
 }
 const itemPrice = (t) => CFG.items[t].price;
@@ -547,15 +549,31 @@ export class World {
     const f = this.flyFree.pop() || {};
     f.type = type; f.kind = kind; f.x0 = x0; f.y0 = y0; f.z0 = z0; f.ref = ref; f.tx = tx; f.ty = ty; f.tz = tz;
     f.t = 0; f.dur = dur * (0.85 + this.rnd() * 0.3); f.active = true;
-    // spray: blooms burst up and sideways before arcing onto the stack (render-only shape, deterministic here)
-    f.sx = spray ? (this.rnd() - 0.5) * spray : 0; f.sy = spray ? (this.rnd() - 0.5) * spray : 0; f.arc = spray ? 50 + this.rnd() * 60 : 34;
+    if (kind === 'stack' && ref && isPackableCargo(type)) {
+      const packed = ref.stack.reduce((n, item) => n + (isPackableCargo(item) ? 1 : 0), 0);
+      const inbound = Object.entries(ref.incomingItems || {}).reduce((n, [item, count]) => n + (isPackableCargo(item) ? count : 0), 0);
+      f.crateSlot = packed + inbound;
+    }
+    // Boxable harvest should visibly settle into the open crate, not burst high above it.
+    // Keep a small, lively sideways wobble and a short hop; ordinary drops keep their old arc.
+    const crateLoad = kind === 'stack' && isPackableCargo(type) && ref && ref.crate !== false;
+    const spread = crateLoad ? Math.min(spray || 0, 18) : spray || 0;
+    f.sx = spread ? (this.rnd() - 0.5) * spread : 0;
+    f.sy = spread ? (this.rnd() - 0.5) * spread : 0;
+    f.arc = crateLoad ? 18 + this.rnd() * 10 : spray ? 50 + this.rnd() * 60 : 34;
+    if (kind === 'stack' && ref && ref.incomingItems) ref.incomingItems[type] = (ref.incomingItems[type] || 0) + 1;
     this.fly.push(f);
     return f;
   }
   landFly(f) {
     const r = f.ref;
     switch (f.kind) {
-      case 'stack': r.incoming--; r.stack.push(f.type); break;
+      case 'stack':
+        r.incoming = Math.max(0, r.incoming - 1);
+        if (r.incomingItems && r.incomingItems[f.type]) { if (--r.incomingItems[f.type] <= 0) delete r.incomingItems[f.type]; }
+        r.stack.push(f.type);
+        if (isPackableCargo(f.type)) r.packPulse = 0.42;
+        break;
       case 'pile': r.pending--; r.add(f.tx, f.ty, this.rnd); break;
       case 'counter': r.incoming--; if (r.incMade && this._made && this._made.has(f.type)) r.incMade--; r.stock.push(f.type); r.everStocked = true; r.bumpT = 1; break;
       case 'cust': r.incoming--; r.bag.push(f.type); break;
@@ -1215,7 +1233,16 @@ export class World {
       const batch = Math.max(m.ratio, Math.min(Math.ceil(w.cap * CFG.v45.batch), CFG.proc.inMax - m.buf - m.inc));
       let have = w.incoming; for (const t of w.stack) if (t === m.inItem) have++;
       if (have >= batch) { w.state = 'deliver'; w.batch = batch; }
-      else if (this.smart && have >= m.ratio && m.buf + m.inc < m.ratio * 2 && !(m.work > 0) && !this.mateBrings(w)) { w.state = 'deliver'; w.batch = have; }   // v4.6: machine about to run dry → bring what you have
+      else {
+        const pondFeed = srcs.some((source) => source.kind === 'pond');
+        const waitedForFish = pondFeed && w.wait >= collectWaitLimit(w, srcs, CFG);
+        const emergency = pondFeed ? Math.max(m.ratio, Math.ceil(batch * 0.75)) : m.ratio;
+        if (this.smart && have >= emergency && m.buf + m.inc < m.ratio * 2 && !(m.work > 0) && !this.mateBrings(w) && (!pondFeed || waitedForFish)) {
+          // Fishers wait through a school respawn and deliver a full useful batch whenever possible;
+          // only flush a smaller batch after the bounded pond wait or to fill the machine's remaining room.
+          w.state = 'deliver'; w.batch = Math.min(have, batch);
+        }
+      }   // v4.6: machine about to run dry → bring a useful batch
     }
     // v4.7 porter: leave the tray with a fair batch, or at once when the goods counter is running low
     if (w.state === 'collect' && w.porter && this.smart) {
@@ -1247,11 +1274,12 @@ export class World {
       }
       if (!best) {
         w.wait += dt; w.idleT = (w.idleT || 0) + dt;
-        if (w.stack.length > 0 && w.wait > 1.5) w.state = 'deliver';
+        const collectWait = collectWaitLimit(w, srcs, CFG);
+        if (w.stack.length > 0 && w.wait > collectWait) w.state = 'deliver';
         // v4.7 nothing to pick up: wait at its own post (porter by its tray, others at the edge of their field)
         else if (this.smart && w.idleT > CFG.v47.idleWait) { const o = this.idlePost(w, srcs); tx = o.x; ty = o.y; }
       } else {
-        w.idleT = 0;
+        w.idleT = 0; w.wait = 0;
         w.retarget -= dt;
         if (best.kind === 'pond') {   // 渔夫 chase the nearest school (re-aimed often: fish move)
           if (w.retarget <= 0 || !w.tgt) {
@@ -1487,6 +1515,14 @@ export class World {
 
   // ---- save/restore of a level in progress ---------
   snapshot() {
+    // A pause-save can happen while harvest, fishing, counter or processing items are
+    // still in flight. Those animations are transient and aren't serialized, so settle
+    // each one into its destination before capturing inventories to avoid losing cargo.
+    if (this.fly.length) {
+      const pending = this.fly.splice(0);
+      for (const f of pending) if (f.active) this.landFly(f);
+      this.flyFree.push(...pending);
+    }
     return { li: this.li, t: this.t, money: this.money, stats: this.stats, env: { season: this.season, rain: this.rain },
              tiles: this.tiles.map((t) => ({ id: t.id, paid: t.paid, bought: t.bought })),
              stack: this.player.stack.slice(0, 600),

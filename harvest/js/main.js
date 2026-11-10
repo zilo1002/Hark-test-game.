@@ -7,6 +7,7 @@ import { FX } from './fx.js';
 import { Input } from './input.js';
 import { Sound, Haptics } from './audio.js';
 import * as Save from './save.js';
+import { saveRun } from './run-save.js';
 import { drawHome, hitSpot } from './home.js';
 import { UI } from './ui.js';
 import * as Shop from './shop.js';
@@ -107,7 +108,7 @@ const ui = new UI({
   },
   dailyStart: () => { snd.unlock(); snd.play('tap'); startDaily(); },
   locked: () => { snd.play('full'); hap.tick(30, 0); },
-  save: () => Save.save(data),
+  save: () => saveRun(data, world, { credit, persist: Save.save }),
   shopToggle: (id) => { const r = Shop.toggle(data, id); Save.save(data); applyLook(); snd.play(r === 'on' ? 'appear' : 'tap'); hap.tick(14, 0); return r; },
 });
 
@@ -206,7 +207,7 @@ function dailyWin() {
   return r;
 }
 
-function snapshot() { if (world && world.daily) { credit(); Save.save(data); return; } if (world && !world.won) { credit(); data.cur = world.snapshot(); Save.save(data); } }
+function snapshot() { return saveRun(data, world, { credit, persist: Save.save }); }
 
 // v3.6: what happened in the level since the last call goes to the 订单 and the 雇工 XP
 function credit() {
