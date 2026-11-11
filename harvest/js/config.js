@@ -432,7 +432,7 @@ export const CFG = {
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 300, h: 300, gap: 9 },
         { id: 'T1', type: 'coop', item: 'tomato', producer: 'bush', x: 70, y: 430, w: 280, h: 300, n: 8, max: 18, prefill: 900 },
-        { id: 'M1', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 5, time: 0.5, x: 740, y: 260, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 3, time: 0.4, x: 740, y: 260, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->3 + time 0.5->0.4, B PS svc was 3.1s
         { id: 'C1', type: 'counter', items: ['wheat', 'tomato', 'ketchup'], x: 750, y: 480 },
       ],
       tiles: [
@@ -455,8 +455,8 @@ export const CFG = {
         { id: 'R1', type: 'field', crop: 'rose', x: 350, y: 40, w: 250, h: 200, gap: 9 },
         { id: 'G1', type: 'field', crop: 'gold', x: 40, y: 310, w: 290, h: 430, gap: 9 },
         { id: 'C1', type: 'counter', items: ['tulip', 'rose', 'gold', 'bouquet', 'basket'], x: 750, y: 470 },
-        { id: 'M1', type: 'proc', in: 'gold', out: 'bouquet', ratio: 5, time: 0.45, x: 560, y: 650, outTo: 'C1', hidden: true },
-        { id: 'M2', type: 'proc', in: 'tulip', out: 'basket', ratio: 6, time: 0.45, x: 740, y: 260, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'gold', out: 'bouquet', ratio: 5, time: 0.8, x: 560, y: 650, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->0.8, tray was 68
+        { id: 'M2', type: 'proc', in: 'tulip', out: 'basket', ratio: 6, time: 0.8, x: 740, y: 260, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->0.8, tray was 68
       ],
       tiles: [
         { id: 'a', x: 460, y: 520, price: 50, icon: 'cap', label: '大花篮', effect: { up: { key: 'cap', v: 50 } } },
@@ -628,7 +628,7 @@ export const CFG = {
       objects: [
         { id: 'P1', type: 'field', crop: 'pumpkin', x: 40, y: 40, w: 330, h: 300, gap: 22 },
         { id: 'P2', type: 'field', crop: 'pumpkin', x: 40, y: 390, w: 330, h: 290, gap: 22, hidden: true },
-        { id: 'M1', type: 'proc', in: 'pumpkin', out: 'pie', ratio: 4, time: 0.5, x: 660, y: 210, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'pumpkin', out: 'pie', ratio: 2, time: 0.4, x: 660, y: 210, outTo: 'C1', hidden: true }, // v4.8.8: ratio 4->2 + time 0.5->0.4, B PS svc was 4.3s
         { id: 'C1', type: 'counter', items: ['pumpkin', 'pie'], x: 670, y: 430 },
       ],
       tiles: [
@@ -706,8 +706,8 @@ export const CFG = {
       objects: [
         { id: 'T1', type: 'field', crop: 'log', x: 40, y: 40, w: 330, h: 300, gap: 30 },
         { id: 'T2', type: 'field', crop: 'log', x: 40, y: 390, w: 330, h: 300, gap: 30, hidden: true },
-        { id: 'M1', type: 'proc', in: 'log', out: 'plank', ratio: 4, time: 0.45, x: 640, y: 160, outTo: 'M2' },
-        { id: 'M2', type: 'proc', in: 'plank', out: 'chair', ratio: 3, time: 0.6, x: 760, y: 330, outTo: 'C1' },
+        { id: 'M1', type: 'proc', in: 'log', out: 'plank', ratio: 2, time: 0.25, x: 640, y: 160, outTo: 'M2' }, // v4.8.8: ratio 4->2 + time 0.45->0.25, chain was plank-starved, B PS svc was 4.7s
+        { id: 'M2', type: 'proc', in: 'plank', out: 'chair', ratio: 2, time: 0.5, x: 760, y: 330, outTo: 'C1' }, // v4.8.8: ratio 3->2 + time 0.6->0.5, chain balance
         { id: 'C1', type: 'counter', items: ['log', 'chair'], x: 720, y: 520 },
       ],
       tiles: [
@@ -728,8 +728,8 @@ export const CFG = {
       objects: [
         { id: 'K1', type: 'coop', item: 'milk', producer: 'cow', x: 80, y: 80, w: 300, h: 250, n: 5, max: 11, prefill: 800 },
         { id: 'B1', type: 'field', crop: 'berry', x: 40, y: 420, w: 320, h: 310, gap: 9 },
-        { id: 'M1', type: 'proc', in: 'milk', out: 'icecream', ratio: 6, time: 0.45, x: 760, y: 200, outTo: 'C1' },
-        { id: 'M2', type: 'proc', in: 'berry', out: 'jam', ratio: 5, time: 0.5, x: 560, y: 680, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'milk', out: 'icecream', ratio: 3, time: 0.9, x: 760, y: 200, outTo: 'C1' }, // v4.8.8: ratio 6->3 + time 0.45->0.9, starve was 20%, tray 64
+        { id: 'M2', type: 'proc', in: 'berry', out: 'jam', ratio: 5, time: 0.8, x: 560, y: 680, outTo: 'C1', hidden: true }, // v4.8.8: time 0.5->0.8, tray was 64
         { id: 'C1', type: 'counter', items: ['berry', 'icecream', 'jam'], x: 770, y: 470 },
       ],
       tiles: [
@@ -751,8 +751,8 @@ export const CFG = {
       objects: [
         { id: 'T1', type: 'field', crop: 'log', x: 40, y: 40, w: 300, h: 280, gap: 30 },
         { id: 'K1', type: 'coop', item: 'milk', producer: 'cow', x: 80, y: 440, w: 280, h: 300, n: 4, max: 11, prefill: 700 },
-        { id: 'M1', type: 'proc', in: 'log', out: 'plank', ratio: 5, time: 0.45, x: 640, y: 160, outTo: 'C1' },
-        { id: 'M2', type: 'proc', in: 'milk', out: 'cheese', ratio: 6, time: 0.45, x: 640, y: 700, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'log', out: 'plank', ratio: 2, time: 1.0, x: 640, y: 160, outTo: 'C1' }, // v4.8.8: ratio 5->2 + time 0.45->1.0, starve was 35%, tray 65
+        { id: 'M2', type: 'proc', in: 'milk', out: 'cheese', ratio: 3, time: 1.1, x: 640, y: 700, outTo: 'C1', hidden: true }, // v4.8.8: ratio 6->3 + time 0.45->1.1, starve was 17%, tray 65
         { id: 'C1', type: 'counter', items: ['log', 'plank', 'cheese'], x: 790, y: 440 },
       ],
       tiles: [
@@ -774,9 +774,9 @@ export const CFG = {
         { id: 'F1', type: 'field', crop: 'corn', x: 40, y: 40, w: 300, h: 260, gap: 10 },
         { id: 'P1', type: 'field', crop: 'pumpkin', x: 40, y: 350, w: 300, h: 220, gap: 22 },
         { id: 'A1', type: 'coop', item: 'apple', producer: 'appletree', x: 80, y: 640, w: 260, h: 150, n: 4, max: 7, prefill: 500 },
-        { id: 'M1', type: 'proc', in: 'corn', out: 'popcorn', ratio: 6, time: 0.45, x: 700, y: 140, outTo: 'C1' },
-        { id: 'M2', type: 'proc', in: 'pumpkin', out: 'pie', ratio: 4, time: 0.5, x: 700, y: 330, outTo: 'C1', hidden: true },
-        { id: 'M3', type: 'proc', in: 'apple', out: 'juice', ratio: 5, time: 0.5, x: 700, y: 720, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'corn', out: 'popcorn', ratio: 6, time: 0.9, x: 700, y: 140, outTo: 'C1' }, // v4.8.8: time 0.45->0.9, tray was 71
+        { id: 'M2', type: 'proc', in: 'pumpkin', out: 'pie', ratio: 2, time: 0.9, x: 700, y: 330, outTo: 'C1', hidden: true }, // v4.8.8: ratio 4->2 + time 0.5->0.9, starve was 23%, tray 71
+        { id: 'M3', type: 'proc', in: 'apple', out: 'juice', ratio: 2, time: 1.1, x: 700, y: 720, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->2 + time 0.5->1.1, starve was 70%, tray 71
         { id: 'C1', type: 'counter', items: ['corn', 'pumpkin', 'popcorn', 'pie', 'juice'], x: 840, y: 480 },
       ],
       tiles: [
@@ -800,10 +800,10 @@ export const CFG = {
         { id: 'K1', type: 'coop', item: 'milk', producer: 'cow', x: 420, y: 70, w: 260, h: 200, n: 4, max: 9, prefill: 600 },
         { id: 'B1', type: 'field', crop: 'berry', x: 40, y: 360, w: 300, h: 260, gap: 9 },
         { id: 'S1', type: 'coop', item: 'wool', producer: 'sheep', x: 80, y: 690, w: 260, h: 210, n: 4, max: 9, prefill: 600 },
-        { id: 'M1', type: 'proc', in: 'log', out: 'plank', ratio: 5, time: 0.45, x: 900, y: 170, outTo: 'C1' },
-        { id: 'M2', type: 'proc', in: 'milk', out: 'cheese', ratio: 6, time: 0.45, x: 900, y: 330, outTo: 'C1', hidden: true },
-        { id: 'M3', type: 'proc', in: 'berry', out: 'jam', ratio: 5, time: 0.5, x: 560, y: 420, outTo: 'C1', hidden: true },
-        { id: 'M4', type: 'proc', in: 'wool', out: 'yarn', ratio: 5, time: 0.45, x: 620, y: 820, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'log', out: 'plank', ratio: 2, time: 1.2, x: 900, y: 170, outTo: 'C1' }, // v4.8.8: ratio 5->2 + time 0.45->1.2, starve was 47%, tray 64
+        { id: 'M2', type: 'proc', in: 'milk', out: 'cheese', ratio: 2, time: 1.2, x: 900, y: 330, outTo: 'C1', hidden: true }, // v4.8.8: ratio 6->2 + time 0.45->1.2, starve was 32%, tray 64
+        { id: 'M3', type: 'proc', in: 'berry', out: 'jam', ratio: 5, time: 1.0, x: 560, y: 420, outTo: 'C1', hidden: true }, // v4.8.8: time 0.5->1.0, tray was 64
+        { id: 'M4', type: 'proc', in: 'wool', out: 'yarn', ratio: 2, time: 1.3, x: 620, y: 820, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->2 + time 0.45->1.3, starve was 86%, tray 64
         { id: 'C1', type: 'counter', items: ['berry', 'plank', 'cheese', 'jam', 'yarn'], x: 940, y: 560 },
       ],
       tiles: [
@@ -982,7 +982,7 @@ export const CFG = {
         { id: 'T1', type: 'field', crop: 'tomato', x: 50, y: 430, w: 290, h: 300, gap: 11 },
         { id: 'M1', type: 'proc', in: 'wheat', out: 'flour', ratio: 4, time: 0.45, x: 700, y: 140, outTo: 'M2' },
         { id: 'M2', type: 'proc', in: 'flour', out: 'bread', ratio: 3, time: 0.55, x: 860, y: 280, outTo: 'C1' },
-        { id: 'M3', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 5, time: 0.45, x: 640, y: 760, outTo: 'C1', hidden: true },
+        { id: 'M3', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 5, time: 0.8, x: 640, y: 760, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->0.8, tray was 78
         { id: 'C1', type: 'counter', items: ['wheat', 'tomato', 'bread', 'ketchup'], x: 850, y: 520 },
       ],
       tiles: [
@@ -1030,8 +1030,8 @@ export const CFG = {
       objects: [
         { id: 'G1', type: 'field', crop: 'grape', x: 40, y: 40, w: 330, h: 300, gap: 9, gapY: 24 },
         { id: 'G2', type: 'field', crop: 'grape', x: 40, y: 390, w: 330, h: 300, gap: 9, gapY: 24, hidden: true },
-        { id: 'M1', type: 'proc', in: 'grape', out: 'gjuice', ratio: 4, time: 0.45, x: 640, y: 160, outTo: 'M2' },
-        { id: 'M2', type: 'proc', in: 'gjuice', out: 'wine', ratio: 3, time: 0.6, x: 760, y: 330, outTo: 'C1' },
+        { id: 'M1', type: 'proc', in: 'grape', out: 'gjuice', ratio: 2, time: 0.2, x: 640, y: 160, outTo: 'M2' }, // v4.8.8: ratio 4->2 + time 0.45->0.2, chain was juice-starved, B PS svc was 4.4s
+        { id: 'M2', type: 'proc', in: 'gjuice', out: 'wine', ratio: 2, time: 0.4, x: 760, y: 330, outTo: 'C1' }, // v4.8.8: ratio 3->2 + time 0.6->0.4, chain balance
         { id: 'C1', type: 'counter', items: ['grape', 'wine'], x: 720, y: 520 },
       ],
       tiles: [
@@ -1124,9 +1124,9 @@ export const CFG = {
         { id: 'P1', type: 'field', crop: 'fish', x: 40, y: 40, w: 300, h: 250, gap: 16 },
         { id: 'G1', type: 'field', crop: 'grape', x: 40, y: 340, w: 300, h: 250, gap: 9, gapY: 24 },
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 640, w: 300, h: 220, gap: 9, hidden: true },
-        { id: 'M1', type: 'proc', in: 'fish', out: 'smoked', ratio: 5, time: 0.45, x: 700, y: 140, outTo: 'C1' },
-        { id: 'M2', type: 'proc', in: 'grape', out: 'gjuice', ratio: 5, time: 0.45, x: 560, y: 420, outTo: 'C1', hidden: true },
-        { id: 'M3', type: 'proc', in: 'wheat', out: 'flour', ratio: 4, time: 0.45, x: 640, y: 780, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'fish', out: 'smoked', ratio: 2, time: 1.5, x: 700, y: 140, outTo: 'C1' }, // v4.8.8: ratio 5->2 + time 0.45->1.5, starve was 58%, tray 91
+        { id: 'M2', type: 'proc', in: 'grape', out: 'gjuice', ratio: 2, time: 1.3, x: 560, y: 420, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->2 + time 0.45->1.3, starve was 32%, tray 91
+        { id: 'M3', type: 'proc', in: 'wheat', out: 'flour', ratio: 4, time: 1.1, x: 640, y: 780, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->1.1, tray was 91
         { id: 'C1', type: 'counter', items: ['fish', 'grape', 'smoked', 'gjuice', 'flour'], x: 900, y: 520 },
       ],
       tiles: [
@@ -1152,10 +1152,10 @@ export const CFG = {
         { id: 'P1', type: 'field', crop: 'fish', x: 400, y: 60, w: 260, h: 210, gap: 16, hidden: true },
         { id: 'T1', type: 'field', crop: 'tomato', x: 50, y: 380, w: 280, h: 260, gap: 11, hidden: true },
         { id: 'G2', type: 'field', crop: 'grape', x: 40, y: 700, w: 300, h: 220, gap: 9, gapY: 24, hidden: true },
-        { id: 'M1', type: 'proc', in: 'grape', out: 'gjuice', ratio: 4, time: 0.45, x: 920, y: 160, outTo: 'M2' },
-        { id: 'M2', type: 'proc', in: 'gjuice', out: 'wine', ratio: 3, time: 0.55, x: 920, y: 330, outTo: 'C1' },
-        { id: 'M3', type: 'proc', in: 'fish', out: 'smoked', ratio: 5, time: 0.45, x: 760, y: 120, outTo: 'C1', hidden: true },
-        { id: 'M4', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 5, time: 0.45, x: 580, y: 440, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'grape', out: 'gjuice', ratio: 2, time: 0.25, x: 920, y: 160, outTo: 'M2' }, // v4.8.8: ratio 4->2 + time 0.45->0.25, chain was juice-starved
+        { id: 'M2', type: 'proc', in: 'gjuice', out: 'wine', ratio: 2, time: 0.75, x: 920, y: 330, outTo: 'C1' }, // v4.8.8: ratio 3->2 + time 0.55->0.75, chain balance, tray was 72
+        { id: 'M3', type: 'proc', in: 'fish', out: 'smoked', ratio: 2, time: 1.5, x: 760, y: 120, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->2 + time 0.45->1.5, starve was 58%, tray 72
+        { id: 'M4', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 5, time: 1.1, x: 580, y: 440, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->1.1, tray was 72
         { id: 'C1', type: 'counter', items: ['grape', 'fish', 'tomato', 'wine', 'smoked', 'ketchup'], x: 960, y: 580 },
       ],
       tiles: [
@@ -1351,8 +1351,8 @@ const VL = {
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 300 },
         { id: 'F2', type: 'field', crop: 'C', x: 40, y: 420, w: 300, h: 300, hidden: true },
-        { id: 'M1', type: 'proc', in: 'A', time: 0.45, x: 700, y: 160, outTo: 'C1' },
-        { id: 'M2', type: 'proc', in: 'C', time: 0.45, x: 580, y: 460, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.8, x: 700, y: 160, outTo: 'C1' }, // v4.8.8: time 0.45->0.8, tray was 120
+        { id: 'M2', type: 'proc', in: 'C', time: 0.8, x: 580, y: 460, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->0.8, tray was 120
         { id: 'C1', type: 'counter', items: ['A', 'C', 'A+', 'C+'], x: 800, y: 560 },
       ],
       tiles: [
@@ -1375,7 +1375,7 @@ const VL = {
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 230 },
         { id: 'F2', type: 'field', crop: 'B', x: 40, y: 310, w: 300, h: 230 },
         { id: 'F3', type: 'field', crop: 'C', x: 40, y: 580, w: 300, h: 220, hidden: true },
-        { id: 'M1', type: 'proc', in: 'B', time: 0.45, x: 700, y: 140, outTo: 'C1' },
+        { id: 'M1', type: 'proc', in: 'B', time: 0.6, x: 700, y: 140, outTo: 'C1' }, // v4.8.8: time 0.45->0.6, winter log supply starved 18% in season 3
         { id: 'C1', type: 'counter', items: ['A', 'B', 'C', 'B+'], x: 820, y: 380 },
       ],
       tiles: [
@@ -1399,9 +1399,9 @@ const VL = {
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 250 },
         { id: 'F2', type: 'field', crop: 'B', x: 40, y: 340, w: 300, h: 250, hidden: true },
         { id: 'F3', type: 'field', crop: 'C', x: 40, y: 640, w: 300, h: 220, hidden: true },
-        { id: 'M1', type: 'proc', in: 'A', time: 0.45, x: 700, y: 140, outTo: 'C1' },
-        { id: 'M2', type: 'proc', in: 'B', time: 0.45, x: 560, y: 420, outTo: 'C1', hidden: true },
-        { id: 'M3', type: 'proc', in: 'C', time: 0.45, x: 640, y: 780, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 1.6, x: 700, y: 140, outTo: 'C1' }, // v4.8.8: time 0.45->1.6, tray was 120
+        { id: 'M2', type: 'proc', in: 'B', time: 1.3, x: 560, y: 420, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->1.3, tray was 120
+        { id: 'M3', type: 'proc', in: 'C', time: 1.2, x: 640, y: 780, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->1.2, tray was 120
         { id: 'C1', type: 'counter', items: ['A', 'B', 'C', 'A+', 'B+', 'C+'], x: 900, y: 520 },
       ],
       tiles: [
@@ -1427,9 +1427,9 @@ const VL = {
         { id: 'F2', type: 'field', crop: 'B', x: 400, y: 60, w: 260, h: 210, hidden: true },
         { id: 'F3', type: 'field', crop: 'C', x: 50, y: 380, w: 280, h: 260, hidden: true },
         { id: 'F4', type: 'field', crop: 'A', x: 40, y: 700, w: 300, h: 220, hidden: true },
-        { id: 'M1', type: 'proc', in: 'A', time: 0.45, x: 920, y: 200, outTo: 'C1' },
-        { id: 'M2', type: 'proc', in: 'B', time: 0.45, x: 760, y: 120, outTo: 'C1', hidden: true },
-        { id: 'M3', type: 'proc', in: 'C', time: 0.45, x: 580, y: 440, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.8, x: 920, y: 200, outTo: 'C1' }, // v4.8.8: time 0.45->0.8, tray was 120
+        { id: 'M2', type: 'proc', in: 'B', time: 1.2, x: 760, y: 120, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->1.2, tray was 120
+        { id: 'M3', type: 'proc', in: 'C', time: 1.1, x: 580, y: 440, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->1.1, tray was 120, winter fish supply ~4.7/s
         { id: 'C1', type: 'counter', items: ['A', 'B', 'C', 'A+', 'B+', 'C+'], x: 960, y: 580 },
       ],
       tiles: [
