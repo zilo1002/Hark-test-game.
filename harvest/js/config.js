@@ -351,7 +351,7 @@ export const CFG = {
       goal: { type: 'sell', item: 'ketchup', n: 190 },
       objects: [
         { id: 'T1', type: 'coop', item: 'tomato', producer: 'bush', x: 70, y: 70, w: 330, h: 270, n: 8, max: 18, prefill: 1000 },
-        { id: 'M1', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 5, time: 0.5, x: 620, y: 200, outTo: 'C1' },
+        { id: 'M1', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 2, time: 0.5, x: 620, y: 200, outTo: 'C1' }, // v4.8.7: ratio 5->2, feeder supply ~15/s, starve was 42%
         { id: 'C1', type: 'counter', items: ['ketchup'], x: 630, y: 420 },
       ],
       tiles: [
@@ -480,9 +480,9 @@ export const CFG = {
         { id: 'T1', type: 'coop', item: 'tomato', producer: 'bush', x: 460, y: 70, w: 230, h: 220, n: 8, max: 14, prefill: 900 },
         { id: 'G1', type: 'field', crop: 'gold', x: 40, y: 360, w: 320, h: 460, gap: 9 },
         { id: 'C1', type: 'counter', items: ['gold', 'crate', 'ketchup', 'bouquet'], x: 830, y: 540 },
-        { id: 'M1', type: 'proc', in: 'egg', out: 'crate', ratio: 6, time: 0.4, x: 820, y: 300, outTo: 'C1' },
-        { id: 'M2', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 5, time: 0.45, x: 640, y: 740, outTo: 'C1', hidden: true },
-        { id: 'M3', type: 'proc', in: 'gold', out: 'bouquet', ratio: 5, time: 0.45, x: 470, y: 440, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'egg', out: 'crate', ratio: 4, time: 0.85, x: 820, y: 300, outTo: 'C1' }, // v4.8.7: ratio 6->4 + time 0.4->0.85, supply ~21/s, starve was 16%, tray margin
+        { id: 'M2', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 3, time: 1.15, x: 640, y: 740, outTo: 'C1', hidden: true }, // v4.8.7: ratio 5->3 + time 0.45->1.15, tomato supply ~13/s, starve was 55%, tray was at 40
+        { id: 'M3', type: 'proc', in: 'gold', out: 'bouquet', ratio: 5, time: 0.8, x: 470, y: 440, outTo: 'C1', hidden: true }, // v4.8.7: time 0.45->0.8, output 8.8/s > porter 5.8/s, tray peaked 98
       ],
       tiles: [
         { id: 'a', x: 560, y: 610, price: 60, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
@@ -565,7 +565,7 @@ export const CFG = {
       goal: { type: 'produce', item: 'cheese', n: 280 },
       objects: [
         { id: 'K1', type: 'coop', item: 'milk', producer: 'cow', x: 80, y: 80, w: 330, h: 270, n: 4, max: 12, prefill: 800 },
-        { id: 'M1', type: 'proc', in: 'milk', out: 'cheese', ratio: 6, time: 0.45, x: 640, y: 200, outTo: 'C1' },
+        { id: 'M1', type: 'proc', in: 'milk', out: 'cheese', ratio: 2, time: 0.45, x: 640, y: 200, outTo: 'C1' }, // v4.8.7: ratio 6->2, feeder supply ~14/s, starve was 26%
         { id: 'C1', type: 'counter', items: ['cheese'], x: 650, y: 420 },
       ],
       tiles: [
@@ -649,7 +649,7 @@ export const CFG = {
       goal: { type: 'sell', item: 'yarn', n: 290 },
       objects: [
         { id: 'S1', type: 'coop', item: 'wool', producer: 'sheep', x: 80, y: 80, w: 330, h: 280, n: 4, max: 14, prefill: 900 },
-        { id: 'M1', type: 'proc', in: 'wool', out: 'yarn', ratio: 5, time: 0.45, x: 640, y: 210, outTo: 'C1' },
+        { id: 'M1', type: 'proc', in: 'wool', out: 'yarn', ratio: 2, time: 0.45, x: 640, y: 210, outTo: 'C1' }, // v4.8.7: ratio 5->2, feeder supply ~14/s, starve was 47%
         { id: 'C1', type: 'counter', items: ['wool', 'yarn'], x: 650, y: 430 },
       ],
       tiles: [
@@ -687,7 +687,7 @@ export const CFG = {
       goal: { type: 'produce', item: 'juice', n: 340 },
       objects: [
         { id: 'A1', type: 'coop', item: 'apple', producer: 'appletree', x: 80, y: 80, w: 340, h: 280, n: 4, max: 11, prefill: 800 },
-        { id: 'M1', type: 'proc', in: 'apple', out: 'juice', ratio: 5, time: 0.5, x: 650, y: 210, outTo: 'C1' },
+        { id: 'M1', type: 'proc', in: 'apple', out: 'juice', ratio: 2, time: 0.5, x: 650, y: 210, outTo: 'C1' }, // v4.8.7: ratio 5->2, feeder supply ~12/s, starve was 49%
         { id: 'C1', type: 'counter', items: ['apple', 'juice'], x: 660, y: 440 },
       ],
       tiles: [
@@ -893,7 +893,7 @@ export const CFG = {
       objects: [
         { id: 'P1', type: 'field', crop: 'fish', x: 40, y: 40, w: 320, h: 300, gap: 16 },
         { id: 'P2', type: 'field', crop: 'fish', x: 40, y: 390, w: 300, h: 250, gap: 16, hidden: true },
-        { id: 'M1', type: 'proc', in: 'fish', out: 'smoked', ratio: 5, time: 0.5, x: 640, y: 200, outTo: 'C1' },
+        { id: 'M1', type: 'proc', in: 'fish', out: 'smoked', ratio: 2, time: 0.5, x: 640, y: 200, outTo: 'C1' }, // v4.8.7: ratio 5->2, feeder supply ~15/s, starve was 40%
         { id: 'C1', type: 'counter', items: ['fish', 'smoked'], x: 650, y: 420 },
       ],
       tiles: [
@@ -1007,7 +1007,7 @@ export const CFG = {
       objects: [
         { id: 'P1', type: 'field', crop: 'fish', x: 40, y: 40, w: 330, h: 300, gap: 16 },
         { id: 'P2', type: 'field', crop: 'fish', x: 40, y: 390, w: 330, h: 300, gap: 16, hidden: true },
-        { id: 'M1', type: 'proc', in: 'fish', out: 'smoked', ratio: 5, time: 0.45, x: 640, y: 160, outTo: 'C1' },
+        { id: 'M1', type: 'proc', in: 'fish', out: 'smoked', ratio: 2, time: 0.45, x: 640, y: 160, outTo: 'C1' }, // v4.8.7: ratio 5->2, feeder supply ~14/s, starve was 53%
         { id: 'C1', type: 'counter', items: ['fish', 'smoked'], x: 720, y: 520 },
       ],
       tiles: [
@@ -1074,8 +1074,8 @@ export const CFG = {
       objects: [
         { id: 'P1', type: 'field', crop: 'fish', x: 40, y: 40, w: 330, h: 300, gap: 16 },
         { id: 'P2', type: 'field', crop: 'fish', x: 40, y: 400, w: 330, h: 320, gap: 16, hidden: true },
-        { id: 'M1', type: 'proc', in: 'fish', out: 'smoked', ratio: 5, time: 0.45, x: 660, y: 160, outTo: 'C1' },
-        { id: 'M2', type: 'proc', in: 'fish', out: 'smoked', ratio: 5, time: 0.45, x: 640, y: 680, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'fish', out: 'smoked', ratio: 2, time: 0.71, x: 660, y: 160, outTo: 'C1' }, // v4.8.7: ratio 5->2 + time 0.45->0.71, feeder supply ~13/s, starve was 55%, tray peaked 78
+        { id: 'M2', type: 'proc', in: 'fish', out: 'smoked', ratio: 2, time: 1.0, x: 640, y: 680, outTo: 'C1', hidden: true }, // v4.8.7: ratio 5->2 + time 0.45->1.0, feeder supply ~9/s, starve was 67%, tray margin
         { id: 'C1', type: 'counter', items: ['fish', 'smoked'], x: 770, y: 420 },
       ],
       tiles: [
