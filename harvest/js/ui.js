@@ -55,6 +55,7 @@ export class UI {
     $('btnResume').onclick = () => this.closeModal(this.el.pause);
     $('btnPRestart').onclick = () => { h.restart(); };
     $('btnPSettings').onclick = () => this.openSettings();
+    $('btnPExit').onclick = () => { this.closeAll(); h.home(); };
     $('btnPSave').onclick = () => {
       h.tap(); const result = h.save(); const status = $('pauseSaveInfo');
       status.textContent = !result || !result.saved ? '当前没有可保存的关卡' : !result.persisted ? '浏览器本机存储不可用，刷新后可能无法续玩' : result.resumable ? '存档已保存，可继续本局' : result.reason === 'daily-run' ? '每日挑战不支持中途续存' : '本局已结束';
