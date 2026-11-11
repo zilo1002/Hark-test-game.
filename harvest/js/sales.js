@@ -3,11 +3,14 @@
 // counter (id PS), its 店员, two raw carriers (fields → raw counter), two 加工品 porters (trays → PS), a 收银升级 per
 // counter and a per-machine upgrade path are buyable tiles generated here from each level's layout.
 // Levels that only sold machine goods (7 / 9 / 19) now open with a raw counter too, so the first coins come from raw sales.
-// In every level with a processing machine, the machine's goods no longer fly straight onto the sale desk:
-// they heap up on an output tray beside the machine, and two 搬运工 carry them to a SECOND sale counter
-// (店员 ×2, sales go straight into the wallet). Raw crops keep their own counter. The second counter's spot
-// is found automatically (nearest free stretch of the east side next to the raw counter); a level may pin it
-// with `sale2: [x, y]` and a machine may pin its tray with `tray: [x, y, w, h]`.
+// v4.9.7: the output tray is gone. In every level with a processing machine, the machine's goods
+// heap up on a flat wooden board (P_<goods>) next to the machine, and the 加工品搬运工 carry them
+// from the board to a SECOND sale counter (店员 ×2, sales go straight into the wallet). Every farm
+// kind that feeds a machine also gets a big raw board (R_<kind>) where a 田间采收工 heaps it for
+// packaging; the 机器专员 takes full loads from that board. Ordinary levels get raw boards too,
+// and their own carriers drop there. Raw crops keep their own counter. The second counter's spot
+// is found automatically (nearest free stretch of the east side next to the raw counter); a level
+// may pin it with `sale2: [x, y]`.
 // v4.5: ONE dedicated feeder per machine (the first hire that fed it; it carries full worker loads, see world.js), any further
 // hire that used to feed the same machine becomes a farm hand for the raw counter (so fewer generated raw carriers).
 // Every processing level follows the same unlock: one raw counter at start; after buying a processor, a second processed-goods counter becomes available.
@@ -56,6 +59,48 @@ function blockers(L, skip) {
 }
 const inside = (L, r, m = 18) => r.x >= m && r.y >= m && r.x + r.w <= L.W - m && r.y + r.h <= L.H - m;
 
+// v4.9.7: wooden stands are generated for every level, not just food workshops (54-60).
+// A raw stand (R_<item>) heaps one farm kind for packaging; a processed stand (P_<item>)
+// sits next to its machine and takes its output. New levels get them automatically from
+// their own sources and procs — no per-level config.
+const sourceObj = (o) => o.type === 'field' ? o.crop : o.type === 'coop' ? o.item : null;
+// nearest free spot for a stand of (w, h) around (px, py): clear of every object, tile, queue lane and wall
+function standSpot(L, stands, px, py, w = 64, h = 42) {
+  const size = { w, h }, occupied = blockers(L, null).concat(stands.map((a) => R(a.x, a.y, a.w, a.h)));
+  let best = null, score = 1e18;
+  for (let x = 45; x <= L.W - 45; x += 16) for (let y = 45; y <= L.H - 45; y += 16) {
+    const r = R(x, y, size.w, size.h);
+    if (!inside(L, r, 18) || occupied.some((b) => ov(r, b, 3))) continue;
+    const d = Math.hypot(x - px, y - py); if (d < score) { score = d; best = [x, y]; }
+  }
+  return best || [Math.min(L.W - 50, Math.max(50, px)), Math.min(L.H - 50, Math.max(50, py))];
+}
+function saveStand(L, stands, stand) { stands.push(stand); L.objects.push(stand); return stand; }
+
+// v4.9.7: ordinary levels (no procs) get a big raw wooden stand per farm kind, visible
+// from the start. The level's own carriers are NOT rerouted: in an earn level the counter
+// must stay stocked for customers to buy, and routing the carriers to the board instead
+// starves the counter — the bot then has to shuttle every load board -> counter itself and
+// the level takes twice as long (L47 +3:48, L49 +3:16). The board is there for the player
+// to heap and package on (the level-3 pattern); machine levels, where a feeder carries
+// board -> machine, do route through it (see splitSales0 step 0.5 / 2b).
+function addRawStands(L0) {
+  const L = { ...L0, objects: L0.objects.map((o) => ({ ...o, items: o.items ? o.items.slice() : o.items })),
+              tiles: L0.tiles.map((t) => ({ ...t, effect: { ...t.effect }, req: t.req ? t.req.slice() : t.req })) };
+  const stands = [];
+  const kinds = [...new Set(L.objects.filter((o) => o.type === 'field' || o.type === 'coop').map(sourceObj))];
+  for (const item of kinds) {
+    if (L.objects.some((o) => o.type === 'stand' && o.item === item)) continue;   // level 3's T1 stays
+    const src = L.objects.filter((o) => (o.type === 'field' || o.type === 'coop') && sourceObj(o) === item);
+    if (!src.length) continue;
+    const x = Math.min(L.W - 90, Math.max(90, Math.max(...src.map((o) => o.x + o.w)) + 38));
+    const y = src.reduce((n, o) => n + o.y + o.h / 2, 0) / src.length;
+    const [sx, sy] = standSpot(L, stands, x, y, 120, 60);   // v4.9.7: the raw board is BIG (Jin: 一个大木台子) — a wide pile keeps 3-4 workers from stacking on one spot
+    saveStand(L, stands, { id: `R_${item}`, type: 'stand', role: 'raw', item, x: sx, y: sy, w: 120, h: 60, cap: 300 });
+  }
+  return L;
+}
+
 // v4.8 the machines of a level that get a paid 3rd 机器专员 (CFG.v48.feed3: a list, or per season for a valley level)
 export function feed3Of(L) {
   const f = CFG.v48.feed3[L.name];
@@ -90,7 +135,6 @@ function splitFoodLevel(L0) {
   for (const item of allowed) include(item);
   const procs = procs0.filter((p) => keepProc.has(p.id));
   const neededRaw = new Set(procs.map((p) => p.in).filter((item) => !procs.some((q) => q.out === item)));
-  const sourceObj = (o) => o.type === 'field' ? o.crop : o.type === 'coop' ? o.item : null;
   const sources = L.objects.filter((o) => ['field', 'coop'].includes(o.type) && neededRaw.has(sourceObj(o)));
   const keepObjectIds = new Set([...sources.map((o) => o.id), ...procs.map((p) => p.id)]);
   const outItems = [...new Set(procs.map((p) => p.out))];
@@ -141,30 +185,19 @@ function splitFoodLevel(L0) {
   const tileForObject = (id) => tiles.find((t) => t.effect.show?.includes(id));
   const cropKinds = [...new Set(sources.map(sourceObj))];
   const stands = [];
-  const standSpot = (px, py) => {
-    const size = { w: 64, h: 42 }, occupied = blockers(L, null).concat(stands.map((a) => R(a.x, a.y, a.w, a.h)));
-    let best = null, score = 1e18;
-    for (let x = 45; x <= L.W - 45; x += 16) for (let y = 45; y <= L.H - 45; y += 16) {
-      const r = R(x, y, size.w, size.h);
-      if (!inside(L, r, 18) || occupied.some((b) => ov(r, b, 3))) continue;
-      const d = Math.hypot(x - px, y - py); if (d < score) { score = d; best = [x, y]; }
-    }
-    return best || [Math.min(L.W - 50, Math.max(50, px)), Math.min(L.H - 50, Math.max(50, py))];
-  };
-  const saveStand = (stand) => { stands.push(stand); L.objects.push(stand); return stand; };
   for (const item of cropKinds) {
     const src = sources.filter((o) => sourceObj(o) === item);
     const x = Math.min(L.W - 90, Math.max(90, Math.max(...src.map((o) => o.x + o.w)) + 38));
     const y = src.reduce((n, o) => n + o.y + o.h / 2, 0) / src.length;
     const id = `R_${item}`;
-    const [sx, sy] = standSpot(x, y);
-    saveStand({ id, type: 'stand', role: 'raw', item, x: sx, y: sy, w: 64, h: 42, cap: 700 });
+    const [sx, sy] = standSpot(L, stands, x, y);
+    saveStand(L, stands, { id, type: 'stand', role: 'raw', item, x: sx, y: sy, w: 64, h: 42, cap: 700 });
   }
   for (const item of outItems) {
     const p = procs.find((q) => q.out === item);
     const id = `P_${item}`;
-    const [sx, sy] = standSpot(Math.min(L.W - 105, p.x + 76), p.y + 56);
-    const stand = saveStand({ id, type: 'stand', role: 'processed', item, x: sx, y: sy, w: 64, h: 42, cap: 500, hidden: true });
+    const [sx, sy] = standSpot(L, stands, Math.min(L.W - 105, p.x + 76), p.y + 56);
+    const stand = saveStand(L, stands, { id, type: 'stand', role: 'processed', item, x: sx, y: sy, w: 64, h: 42, cap: 500, hidden: true });
     p.outTo = id;
     const unlock = tileForObject(p.id);
     if (unlock) unlock.effect.show = [...new Set([...(unlock.effect.show || []), id])];
@@ -222,7 +255,7 @@ function spot(L, px, py) {
 }
 function splitSales0(L0) {
   const procs0 = L0.objects.filter((o) => o.type === 'proc');
-  if (!procs0.length) return L0;
+  if (!procs0.length) return addRawStands(L0);   // v4.9.7: ordinary levels get raw boards too
   const L = { ...L0, objects: L0.objects.map((o) => ({ ...o, items: o.items ? o.items.slice() : o.items })),
               tiles: L0.tiles.map((t) => ({ ...t, effect: { ...t.effect }, req: t.req ? t.req.slice() : t.req })) };
   const obj = Object.fromEntries(L.objects.map((o) => [o.id, o]));
@@ -234,21 +267,43 @@ function splitSales0(L0) {
   // the level's price scale: median hire price
   const hires = L0.tiles.filter((t) => t.effect.worker).map((t) => t.price).sort((a, b) => a - b);
   const s = hires.length ? hires[hires.length >> 1] : 200;
+  // 0.5) v4.9.7 wooden stands: a big raw board per farm kind that feeds a machine, and a
+  // processed board next to each terminal machine that takes its output (the old tray
+  // stuck to the machine is gone). Same system as the food workshops and level 3.
+  const stands = [];
+  const farmFed = procs.filter((p) => !procs.some((q) => q.outTo === p.id));
+  const neededRaw = [...new Set(farmFed.map((p) => p.in))];
+  const rStand = {};
+  for (const item of neededRaw) {
+    const existing = L.objects.find((o) => o.type === 'stand' && o.role === 'raw' && o.item === item);
+    if (existing) { rStand[item] = existing; continue; }
+    const src = L.objects.filter((o) => (o.type === 'field' || o.type === 'coop') && sourceObj(o) === item);
+    if (!src.length) continue;
+    const x = Math.min(L.W - 90, Math.max(90, Math.max(...src.map((o) => o.x + o.w)) + 38));
+    const y = src.reduce((n, o) => n + o.y + o.h / 2, 0) / src.length;
+    const [sx, sy] = standSpot(L, stands, x, y, 120, 60);   // v4.9.7: the raw board is BIG — a wide pile keeps 3-4 workers from stacking on one spot
+    rStand[item] = saveStand(L, stands, { id: `R_${item}`, type: 'stand', role: 'raw', item, x: sx, y: sy, w: 120, h: 60, cap: 700 });
+  }
+  const pStand = {};
+  for (const p of T) {
+    // Two machines can make the same goods (level 42: two smokehouses) — they share one board.
+    let stand = L.objects.find((o) => o.type === 'stand' && o.role === 'processed' && o.item === p.out);
+    if (!stand) {
+      const [sx, sy] = standSpot(L, stands, Math.min(L.W - 105, p.x + 76), p.y + 56);
+      stand = saveStand(L, stands, { id: `P_${p.out}`, type: 'stand', role: 'processed', item: p.out, x: sx, y: sy, w: 64, h: 42, cap: 500, hidden: true });
+    }
+    pStand[p.id] = stand;
+    p.outTo = stand.id;
+  }
+  for (const p of procs) delete p.tray;   // no machine keeps a tray once it has a board
   // 0) a level that only sold machine goods: its counter takes the raw input too (the first coins come from raw sales)
   let main = L.objects.filter((o) => o.type === 'counter').find((c) => c.items.some((it) => made.has(it))) || obj[T[0].outTo];
   if (!main.items.some((it) => !made.has(it))) {
     const rawIn = [...new Set(procs.filter((p) => !procs.some((q) => q.outTo === p.id)).map((p) => p.in))];
     main.items = [...rawIn, ...main.items];
   }
-  // 1) output trays beside each terminal machine (east, then south, then north side; west is the input zone)
-  for (const p of T) {
-    if (p.tray) continue;
-    const P = CFG.proc, hw = P.bodyW / 2, hd = P.bodyD / 2;
-    const cand = [[p.x + hw + 6, p.y - 22, 40, 44], [p.x - 22, p.y + hd + 6, 44, 38], [p.x - 22, p.y - hd - 44, 44, 38], [p.x + hw + 6, p.y - 8, 34, 34]];
-    const bl = blockers(L, p);
-    let pick = cand.find((c) => { const r = { x: c[0], y: c[1], w: c[2], h: c[3] }; return inside(L, r, 16) && !bl.some((b) => ov(r, b, 3)); });
-    p.tray = pick || cand[0];
-  }
+  // 1) (v4.9.7: output trays are gone — every terminal machine's goods heap on its
+  // processed board next to it, created in step 0.5 above.)
   // 2) the 「加工品」 counter PS: not built at the start, bought from a tile once a machine is there
   // Processing levels always get a separate processed-goods counter after the first machine is unlocked.
   let pos = L0.sale2;
@@ -272,7 +327,8 @@ function splitSales0(L0) {
   const sale = { id: 'PS', type: 'counter', items: [...made], x: pos[0], y: pos[1], hidden: true, sale2: true };
   L.objects.push(sale); obj.PS = sale;
   for (const c of L.objects) if (c.type === 'counter' && c !== sale) c.items = c.items.filter((it) => !made.has(it));
-  for (const p of T) p.outTo = 'PS';
+  // v4.9.7: a terminal machine's outTo is its processed board (set in step 0.5), not PS —
+  // the porter carries board -> PS.
   const dead = new Set(L.objects.filter((c) => c.type === 'counter' && !c.items.length).map((c) => c.id));
   if (dead.size) {
     L.objects = L.objects.filter((o) => !dead.has(o.id));
@@ -300,10 +356,38 @@ function splitSales0(L0) {
     if (hires.length) feedTile[p.id] = hires[0];
     hires.forEach((t, k) => {
       const w0 = t.effect.worker;
-      t.effect = { ...t.effect, worker: k === 0 ? { from: src.length ? src : w0.from, to: [p.id], feeder: p.id }
+      t.effect = { ...t.effect, worker: k === 0 ? { from: rStand[p.in] ? [rStand[p.in].id] : (src.length ? src : w0.from), to: [p.id], feeder: p.id }
                                                 : { from: rawSrc.length ? rawSrc : w0.from, to: rawC.map((c) => c.id), raw: true } };
     });
     if (!hires.length && src.length) needFeeder.push([p, src]);
+  }
+  // 2c) v4.9.7 farmhands: they heap the field/coop output onto the raw board so the 机器专员
+  // always find a full load there. (Same role as the food workshops' 田间采收工, but without
+  // `raw: true`, so they never count as raw carriers to a counter — staff-check /
+  // labour-check recognise `standCarrier` as its own role.) One farmhand per feeder-slot
+  // the kind's machines use (2 normally, 3 on a feed3 machine): a single harvester cannot
+  // keep up with a fast machine — the old flow had 2-3 feeders harvesting in parallel.
+  const farmTiles = [];
+  for (const item of neededRaw) {
+    const stand = rStand[item]; if (!stand) continue;
+    const src = srcOf(item);
+    const machines = farmFed.filter((p) => p.in === item);
+    // v4.9.7: one farmhand per feeder-slot the kind's machines use, plus one spare — the
+    // two-stage board pipeline (field -> board -> machine) is slower than the old direct
+    // field -> machine carry, so the old headcount leaves fast machines starved (L22 25%
+    // with two hands). The spare is what keeps L22 and L51 fed.
+    const nFarm = Math.max(...machines.map((p) => (feed3Of(L0).includes(p.id) ? 3 : 2))) + 1;
+    const coop = src.every((id) => obj[id].type === 'coop');
+    for (let k = 0; k < nFarm; k++) {
+      const sp = spot(L, stand.x - 10, stand.y + 55 + k * 40);
+      farmTiles.push(add({ id: `x_rf_${item}_${k + 1}`, x: sp[0], y: sp[1], price: r10(s * V.raw[0] * 0.4), icon: coop ? 'cart' : 'worker', label: '田间采收工',   // v4.9.7: 0.4x price — a farmhand only hauls field -> board (one short leg), and there are 2-4 of them per kind; at full worker price the bot spends the whole opening saving up for them and the machines start late (L15 casual 3:35 -> 5:44, machines 0% starved)
+        req: k === 0 ? [first.id] : [`x_rf_${item}_${k}`],
+        // v4.9.7: NO fullBatch — a farmhand that waits for a full 150-item load while the
+        // field regrows leaves the board empty and the machine starved (L22 24%); it
+        // delivers a partial load whenever the field is temporarily bare, so the board
+        // stays stocked in a steady trickle instead of rare big bursts.
+        effect: { worker: { from: src, to: [stand.id], standCarrier: true } } }));
+    }
   }
   // 3) machines: every machine is hidden until bought; a machine without a tile gets one on its own spot
   const mTile = {};
@@ -317,6 +401,12 @@ function splitSales0(L0) {
                         req: feeder ? [mTile[feeder.id].id] : [first.id], effect: { show: [p.id] } });
   }
   for (const p of procs) p.hidden = true;
+  // v4.9.7: a terminal machine's processed board appears with the machine itself.
+  for (const p of T) {
+    const stand = pStand[p.id]; if (!stand) continue;
+    const tile = mTile[p.id];
+    tile.effect = { ...tile.effect, show: [...new Set([...(tile.effect.show || []), stand.id])] };
+  }
   // Show both category stands as soon as the first processing machine unlocks.
   // Goods still route to the processed stand automatically; its porter hire remains a separate staff tile.
   const firstMachineTile = mTile[procs[0].id];
@@ -324,12 +414,12 @@ function splitSales0(L0) {
   for (const [p, src] of needFeeder) {
     const sp = spot(L, p.x - 90, p.y + 60);
     feedTile[p.id] = add({ id: 'x_f' + p.id, x: sp[0], y: sp[1], price: r10(s * V.raw[0]), icon: 'worker', label: '机器专员', req: [mTile[p.id].id],
-          effect: { worker: { from: src, to: [p.id], feeder: p.id } } });
+          effect: { worker: { from: rStand[p.in] ? [rStand[p.in].id] : src, to: [p.id], feeder: p.id } } });
   }
   // v4.7 every other farm hire is a 原料搬运工: it only harvests what the raw counter sells and only drops there
   const rawIds = rawC.map((c) => c.id);
   for (const t of L.tiles) {
-    const wk = t.effect.worker; if (!wk || wk.feeder || wk.porter) continue;
+    const wk = t.effect.worker; if (!wk || wk.feeder || wk.porter || wk.standCarrier) continue;   // v4.9.7: farmhands keep their board route
     const from = wk.from.filter((id) => rawSrc.includes(id));
     t.effect = { ...t.effect, worker: { from: from.length ? from : rawSrc.length ? rawSrc : wk.from, to: rawIds, raw: true } };
   }
@@ -403,7 +493,8 @@ function splitSales0(L0) {
   const nP = Math.max(T.length, 2) + (L0.extraPorters || 0);
   const por = [];
   for (let k = 0; k < nP; k++) {
-    const p = T[k % T.length], sp = spot(L, p.tray[0] + p.tray[2] / 2 + 10, p.tray[1] + p.tray[3] + 40);
+    const p = T[k % T.length], st = pStand[p.id];
+    const sp = st ? spot(L, st.x + 10, st.y + 55) : spot(L, p.x + 80, p.y + 60);   // v4.9.7: porter tile by its machine's board, not the old tray
     const req = k >= T.length ? [por[k - T.length].id] : [mTile[p.id].id];
     por.push(add({ id: 'x_p' + (k + 1), x: sp[0], y: sp[1], price: r10(s * V.porter[k < T.length ? 0 : 1]), icon: 'porter', label: '加工品搬运工',
                    req, effect: { worker: { from: [p.id, ...T.filter((q) => q !== p).map((q) => q.id)], to: [sale.id], porter: true, tray: p.id } } }));
@@ -432,12 +523,13 @@ function splitSales0(L0) {
                     req: [mTile[p.id].id], repeat: { times: V.mup.times, mul: V.mup.mul }, effect: { procUp: p.id } }));
   }
   // 8) purchase order (the guide arrow / balance bot buys the first affordable tile in this order):
-  //    first tile → machines without a tile of their own → [processed porter 1, raw carrier 1] after the first processing machine (both stands appear with it)
+  //    first tile → farmhands (so the raw boards are stocked before the first machine) → machines without a tile of their own
+  //    → [processed porter 1, raw carrier 1] after the first processing machine (both stands appear with it)
   //    finished-goods machine → the level's own tiles → clerk, 2nd carrier, 2nd porter → 收银升级 → new machine upgrades
   const genSet = new Set(gen);
   const orig = L.tiles.filter((t) => !genSet.has(t));
   const mGen = gen.filter((t) => t.id.startsWith('m_'));
-  let order = [orig[0], ...mGen, ...orig.slice(1)];
+  let order = [orig[0], ...farmTiles, ...mGen, ...orig.slice(1)];
   const firstTerm = order.findIndex((t) => termTiles.includes(t.id));
   // Hire the first porter promptly after the machine; both stands already appear at machine unlock.
   order.splice(firstTerm + 1, 0, por[0], ...(pc ? [pc] : []), ...(rawT[0] ? [rawT[0]] : []));

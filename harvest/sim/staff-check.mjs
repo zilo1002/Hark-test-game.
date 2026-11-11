@@ -58,7 +58,7 @@ CFG.levels.forEach((L0, li) => {
   const ordinary = w.counters.find((c) => !c.sale2);
   const firstProc = w.procs.find((p) => !w.procs.some((q) => q.outObj === p));
   const firstMachineUnlock = w.tiles.find((t) => t.effect?.show?.includes(firstProc?.id));
-  const firstTerminalProc = w.procs.find((p) => p.outObj?.kind === 'counter');
+  const firstTerminalProc = term[0];   // v4.9.7: a terminal machine's pile lives on its processed board (outObj is the stand, not a counter)
   const machineUnlock = w.tiles.find((t) => t.effect?.show?.includes(firstTerminalProc?.id));
   const psTile = w.tiles.find((t) => t.effect?.worker?.porter && t.effect.worker.to.includes('PS'));
   if (!ordinary || ordinary.hidden) errs.push('no visible ordinary counter at start');
@@ -116,7 +116,21 @@ CFG.levels.forEach((L0, li) => {
   }
   if (w.workers.some((x) => !x.feedFor && x.to.some((id) => w.objs[id] && w.objs[id].kind === 'proc'))) errs.push('a non-feeder hire feeds a machine');
   const raw = w.workers.filter((x) => x.rawCarrier), por = w.workers.filter((x) => x.porter);
-  if (w.workers.some((x) => !x.rawCarrier && !x.porter && !x.feedFor)) errs.push('a hire without a role');
+  if (w.workers.some((x) => !x.rawCarrier && !x.porter && !x.feedFor && !x.standCarrier)) errs.push('a hire without a role');
+  // v4.9.7 田间采收工: one per machine-feeding raw kind; it only ever holds its board's
+  // kind and only drops on that raw board (never a counter, never a machine).
+  const farm = w.workers.filter((x) => x.standCarrier);
+  const stands = new Map(Object.values(w.objs).filter((o) => o.kind === 'stand').map((o) => [o.id, o]));
+  // v4.9.7: one farmhand per feeder-slot the kind's machines use, plus one spare (see sales.js)
+  const wantFarm = [...new Set(farmFed.map((p) => p.inItem))].reduce((n, item) =>
+    n + Math.max(...farmFed.filter((p) => p.inItem === item).map((p) => (feed3Of(L).includes(p.id) ? 3 : 2))) + 1, 0);
+  if (farm.length !== wantFarm) errs.push(`${farm.length} farmhands (want ${wantFarm}: one per feeder-slot of each machine-feeding kind)`);
+  for (const x of farm) {
+    if (drops(x).some((id) => !stands.has(id))) errs.push(`farmhand dropped at ${drops(x).join(',')}`);
+    const h = [...st.get(x).held].filter((it) => !x.to.some((id) => stands.get(id)?.item === it));
+    if (h.length) errs.push(`farmhand held ${h.join(',')}`);
+  }
+  if (farm.length && !farm.some((x) => drops(x).length)) errs.push('farmhands never delivered');
   for (const x of raw) {
     if (drops(x).some((id) => !rawIds.has(id))) errs.push(`raw carrier dropped at ${drops(x).join(',')}`);
     const h = [...st.get(x).held].filter((it) => !rawItems.has(it)); if (h.length) errs.push(`raw carrier held ${h.join(',')}`);

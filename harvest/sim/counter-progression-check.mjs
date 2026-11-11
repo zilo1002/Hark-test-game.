@@ -18,8 +18,9 @@ function buyReadyExcept(w, id) {
 }
 
 for (let i = 0; i < CFG.levels.length; i++) {
+  if (CFG.levels[i].foodLines) continue;   // v4.9.7: food levels have no PS counter by design (player-managed stands); food-levels-check covers them
   const w = new World(i, { quiet: true, seed: 173 + i }), L = w.L, label = i + 1;
-  const initial = visible(w), terminal = w.procs.filter((p) => p.outObj?.kind === 'counter');
+  const initial = visible(w), terminal = w.procs.filter((p) => p.pile);   // v4.9.7: a terminal machine's pile lives on its processed board (outObj is the stand, not a counter)
   if (!terminal.length) {
     ordinaryOnly++;
     if (w.counters.some((c) => c.sale2)) fail(label, 'non-processing level has a processed counter');

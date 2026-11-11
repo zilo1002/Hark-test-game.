@@ -158,7 +158,7 @@ export const CFG = {
   // stops collecting at holdAt × its stack and waits at a post (nobody delivers to a full counter / machine)
   // v4.7 fixed roles in every machine level: feeder2 = price of the 2nd 机器专员 (× median hire), porters leave the tray with
   // ≥ porterGo × stack or as soon as the goods counter runs below porterLow; idle staff walk to their post after idleWait s
-  v47: { feeder2: 0.8, porterGo: 0.4, porterLow: 14, porterMin: 5, trayHelp: 16, idleWait: 1.2, trayMax: 40 },
+  v47: { feeder2: 0.8, porterGo: 0.4, porterLow: 14, porterMin: 5, trayHelp: 16, idleWait: 1.2, trayMax: 70 },   // v4.9.7: was 40 — calibrated for the old 40×44 trays (cap 120, ~6 pile cells). A processed board is 64×42 (cap 500, 15 cells), so the same heap height holds ~70 items; a runaway pile still blows past it fast.
   // v4.8 a paid 3rd 机器专员 (feeder3 × median hire, after that machine's 2nd) only on the machines feed3[level name] lists:
   // the ones sim/fit-check.mjs showed starving > 15% with everything else bought. A valley level may list machines per season
   // ({ season: [ids] }) where one set does not fit all four (the extra goods must not heap the trays past v47.trayMax)
@@ -235,7 +235,7 @@ export const CFG = {
 
     // 3 — the egg mountain
     { name: '鸡蛋堆', W: 760, H: 660, start: [430, 400], par: 210, bill: 5,
-      goal: { type: 'collect', item: 'egg', n: 4350 },
+      goal: { type: 'collect', item: 'egg', n: 2600 },   // v4.9.7: was 4350 — the old count double-counted every egg (porter picks it from the coop, then you pick it from the board); 2600 real eggs take the same ~2:44/2:57 the level always took
       objects: [
         { id: 'K1', type: 'coop', item: 'egg', producer: 'hen', x: 70, y: 70, w: 330, h: 280, n: 4, max: 20, prefill: 1800 },
         { id: 'T1', type: 'stand', role: 'raw', item: 'egg', x: 540, y: 382, w: 64, h: 42, cap: 300 },   // v4.9.4: real wooden stand (was a dashed-outline raw tray); centre kept on the old tray's centre; cap 300 (was 120) so two porters can keep working while the player shuttles — 120 starved them, they waited with full loads
@@ -484,9 +484,9 @@ export const CFG = {
         { id: 'T1', type: 'coop', item: 'tomato', producer: 'bush', x: 460, y: 70, w: 230, h: 220, n: 8, max: 14, prefill: 900 },
         { id: 'G1', type: 'field', crop: 'gold', x: 40, y: 360, w: 320, h: 460, gap: 9 },
         { id: 'C1', type: 'counter', items: ['gold', 'crate', 'ketchup', 'bouquet'], x: 830, y: 540 },
-        { id: 'M1', type: 'proc', in: 'egg', out: 'crate', ratio: 4, time: 0.85, x: 820, y: 300, outTo: 'C1' }, // v4.8.7: ratio 6->4 + time 0.4->0.85, supply ~21/s, starve was 16%, tray margin
-        { id: 'M2', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 3, time: 1.15, x: 640, y: 740, outTo: 'C1', hidden: true }, // v4.8.7: ratio 5->3 + time 0.45->1.15, tomato supply ~13/s, starve was 55%, tray was at 40
-        { id: 'M3', type: 'proc', in: 'gold', out: 'bouquet', ratio: 5, time: 0.8, x: 470, y: 440, outTo: 'C1', hidden: true }, // v4.8.7: time 0.45->0.8, output 8.8/s > porter 5.8/s, tray peaked 98
+        { id: 'M1', type: 'proc', in: 'egg', out: 'crate', ratio: 3, time: 0.7, x: 820, y: 300, outTo: 'C1' }, // v4.9.7: ratio 4->3 + time 0.85->0.7 — the board flow adds a farmhand leg, so the machine needs less input per crate to hold its rate (v4.8.7: ratio 6->4 + time 0.4->0.85, starve was 16%)
+        { id: 'M2', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 2, time: 0.95, x: 640, y: 740, outTo: 'C1', hidden: true }, // v4.9.7: ratio 3->2 + time 1.15->0.95, same reason (v4.8.7: ratio 5->3 + time 0.45->1.15, tomato supply ~13/s, starve was 55%)
+        { id: 'M3', type: 'proc', in: 'gold', out: 'bouquet', ratio: 3, time: 0.65, x: 470, y: 440, outTo: 'C1', hidden: true }, // v4.9.7: ratio 5->3 + time 0.8->0.65, same reason (v4.8.7: time 0.45->0.8, output 8.8/s > porter 5.8/s, tray peaked 98)
       ],
       tiles: [
         { id: 'a', x: 560, y: 610, price: 60, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
@@ -546,7 +546,7 @@ export const CFG = {
 
     // 18 — dairy cows: milk bottles pile up in the pasture, carry them to the stand
     { name: '奶牛牧场', W: 780, H: 680, start: [440, 420], par: 180, bill: 10,
-      goal: { type: 'collect', item: 'milk', n: 3050 },
+      goal: { type: 'collect', item: 'milk', n: 2800 },   // v4.9.7: was 3050 — the old count double-counted milk (worker picks it from the coop, then you pick it from the board); 2800 real bottles take the same ~2:53 the level always took
       objects: [
         { id: 'K1', type: 'coop', item: 'milk', producer: 'cow', x: 80, y: 80, w: 330, h: 280, n: 3, max: 12, prefill: 900 },
         { id: 'C1', type: 'counter', items: ['milk'], x: 620, y: 400 },
@@ -779,7 +779,7 @@ export const CFG = {
         { id: 'P1', type: 'field', crop: 'pumpkin', x: 40, y: 350, w: 300, h: 220, gap: 22 },
         { id: 'A1', type: 'coop', item: 'apple', producer: 'appletree', x: 80, y: 640, w: 260, h: 150, n: 4, max: 7, prefill: 500 },
         { id: 'M1', type: 'proc', in: 'corn', out: 'popcorn', ratio: 6, time: 0.9, x: 700, y: 140, outTo: 'C1' }, // v4.8.8: time 0.45->0.9, tray was 71
-        { id: 'M2', type: 'proc', in: 'pumpkin', out: 'pie', ratio: 2, time: 0.9, x: 700, y: 330, outTo: 'C1', hidden: true }, // v4.8.8: ratio 4->2 + time 0.5->0.9, starve was 23%, tray 71
+        { id: 'M2', type: 'proc', in: 'pumpkin', out: 'pie', ratio: 1, time: 1.2, x: 700, y: 330, outTo: 'C1', hidden: true }, // v4.8.8: ratio 4->2 + time 0.5->0.9, starve was 23%, tray 71; v4.9.7: ratio 2->1 (time 0.9->1.2 did not move the 26% starve — the sparse pumpkin field feeds the board too slowly, so the oven takes fewer pumpkins per pie instead)
         { id: 'M3', type: 'proc', in: 'apple', out: 'juice', ratio: 2, time: 1.1, x: 700, y: 720, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->2 + time 0.5->1.1, starve was 70%, tray 71
         { id: 'C1', type: 'counter', items: ['corn', 'pumpkin', 'popcorn', 'pie', 'juice'], x: 840, y: 480 },
       ],
@@ -854,7 +854,7 @@ export const CFG = {
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 330, h: 300, gap: 9 },
         { id: 'F2', type: 'field', crop: 'wheat', x: 40, y: 390, w: 330, h: 300, gap: 9, hidden: true },
         { id: 'M1', type: 'proc', in: 'wheat', out: 'flour', ratio: 4, time: 0.45, x: 640, y: 160, outTo: 'M2' },
-        { id: 'M2', type: 'proc', in: 'flour', out: 'bread', ratio: 3, time: 0.6, x: 760, y: 330, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'flour', out: 'bread', ratio: 3, time: 0.5, x: 760, y: 330, outTo: 'C1' },   // v4.9.7: time 0.6->0.5 — the bread board -> counter leg leaves the PS counter short (fit-check front wait 3.2s vs 3.0s limit); faster bread keeps the counter stocked
         { id: 'C1', type: 'counter', items: ['wheat', 'bread'], x: 720, y: 520 },
       ],
       tiles: [
@@ -1158,7 +1158,7 @@ export const CFG = {
         { id: 'G2', type: 'field', crop: 'grape', x: 40, y: 700, w: 300, h: 220, gap: 9, gapY: 24, hidden: true },
         { id: 'M1', type: 'proc', in: 'grape', out: 'gjuice', ratio: 2, time: 0.25, x: 920, y: 160, outTo: 'M2' }, // v4.8.8: ratio 4->2 + time 0.45->0.25, chain was juice-starved
         { id: 'M2', type: 'proc', in: 'gjuice', out: 'wine', ratio: 2, time: 0.75, x: 920, y: 330, outTo: 'C1' }, // v4.8.8: ratio 3->2 + time 0.55->0.75, chain balance, tray was 72
-        { id: 'M3', type: 'proc', in: 'fish', out: 'smoked', ratio: 2, time: 1.5, x: 760, y: 120, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->2 + time 0.45->1.5, starve was 58%, tray 72
+        { id: 'M3', type: 'proc', in: 'fish', out: 'smoked', ratio: 1, time: 1.9, x: 760, y: 120, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->2 + time 0.45->1.5, starve was 58%, tray 72; v4.9.7: ratio 2->1 (time 1.5->1.9 did not move the 19% starve — the fish pond feeds the board too slowly, so the smokehouse takes fewer fish per smoked)
         { id: 'M4', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 5, time: 1.1, x: 580, y: 440, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->1.1, tray was 72
         { id: 'C1', type: 'counter', items: ['grape', 'fish', 'tomato', 'wine', 'smoked', 'ketchup'], x: 960, y: 580 },
       ],

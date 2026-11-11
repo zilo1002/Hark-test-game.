@@ -446,7 +446,11 @@ export class World {
     const s = [];
     for (const c of this.counters) if (!c.hidden) s.push(c.desk);
     for (const p of this.procs) if (!p.hidden) s.push(p.body);
-    for (const a of Object.values(this.objs)) if (a.kind === 'stand' && !a.hidden) s.push(rectAt(a.x, a.y, a.w, a.h));
+    // v4.9.7: stands are WALKABLE — Jin wants people to step onto the board to carry, not
+    // reach over the edge. (The v4.9.5 solid stand was belt-and-braces for the egg-farming
+    // exploit; the real block is the counting fix in the pile pickup below — picking from
+    // a stand/tray pile no longer counts toward the goal, so the same eggs cannot be
+    // farmed by shuttling them on and off the board.) Stands are deliberately NOT solids.
     for (const c of this.coops) if (!c.hidden) {
       s.push({ x: c.x - 26, y: c.y - 30, w: c.w + 32, h: 22 });           // north fence + nests
       s.push({ x: c.x - 30, y: c.y - 30, w: 22, h: c.h + 30 });           // west fence + nests
@@ -1022,13 +1026,21 @@ export class World {
         c.pickAcc = Math.min(c.pickAcc + c.pickRate * dt, Math.max(1, c.pickRate * 0.1));
         let took = false;
         for (const pl of this.piles) {
-          if (pl.owner.hidden || (srcs && !srcs.includes(pl.owner)) || !this.hasSink(pl.type)) continue;
+          // v4.9.7: a machine's output pile lives on its processed board, whose owner is the
+          // board — a porter whose source is that machine may take from it (its pile IS the
+          // machine's pile). Feeders take from raw boards the same way (the board is in srcs).
+          if (pl.owner.hidden || (srcs && !srcs.includes(pl.owner) && !srcs.some((s) => s.kind === 'proc' && s.pile === pl)) || !this.hasSink(pl.type)) continue;
           while (c.pickAcc >= 1 && space() > 0) {
             const i = pl.take(c.x, c.y, c.pickR);
             if (i < 0) break;
             c.pickAcc--; took = true; c.incoming++;
             this.launch(pl.type, 'stack', pl.cx(i), pl.cy(i), pl.hs[i] * CFG.pile.layer, c, 0, 0, 0, CFG.fly.pick);
-            this.stats.collected[pl.type] = (this.stats.collected[pl.type] || 0) + 1;
+            // v4.9.7: only a FIRST harvest counts toward the goal. Goods sitting on a stand,
+            // a tray or a machine's output pile were already counted when first picked from
+            // their source — counting them again lets the same eggs be farmed by shuttling
+            // them on and off the board. Source piles (field spill heaps, coop piles) count;
+            // transfer piles (stand / tray / proc) do not.
+            if (pl.owner && (pl.owner.kind === 'field' || pl.owner.kind === 'coop')) this.stats.collected[pl.type] = (this.stats.collected[pl.type] || 0) + 1;
             if (isPlayer) { this.emit('pick', { item: pl.type }); this.comboGain++; }
           }
         }
@@ -1158,10 +1170,15 @@ export class World {
     // A processed-goods counter is supplied in two legs: machine → tray → porter → counter.
     // While the porter is empty, the tray or an active/ready machine output is still real supply
     // in the delivery pipeline. Don't let the front customer time out during that hand-off.
+    // v4.9.7: the tray is a processed board now — a machine supplies this counter directly
+    // (outObj === c) or via its board, when a porter routes that machine to this counter.
     if (c.sale2) for (const p of this.procs) {
-      if (p.hidden || p.outObj !== c || !p.pile) continue;
+      if (p.hidden || !p.pile) continue;
       const porter = this.workers.some((w) => w.porter && w.trayOf === p.id && w.to && w.to.includes(c.id));
       if (!porter) continue;
+      const direct = p.outObj === c;
+      const viaStand = p.outObj && p.outObj.kind === 'stand' && p.outObj.item === p.outItem;
+      if (!direct && !viaStand) continue;
       if (p.pile.total + p.pile.pending > 0 || p.work > 0 || p.buf + p.inc >= p.ratio) return true;
       // During startup the machine may still be empty while its feeder is carrying the first
       // batch of raw input. That load is committed supply too; don't abandon buyers mid-handoff.
@@ -1312,7 +1329,11 @@ export class World {
   // a spot in a drop zone of its own (up to 6 slots per zone, then they repeat)
   slot(z, w) {
     const m = this._slots || (this._slots = new Map()), k = m.get(z) || 0; m.set(z, k + 1);
-    const c = k % 6, dx = (c % 3 - 1) * 14, dy = (c < 3 ? -1 : 1) * 10;
+    // v4.9.7: spread by the zone's size. A wide wooden board's drop slots must be far apart —
+    // a feeder picks from the pile at the board's centre while a farmhand drops at its rim, and
+    // the old fixed ±14/±10 put them on top of each other. A small counter keeps the old slots.
+    const sx = Math.max(14, (z.w || 40) / 4), sy = Math.max(10, (z.h || 40) / 4);
+    const c = k % 6, dx = (c % 3 - 1) * sx, dy = (c < 3 ? -1 : 1) * sy;
     return { x: z.cx + dx, y: z.cy + dy };
   }
   // where a worker waits with its load: a feeder beside its machine, others along the east edge of their field
@@ -1330,6 +1351,17 @@ export class World {
       const p = this.objs[w.trayOf] || srcs[0], tr = p && p.pile; if (!tr) return { x: w.x, y: w.y };
       const mates = this.workers.filter((o) => o.porter && o.trayOf === w.trayOf), k = Math.max(0, mates.indexOf(w));
       return { x: tr.x + tr.w / 2 + (k % 2 ? 14 : -14), y: tr.y + tr.h / 2 + (k < 2 ? 0 : 14) };
+    }
+    // v4.9.7: workers sharing a wooden stand wait spread round it — the field-edge spread
+    // in post() collapses onto one point for a short board (its height minus 48 is ≤ 0).
+    const stand = (srcs || []).find((o) => o && o.kind === 'stand');
+    if (stand) {
+      const mates = this.workers.filter((o) => {
+        const s = o.sources || (o.from || []).map((id) => this.objs[id]).filter(Boolean);
+        return s.includes(stand);
+      });
+      const k = Math.max(0, mates.indexOf(w));
+      return { x: stand.x + stand.w / 2 + (k % 2 ? 40 : -40), y: stand.y + stand.h / 2 + (k < 2 ? -40 : 40) };
     }
     return this.post({ ...w, feedFor: null }, srcs.filter((o) => o.kind === 'field').concat(srcs));
   }
@@ -1409,11 +1441,19 @@ export class World {
         else if (this.smart && w.idleT > CFG.v47.idleWait) { const o = this.idlePost(w, srcs); tx = o.x; ty = o.y; }
       } else {
         w.idleT = 0; w.wait = 0;
+        // v4.9.7: a board-filler (standCarrier) with a fair load leaves when its source is
+        // nearly bare — waiting to fill a 150-item basket one sparse pumpkin at a time leaves
+        // the board empty and the machine starved between rare big bursts (L29 M2 26% -> 10%,
+        // L45 M3 19%). The board buffers the smaller loads; the feeder still takes a full batch.
+        if (w.standCarrier && w.stack.length >= Math.ceil(w.cap * 0.2) && bv < 25) { w.state = 'deliver'; }
         w.retarget -= dt;
         if (best.kind === 'pond') {   // 渔夫 chase the nearest school (re-aimed often: fish move)
           if (w.retarget <= 0 || !w.tgt) {
             w.retarget = 0.2; w.tgt = best.bestSchool(w.x, w.y, 0.3);
-            if (this.smart && w.tgt) { const k = this.workers.indexOf(w) % 4; w.tgt = { x: w.tgt.x + (k % 2 ? 16 : -16), y: w.tgt.y + (k < 2 ? -12 : 12) }; }   // v4.6: fishers fan out round a school
+            // v4.9.7: fan out by the worker's index among this pond's crew — the old global
+            // worker index mod 4 collided once more than four workers shared one pond (a
+            // farmhand and a raw carrier could land on the same school spot).
+            if (this.smart && w.tgt) { const crew = this.workers.filter((o) => o.sources && o.sources.includes(best)); const k = Math.max(0, crew.indexOf(w)) % 6; w.tgt = { x: w.tgt.x + ((k % 3) - 1) * 20, y: w.tgt.y + (k < 3 ? -14 : 14) }; }
           }
         } else if (w.retarget <= 0 || !w.tgt) {
           w.retarget = 0.4;
@@ -1424,7 +1464,18 @@ export class World {
             if (crew.length > 1) lane = { index: Math.max(0, crew.indexOf(w)), count: crew.length };
           }
           const i = pl && pl.total > 0 ? pl.hottest(w.x, w.y, T, lane) : -1;
-          if (i >= 0) w.tgt = pl.safe(i);
+          if (i >= 0) {
+            w.tgt = pl.safe(i);
+            // v4.9.7: a lane's workers pick from neighbouring cells (10 px apart) — offset each
+            // worker's stance by its lane, on a small grid, so they stand apart while still in
+            // pick range (28) of the cell they take from.
+            if (lane) {
+              const cols = Math.ceil(Math.sqrt(lane.count)), rows = Math.ceil(lane.count / cols);
+              const ox = ((lane.index % cols) - (cols - 1) / 2) * 22, oy = ((Math.floor(lane.index / cols)) - (rows - 1) / 2) * 20;
+              const d = Math.hypot(ox, oy), s = d > 20 ? 20 / d : 1;
+              w.tgt = { x: w.tgt.x + ox * s, y: w.tgt.y + oy * s };
+            }
+          }
           else if (best.kind === 'field') {
             // v4.6: each worker works its own lane of the field (no crowding on one corner)
             let qx = w.x, qy = w.y;

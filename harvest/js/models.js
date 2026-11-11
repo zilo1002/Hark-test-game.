@@ -910,16 +910,23 @@ const fol = (c, kind) => {
 };
 export const Env = {
   stockStand(out, w = 64, d = 42) {
-    // v4.9.5: a flat wooden board lying on the ground — NOT a table. The old version was a
-    // legged table (top at 22) and Jin said the goods on it sometimes felt out of reach;
-    // a wooden platform is flat on the grass, goods sit right on the boards (board top = 2).
-    // The dark base slab shows through as the seams between the planks; planks run along the depth.
-    out.push(P(box(w, 1.4, d), '#7A4A22', [0, 0.7, 0]));
+    // v4.9.7: the board must read as WOOD at a glance. v4.9.5's dark base (#7A4A22) was too
+    // close in tone to the planks, so on a real phone the seams vanished and Jin did not
+    // recognise the board. Now: a near-black base shows through as WIDE, DEEP seams (gap 3,
+    // base top a full 0.8 below the plank tops), planks are lighter with strong alternating
+    // contrast, and darker frame rails outline the board. Planks run along the depth.
+    // Board top stays at 2.0, footprint w x d.
+    out.push(P(box(w, 1.2, d), '#2E1A0C', [0, 0.6, 0]));            // near-black base (the seams)
     const n = Math.max(3, Math.round(w / 10));
     for (let i = 0; i < n; i++) {
-      const x = -w / 2 + 1 + ((w - 2) * (i + 0.5)) / n;
-      out.push(P(box((w - 2) / n - 1.2, 0.6, d - 2), i % 2 ? '#A86D37' : '#C8874A', [x, 1.7, 0]));
+      const x = -w / 2 + 1.5 + ((w - 3) * (i + 0.5)) / n;
+      out.push(P(box((w - 3) / n - 3, 0.8, d - 5), i % 2 ? '#B57A3E' : '#D29A5B', [x, 1.6, 0]));
     }
+    // frame rails around the outline (darker wood, flush with the plank tops)
+    out.push(P(box(w, 0.8, 2.5), '#6B4423', [0, 1.6, -d / 2 + 1.25]));
+    out.push(P(box(w, 0.8, 2.5), '#6B4423', [0, 1.6, d / 2 - 1.25]));
+    out.push(P(box(2.5, 0.8, d - 5), '#6B4423', [-w / 2 + 1.25, 1.6, 0]));
+    out.push(P(box(2.5, 0.8, d - 5), '#6B4423', [w / 2 - 1.25, 1.6, 0]));
   },
   stoneWall(out, x0, y0, x1, y1, pa, pb) {
     const L = Math.hypot(x1 - x0, y1 - y0), a = Math.atan2(x1 - x0, y1 - y0), mx = (x0 + x1) / 2, my = (y0 + y1) / 2;

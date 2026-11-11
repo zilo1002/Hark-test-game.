@@ -81,8 +81,13 @@ function buyReady(w, skip = () => false) {
   assert.ok(pondWait >= 7 && pondWait <= 12);
   const level = w.L;
   buyReady(w);
-  const feeders = w.workers.filter((worker) => worker.feedFor && worker.from.some((id) => w.objs[id]?.kind === 'pond'));
-  assert.ok(feeders.length > 0, 'smoked-fish workers should be assigned to pond supply');
+  // v4.9.7: the pond's fish go onto the raw board first — a farmhand fishes the pond and
+  // heaps the board, and the smokehouse feeder takes full loads from the board. Both legs
+  // keep the pond's restock window (the farmhand is fullBatch, so it never dumps one fish).
+  const fishers = w.workers.filter((worker) => worker.standCarrier && worker.from.some((id) => w.objs[id]?.kind === 'pond'));
+  assert.ok(fishers.length > 0, 'smoked-fish workers should be assigned to pond supply');
+  const feeders = w.workers.filter((worker) => worker.feedFor && worker.from.some((id) => w.objs[id]?.kind === 'stand'));
+  assert.ok(feeders.length > 0, 'smokehouse should have a feeder taking full loads from the raw board');
   const loads = new Map(feeders.map((worker) => [worker, []]));
   let maxLoad = 0;
   for (let i = 0; i < 180 * 30; i++) {

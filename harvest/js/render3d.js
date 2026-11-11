@@ -237,18 +237,23 @@ export class Renderer {
     for (const t of w.trays || []) {   // v4.8.4: raw-goods tray, same dashed outline as a machine tray
       const pl = t.pile; pave(pl.x - 6, pl.y - 6, pl.w + 12, pl.h + 12); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.setLineDash([5, 4]); g.lineWidth = 1.6; g.strokeRect(pl.x - 2, pl.y - 2, pl.w + 4, pl.h + 4); g.setLineDash([]);
     }
-    // v4.9.5: wooden stands are flat boards lying on the ground (same board as the 3D mesh);
-    // paint the planks here too so the top-down map shows wood. Hidden stands are skipped —
-    // the ground repaints when they are revealed (world emits 'ground' on show).
+    // v4.9.7: wooden stands are flat boards lying on the ground (same board as the 3D mesh);
+    // paint the planks here too so the top-down map shows wood. v4.9.5's seams were too
+    // subtle on a real phone — now the seams are near-black and 3px wide, the planks are
+    // lighter with strong contrast, the outline is thick, and each plank carries a staggered
+    // end-joint tick. Hidden stands are skipped — the ground repaints when they are revealed
+    // (world emits 'ground' on show).
     const woodBoard = (x, y, pw, ph, seed) => {
-      g.fillStyle = '#5E3A1A'; g.fillRect(x - 2, y - 2, pw + 4, ph + 4);   // dark edge
-      g.fillStyle = '#7A4A22'; g.fillRect(x, y, pw, ph);                    // dark base (the seams)
+      g.fillStyle = '#1F1208'; g.fillRect(x - 3, y - 3, pw + 6, ph + 6);   // thick dark outline
+      g.fillStyle = '#2E1A0C'; g.fillRect(x, y, pw, ph);                    // near-black base (the seams)
       const n = Math.max(3, Math.round(pw / 10));
       for (let i = 0; i < n; i++) {
-        g.fillStyle = i % 2 ? '#A86D37' : '#C8874A';
-        g.fillRect(x + 1 + i * (pw - 2) / n, y + 1, (pw - 2) / n - 1.2, ph - 2);
+        g.fillStyle = i % 2 ? '#B57A3E' : '#D29A5B';
+        g.fillRect(x + 1.5 + i * (pw - 3) / n, y + 2.5, (pw - 3) / n - 3, ph - 5);
+        g.fillStyle = '#2E1A0C';                                             // staggered plank-end joint
+        g.fillRect(x + 1.5 + i * (pw - 3) / n, y + ph * (i % 2 ? 0.32 : 0.68), (pw - 3) / n - 3, 1.6);
       }
-      for (let i = 0; i < 30; i++) { g.fillStyle = i % 2 ? 'rgba(90,50,20,0.3)' : 'rgba(255,220,160,0.3)'; g.fillRect(x + R(seed + i * 7) * pw, y + R(seed + i * 13) * ph, 2, 1); }
+      for (let i = 0; i < 30; i++) { g.fillStyle = i % 2 ? 'rgba(46,26,12,0.35)' : 'rgba(255,220,160,0.3)'; g.fillRect(x + R(seed + i * 7) * pw, y + R(seed + i * 13) * ph, 2, 1); }
     };
     for (const a of Object.values(w.objs)) if (a.kind === 'stand' && !a.hidden) woodBoard(a.x - a.w / 2, a.y - a.h / 2, a.w, a.h, a.x * 1000 + a.y);
     // v4.2 鱼塘: the full basin is a damp grassy hollow; the water (and its stone-edged shore) grows with the pond level
