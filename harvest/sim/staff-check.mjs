@@ -20,10 +20,18 @@ let bad = 0, n = 0;
 const buyAll = (w, skip = () => false) => { let more = true; while (more) { more = false; for (const t of w.tiles) if (t.visible && !t.done && !skip(t)) { w.completeTile(t, true); more = true; } } };
 // run, recording what every worker ever held, its feeder batch sizes, and the tray peak
 function run(w, secs) {
-  const st = new Map(); let trayMax = 0, trayOverflow = null;
+  const st = new Map(), batches = [], batchLaunches = []; let trayMax = 0, trayOverflow = null;
+  const launch = w.launch.bind(w);
+  w.launch = (...args) => {
+    const f = launch(...args);
+    if (args[1] === 'procBatch') batchLaunches.push({ f, sinkId: args[5].id });
+    return f;
+  };
   for (let i = 0; i < secs * 30; i++) {
     const before = new Map(w.workers.map((x) => [x, x.state]));
+    const launchesBefore = batchLaunches.length;
     w.update(1 / 30, 0, 0);
+    for (const { f, sinkId } of batchLaunches.slice(launchesBefore)) batches.push({ sinkId, count: f.count, cap: f.batchCap });
     if (w.t > 20) for (const p of w.procs) if (p.pile && !p.hidden) { trayMax = Math.max(trayMax, p.pile.total); if (p.pile.total > p.pile.cap) trayOverflow = `${p.id}:${p.pile.total}/${p.pile.cap}`; }
     for (const x of w.workers) {
       let s = st.get(x); if (!s) st.set(x, (s = { held: new Set(), loads: [] }));
@@ -31,7 +39,7 @@ function run(w, secs) {
       if (x.feedFor && before.get(x) === 'collect' && x.state === 'deliver') s.loads.push({ size: x.stack.length + x.incoming, cap: x.cap });
     }
   }
-  return { st, trayMax, trayOverflow };
+  return { st, batches, trayMax, trayOverflow };
 }
 CFG.levels.forEach((L0, li) => {
   if (only && +only.split('=')[1] !== li + 1) return;
@@ -65,7 +73,7 @@ CFG.levels.forEach((L0, li) => {
   if (ps && (!machineUnlock || !machineUnlock.effect.show.includes(ps.id))) errs.push('first processor unlock does not reveal the processed counter');
   // A) every tile bought
   buyAll(w);
-  const { st, trayMax, trayOverflow } = run(w, SECS);
+  const { st, batches, trayMax, trayOverflow } = run(w, SECS);
   const rawIds = new Set(w.counters.filter((c) => c !== ps).map((c) => c.id));
   const rawItems = new Set(w.counters.filter((c) => c !== ps).flatMap((c) => c.items).filter((it) => !made.has(it)));
   const drops = (x) => Object.keys(x.drops || {});
@@ -84,6 +92,12 @@ CFG.levels.forEach((L0, li) => {
       }
     } else if (w.tiles.some((t) => t.id === 'x_h' + p.id)) errs.push(`unexpected x_h${p.id}`);
     if (!f.some((x) => (x.drops || {})[p.id] > 0)) errs.push(`${p.id} feeders never delivered`);
+    const machineBatches = batches.filter((batch) => batch.sinkId === p.id);
+    const delivered = f.reduce((sum, x) => sum + ((x.drops || {})[p.id] || 0), 0);
+    if (delivered && !machineBatches.length) errs.push(`${p.id} has no atomic batch deposits`);
+    for (const batch of machineBatches) if (batch.count !== batch.cap) errs.push(`${p.id} deposited a partial batch (${batch.count}/${batch.cap})`);
+    const deposited = machineBatches.reduce((sum, batch) => sum + batch.count, 0);
+    if (deposited !== delivered) errs.push(`${p.id} batch deposits total ${deposited}, but workers reported ${delivered} items delivered`);
     for (const x of f) {
       const s = st.get(x);
       if (drops(x).some((id) => id !== p.id)) errs.push(`${p.id} feeder dropped at ${drops(x).join(',')}`);

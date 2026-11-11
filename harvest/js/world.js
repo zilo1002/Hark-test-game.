@@ -586,6 +586,7 @@ export class World {
       case 'counter': r.incoming--; if (r.incMade && this._made && this._made.has(f.type)) r.incMade--; r.stock.push(f.type); r.everStocked = true; r.bumpT = 1; break;
       case 'cust': r.incoming--; r.bag.push(f.type); break;
       case 'procIn': r.inc--; r.buf++; break;
+      case 'procBatch': r.inc = Math.max(0, r.inc - f.count); r.buf += f.count; break;
     }
   }
 
@@ -955,21 +956,33 @@ export class World {
     if (c.canDrop && c.stack.length > 0) {
       let sink = null, accepts = null;
       for (const k of this.counters) if (!k.hidden && inRect(c.x, c.y, k.zone) && (!c.toObjs || c.toObjs.includes(k)) && c.stack.some((t) => k.items.includes(t))) { sink = k; accepts = (t) => k.items.includes(t); break; }
-      if (!sink) for (const p of this.procs) if (!p.hidden && inRect(c.x, c.y, p.inZone) && (!c.toObjs || c.toObjs.includes(p)) && c.stack.includes(p.inItem) && !this.procFull(p)) { sink = p; accepts = (t) => t === p.inItem; break; }
+      if (!sink) for (const p of this.procs) if (!p.hidden && inRect(c.x, c.y, p.inZone) && (!c.toObjs || c.toObjs.includes(p)) && c.stack.includes(p.inItem) && (c.feedFor === p.id ? this.canDropFeederBatch(c, p) : !this.procFull(p))) { sink = p; accepts = (t) => t === p.inItem; break; }
       c.dropping = !!sink;
       if (sink) {
-        c.dropAcc = Math.min(c.dropAcc + c.dropRate * dt, Math.max(1, c.dropRate * 0.1));
-        while (c.dropAcc >= 1) {
-          let idx = -1; for (let j = c.stack.length - 1; j >= 0; j--) if (accepts(c.stack[j])) { idx = j; break; }
-          if (idx < 0 || (sink.kind === 'proc' && this.procFull(sink))) break;
-          if (this.smart && !isPlayer && !this.sinkOpen(c, sink)) break;   // v4.6: staff never overfill a counter / machine
-          const item = c.stack[idx];
-          c.stack.splice(idx, 1); c.dropAcc--;
-          if (!isPlayer) { c.done = (c.done || 0) + 1; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + 1; }   // 雇工 XP (+ v4.3 where it went)
-          const z = 44 + idx * CFG.items[item].step;
-          if (sink.kind === 'counter') { sink.incoming++; if ((this._made || (this._made = new Set(this.procs.map((q) => q.outItem)))).has(item)) sink.incMade = (sink.incMade || 0) + 1; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop); }
-          else { sink.inc++; this.launch(item, 'procIn', c.x, c.y, z, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop); }
-          if (isPlayer) this.emit('drop', { item });
+        if (sink.kind === 'proc' && c.feedFor === sink.id) {
+          if (this.canDropFeederBatch(c, sink) && (!this.smart || this.sinkOpen(c, sink))) {
+            const count = c.stack.length, item = sink.inItem;
+            c.stack.length = 0; c.dropAcc = 0;
+            sink.inc += count;
+            c.done = (c.done || 0) + count;
+            const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + count;
+            const f = this.launch(item, 'procBatch', c.x, c.y, 44 + Math.max(0, count - 1) * CFG.items[item].step, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop);
+            f.count = count; f.batchCap = c.batchCap || c.cap;
+          }
+        } else {
+          c.dropAcc = Math.min(c.dropAcc + c.dropRate * dt, Math.max(1, c.dropRate * 0.1));
+          while (c.dropAcc >= 1) {
+            let idx = -1; for (let j = c.stack.length - 1; j >= 0; j--) if (accepts(c.stack[j])) { idx = j; break; }
+            if (idx < 0 || (sink.kind === 'proc' && this.procFull(sink))) break;
+            if (this.smart && !isPlayer && !this.sinkOpen(c, sink)) break;   // v4.6: staff never overfill a counter / machine
+            const item = c.stack[idx];
+            c.stack.splice(idx, 1); c.dropAcc--;
+            if (!isPlayer) { c.done = (c.done || 0) + 1; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + 1; }   // 雇工 XP (+ v4.3 where it went)
+            const z = 44 + idx * CFG.items[item].step;
+            if (sink.kind === 'counter') { sink.incoming++; if ((this._made || (this._made = new Set(this.procs.map((q) => q.outItem)))).has(item)) sink.incMade = (sink.incMade || 0) + 1; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop); }
+            else { sink.inc++; this.launch(item, 'procIn', c.x, c.y, z, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop); }
+            if (isPlayer) this.emit('drop', { item });
+          }
         }
       } else c.dropAcc = 0;
     } else c.dropping = false;
@@ -1178,7 +1191,7 @@ export class World {
   // a raw counter wants staff deliveries: in a machine level only to top it up (below rawLow → until rawFull)
   rawNeedsTopUp() { return this.counters.some((c) => !c.hidden && !c.sale2 && this.rawStock(c) < CFG.v46.rawLow); }
   sinkOpen(w, s) {
-    if (s.kind === 'proc') return !this.procFull(s) && s.buf + s.inc < CFG.proc.inMax;
+    if (s.kind === 'proc') return w.feedFor === s.id ? this.procBatchRoom(s, w.stack.length || w.cap) : !this.procFull(s) && s.buf + s.inc < CFG.proc.inMax;
     if (s.sale2 || w.porter) return s.stock.length + s.incoming < CFG.counter.stockMax;
     const n = this.rawStock(s);
     if (!this.procs.length) return n < CFG.counter.stockMax;
@@ -1234,13 +1247,18 @@ export class World {
     w.sources = srcs; w.toObjs = sinks;
     w.holding = false;
     const space = w.cap - w.stack.length - w.incoming;
-    if (w.state === 'collect' && space <= 0) w.state = 'deliver';
+    if (w.state === 'collect' && space <= 0) {
+      w.state = 'deliver';
+      // Freeze a feeder's batch size when it leaves full. A later worker-capacity upgrade
+      // must not turn an already-full load into a permanently partial-looking delivery.
+      if (w.feedFor) { w.batch = w.stack.length + w.incoming; w.batchCap = w.cap; }
+    }
     // Feeders collect a full carrying load before starting a machine trip. If the input is full,
     // they keep that load and wait at the machine until it can accept the next items.
     if (w.state === 'collect' && w.feedFor) {
       const batch = Math.ceil(w.cap * CFG.v45.batch);
       let have = w.incoming; for (const t of w.stack) if (t === this.objs[w.feedFor].inItem) have++;
-      if (have >= batch) { w.state = 'deliver'; w.batch = batch; }
+      if (have >= batch) { w.state = 'deliver'; w.batch = batch; w.batchCap = w.cap; }
     }
     // v4.7 porter: leave the tray with a fair batch, or at once when the goods counter is running low
     if (w.state === 'collect' && w.porter && this.smart) {
@@ -1251,7 +1269,7 @@ export class World {
       if (left === 0 && w.incoming === 0 && (have >= Math.ceil(w.cap * CFG.v47.porterGo) || (low && have >= CFG.v47.porterMin))) w.state = 'deliver';
     }
     if (w.state === 'deliver' && w.stack.length === 0 && w.incoming === 0) {
-      w.state = 'collect'; w.wait = 0; w.otherTray = null;
+      w.state = 'collect'; w.wait = 0; w.otherTray = null; w.batch = 0; w.batchCap = 0;
       // 园丁成长: level up every few delivery trips
       w.trips++;
       const Lv = CFG.workerLv, nl = Math.min(Lv.max, 1 + Math.floor(w.trips / Lv.per));
@@ -1302,7 +1320,9 @@ export class World {
           }
         }
         if (w.tgt) { tx = w.tgt.x; ty = w.tgt.y; }
-        if (bv === 0 && w.stack.length > 0) w.state = 'deliver';
+        // Machine feeders never leave with a partial load just because a field is temporarily bare;
+        // they wait for regrowth and only deliver a complete, frozen batch.
+        if (bv === 0 && w.stack.length > 0 && !w.feedFor) w.state = 'deliver';
       }
     }
     if (w.state === 'deliver') {
@@ -1312,7 +1332,7 @@ export class World {
         const ok = s.kind === 'counter' ? w.stack.some((t) => s.items.includes(t)) : w.stack.includes(s.inItem);
         if (!ok) continue;
         anyTakes = true;
-        if (s.kind === 'proc' && this.procFull(s)) { w.blocked = s; continue; }   // v4.3: machine full → wait by it
+        if (s.kind === 'proc' && (w.feedFor === s.id ? !this.procBatchRoom(s, w.batchCap || w.cap) : this.procFull(s))) { w.blocked = s; continue; }   // feeders wait until the whole frozen load fits
         if (this.smart && !this.sinkOpen(w, s)) { if (s.kind === 'proc') w.blocked = s; continue; }
         const z = s.kind === 'counter' ? s.zone : s.inZone; let dd = d2(z.cx, z.cy, w.x, w.y);
         // v4.6: a raw counter that is being topped up (it ran low) comes first, then a machine that needs crops
@@ -1377,6 +1397,17 @@ export class World {
   // v4.3: a machine whose goods can't be sold yet (no 加工品 counter) stops eating the crop at inMax
   procFull(p) { return p.buf + p.inc >= CFG.proc.inMax && !this.procSells(p); }
   procSells(p) { const o = p.outObj; return !o || (o.kind === 'proc' ? !o.hidden && this.procSells(o) : !o.hidden); }
+  procBatchRoom(p, count) {
+    const held = p.buf + p.inc;
+    // A full worker load may exceed the legacy no-sales buffer; allow one such batch into an empty machine,
+    // then hold the next feeder trip until enough input has been processed to accept another whole load.
+    return this.procSells(p) || held + count <= CFG.proc.inMax || (held === 0 && count > CFG.proc.inMax);
+  }
+  canDropFeederBatch(worker, processor) {
+    const batchCap = worker.batchCap || worker.cap;
+    return worker.feedFor === processor.id && worker.incoming === 0 && worker.stack.length === batchCap &&
+      worker.stack.every((item) => item === processor.inItem) && this.procBatchRoom(processor, worker.stack.length);
+  }
   hasSink(item) {
     for (const p of this.procs) if (!p.hidden && p.inItem === item && !this.procFull(p)) return true;
     for (const k of this.counters) if (!k.hidden && k.items.includes(item)) return true;
