@@ -2,13 +2,13 @@
 //  · nothing is free at the start (no workers, clerks, machines or 加工品 counter)
 //  · 机器专员: one tile per farm-fed machine plus one paid tile for a 2nd (so 2 with everything bought), v4.8 plus a paid 3rd
 //    tile (x_h<machine>, after the 2nd x_g, pricier) on the machines CFG.v48.feed3 lists; a feeder only
-//    ever holds its machine's crop and only drops into its machine (never a counter); it brings small batches
+//    ever holds its machine's crop and only drops into its machine (never a counter); it brings full carrying loads
 //  · 原料搬运工: only hold raw-counter crops and only drop at a raw counter (never a machine, never the 加工品 counter)
 //  · 加工品搬运工: one per finished-goods machine, at least two when using a separate goods counter; one on a oneCounter level;
 //    only ever hold machine goods (never harvest) and only drop at the goods counter; trays stay within their actual `pile.cap` once hired
-//  · one ordinary counter at start; the goods counter is revealed with its first porter after a processor unlocks
+//  · one ordinary counter at start; the goods counter appears with the first processor unlock, and its porter then staffs delivery
 //  · before that first porter is hired, the unlocked machine fills and its feeders wait by it (never carry crops elsewhere)
-//  · every processing level keeps raw and processed goods on separate counters once the processing route is staffed
+//  · every processing level keeps raw and processed goods on separate visible counters after its first processor unlock
 //   node sim/staff-check.mjs [--level=N] [--secs=120]
 import { CFG } from '../js/config.js';
 import { World } from '../js/world.js';
@@ -28,7 +28,7 @@ function run(w, secs) {
     for (const x of w.workers) {
       let s = st.get(x); if (!s) st.set(x, (s = { held: new Set(), loads: [] }));
       for (const it of x.stack) s.held.add(it);
-      if (x.feedFor && before.get(x) === 'collect' && x.state === 'deliver') s.loads.push(x.stack.length + x.incoming);
+      if (x.feedFor && before.get(x) === 'collect' && x.state === 'deliver') s.loads.push({ size: x.stack.length + x.incoming, cap: x.cap });
     }
   }
   return { st, trayMax, trayOverflow };
@@ -48,7 +48,7 @@ CFG.levels.forEach((L0, li) => {
   if (!sale) errs.push('no 加工品 counter');
   const ordinary = w.counters.find((c) => !c.sale2);
   const machineUnlock = w.tiles.find((t) => t.effect?.show?.includes(w.procs.find((p) => p.outObj?.kind === 'counter')?.id));
-  const psTile = w.tiles.find((t) => t.effect?.worker?.porter && t.effect?.show?.includes('PS'));
+  const psTile = w.tiles.find((t) => t.effect?.worker?.porter && t.effect.worker.to.includes('PS'));
   if (!ordinary || ordinary.hidden) errs.push('no visible ordinary counter at start');
   if (w.counters.filter((c) => !c.sale2 && !c.hidden).length !== 1) errs.push('should start with exactly one visible ordinary counter');
   if (!ps || !ps.sale2 || !ps.hidden) errs.push('processed counter should exist hidden until purchased');
@@ -61,8 +61,8 @@ CFG.levels.forEach((L0, li) => {
   if (w.procs.some((p) => !p.hidden)) free.push('a machine');
   if (ps && !ps.hidden) free.push('the 加工品 counter');
   if (free.length) errs.push('FREE AT START: ' + free.join(', '));
-  // The first processed-goods porter is available after the first processor unlock and reveals its desk.
-  if (ps && (!psTile || !psTile.effect.show.includes(ps.id))) errs.push('first goods porter does not reveal the processed counter');
+  // The first processor unlock reveals the second desk; its first porter staffs the delivery route.
+  if (ps && (!machineUnlock || !machineUnlock.effect.show.includes(ps.id))) errs.push('first processor unlock does not reveal the processed counter');
   // A) every tile bought
   buyAll(w);
   const { st, trayMax, trayOverflow } = run(w, SECS);
@@ -88,7 +88,8 @@ CFG.levels.forEach((L0, li) => {
       const s = st.get(x);
       if (drops(x).some((id) => id !== p.id)) errs.push(`${p.id} feeder dropped at ${drops(x).join(',')}`);
       if ([...s.held].some((it) => it !== p.inItem)) errs.push(`${p.id} feeder held ${[...s.held].join(',')}`);
-      const mx = s.loads.length ? Math.max(...s.loads) : 0;
+      const mx = s.loads.length ? Math.max(...s.loads.map((load) => load.size)) : 0;
+      if (s.loads.some((load) => load.size !== load.cap)) errs.push(`${p.id} feeder left with a partial load (${s.loads.filter((load) => load.size !== load.cap).map((load) => `${load.size}/${load.cap}`).join(',')})`);
       if (mx > x.cap) errs.push(`${p.id} feeder exceeded its stack capacity (${mx}/${x.cap})`);
       x._mx = mx; x._trips = s.loads.length;
     }
@@ -110,22 +111,23 @@ CFG.levels.forEach((L0, li) => {
   if (!por.some((x) => (x.drops || {})[sale.id] > 0)) errs.push('porters did not deliver goods');
   if (trayOverflow) errs.push(`tray exceeded its actual capacity (${trayOverflow})`);
   if (!(w.stats.sold[FIN] > 0)) errs.push(`no ${FIN} sold`);
-  // B) processor unlocked but its first porter not hired: desk remains hidden; feeders wait at the machine.
+  // B) processor unlocked but its first porter not hired: both desks are visible; feeders wait at the machine.
   let waitB = '-';
   if (ps) {
     const w2 = new World(li, { quiet: true, seed: 177 + li });
-    const firstGoodsPorter = w2.tiles.find((t) => t.effect?.worker?.porter && t.effect?.show?.includes('PS'));
+    const firstGoodsPorter = w2.tiles.find((t) => t.effect?.worker?.porter && t.effect.worker.to.includes('PS'));
     buyAll(w2, (t) => t === firstGoodsPorter);
     run(w2, 200);
     const fs = w2.workers.filter((x) => x.feedFor);
     const wrong = fs.filter((x) => drops(x).some((id) => id !== x.feedFor));
+    if (w2.counters.filter((c) => !c.hidden).length !== 2) errs.push('both raw and processed desks are not visible after processor unlock');
     const waiting = fs.filter((x) => { const m = w2.objs[x.feedFor]; return m.buf + m.inc >= CFG.proc.inMax || x.holding || x.state === 'collect'; });
     waitB = wrong.length ? 'NO' : `${waiting.length}/${fs.length} 专员在机器旁等`;
     if (wrong.length) errs.push('a feeder took crops elsewhere while its machine was full');
   }
   const fsum = w.workers.filter((x) => x.feedFor).map((x) => `${x.feedFor}:${x._trips || 0}趟≤${x._mx || 0}/${x.cap}`).join(' ');
   const ok = !errs.length; if (!ok) bad++;
-  console.log(`${ok ? 'OK  ' : 'FAIL'} 第${li + 1}关 ${L.name}: 专员 ${fsum} · 原料搬运工 ×${raw.length}→普通台 · 加工品搬运工 ×${por.length}→${sale ? sale.id : '?'} · 出货台最高 ${trayMax}${ps ? ' · 加工品台隐藏: ' + waitB : ''}${errs.length ? ' · ' + errs.join('; ') : ''}`);
+  console.log(`${ok ? 'OK  ' : 'FAIL'} 第${li + 1}关 ${L.name}: 专员 ${fsum} · 原料搬运工 ×${raw.length}→普通台 · 加工品搬运工 ×${por.length}→${sale ? sale.id : '?'} · 出货台最高 ${trayMax}${ps ? ' · 无加工品搬运工时双台可见/专员等待: ' + waitB : ''}${errs.length ? ' · ' + errs.join('; ') : ''}`);
 });
 console.log(bad ? `${bad} of ${n} machine levels failed` : `all ${n} machine levels: fixed roles (raw carriers → raw counter, 2 (or 3) feeders per machine → that machine, one per tray / at least two for a separate goods counter → goods counter), nothing free at start`);
 if (bad) process.exitCode = 1;

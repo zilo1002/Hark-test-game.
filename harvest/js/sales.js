@@ -8,7 +8,7 @@
 // (店员 ×2, sales go straight into the wallet). Raw crops keep their own counter. The second counter's spot
 // is found automatically (nearest free stretch of the east side next to the raw counter); a level may pin it
 // with `sale2: [x, y]` and a machine may pin its tray with `tray: [x, y, w, h]`.
-// v4.5: ONE dedicated feeder per machine (the first hire that fed it; it carries small batches, see world.js), any further
+// v4.5: ONE dedicated feeder per machine (the first hire that fed it; it carries full worker loads, see world.js), any further
 // hire that used to feed the same machine becomes a farm hand for the raw counter (so fewer generated raw carriers).
 // Every processing level follows the same unlock: one raw counter at start; after buying a processor, a second processed-goods counter becomes available.
 // v4.7 FIXED ROLES:  原料搬运工 only fields → raw counter; 机器专员 only that
@@ -176,9 +176,10 @@ function splitSales0(L0) {
                         req: feeder ? [mTile[feeder.id].id] : [first.id], effect: { show: [p.id] } });
   }
   for (const p of procs) p.hidden = true;
-  // Keep the processed counter hidden until its first delivery route is staffed.
-  // The first porter hire reveals it, avoiding customers queueing at an empty new desk.
+  // Show both category stands as soon as the first processing machine unlocks.
+  // Goods still route to the processed stand automatically; its porter hire remains a separate staff tile.
   const firstMachineTile = mTile[T[0].id];
+  firstMachineTile.effect = { ...firstMachineTile.effect, show: [...new Set([...(firstMachineTile.effect.show || []), sale.id])] };
   for (const [p, src] of needFeeder) {
     const sp = spot(L, p.x - 90, p.y + 60);
     feedTile[p.id] = add({ id: 'x_f' + p.id, x: sp[0], y: sp[1], price: r10(s * V.raw[0]), icon: 'worker', label: '机器专员', req: [mTile[p.id].id],
@@ -264,7 +265,7 @@ function splitSales0(L0) {
     const p = T[k % T.length], sp = spot(L, p.tray[0] + p.tray[2] / 2 + 10, p.tray[1] + p.tray[3] + 40);
     const req = k >= T.length ? [por[k - T.length].id] : [mTile[p.id].id];
     por.push(add({ id: 'x_p' + (k + 1), x: sp[0], y: sp[1], price: r10(s * V.porter[k < T.length ? 0 : 1]), icon: 'porter', label: '加工品搬运工',
-                   req, effect: { worker: { from: [p.id, ...T.filter((q) => q !== p).map((q) => q.id)], to: [sale.id], porter: true, tray: p.id }, ...(k === 0 ? { show: [sale.id] } : {}) } }));
+                   req, effect: { worker: { from: [p.id, ...T.filter((q) => q !== p).map((q) => q.id)], to: [sale.id], porter: true, tray: p.id } } }));
   }
   // 6) 店员 + 收银升级 (the upgrade waits on the clerk, on the same spot)
   const cup = (id, at, ids, clerk) => add({ id, x: at.x, y: at.y, price: r10(s * V.cup.base), icon: 'register', label: '收银升级', req: [clerk],
@@ -290,14 +291,14 @@ function splitSales0(L0) {
                     req: [mTile[p.id].id], repeat: { times: V.mup.times, mul: V.mup.mul }, effect: { procUp: p.id } }));
   }
   // 8) purchase order (the guide arrow / balance bot buys the first affordable tile in this order):
-  //    first tile → machines without a tile of their own → [processed porter 1, raw carrier 1] after the first processing machine
+  //    first tile → machines without a tile of their own → [processed porter 1, raw carrier 1] after the first processing machine (both stands appear with it)
   //    finished-goods machine → the level's own tiles → clerk, 2nd carrier, 2nd porter → 收银升级 → new machine upgrades
   const genSet = new Set(gen);
   const orig = L.tiles.filter((t) => !genSet.has(t));
   const mGen = gen.filter((t) => t.id.startsWith('m_'));
   let order = [orig[0], ...mGen, ...orig.slice(1)];
   const firstTerm = order.findIndex((t) => termTiles.includes(t.id));
-  // Hire the first porter before enabling processed-counter customers; this prevents premature empty-desk waits.
+  // Hire the first porter promptly after the machine; both stands already appear at machine unlock.
   order.splice(firstTerm + 1, 0, por[0], ...(pc ? [pc] : []), ...(rawT[0] ? [rawT[0]] : []));
   T.forEach((p, k) => { if (!k) return; const i = order.indexOf(mTile[p.id]); if (i >= 0) order.splice(i + 1, 0, por[k]); else order.push(por[k]); });
   order.push(...gen.filter((t) => t.id.startsWith('x_f')), ...rawT.slice(1), ...por.slice(T.length), ...feed2, ...feed3, ...(pu ? [pu] : []), ...ups, ...gen.filter((t) => t.id.startsWith('u_')));

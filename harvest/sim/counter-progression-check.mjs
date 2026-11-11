@@ -1,6 +1,6 @@
 // Verify the counter progression and automatic worker routing across every level.
 // Before a sellable processed-goods machine unlocks, a processing level has one ordinary counter.
-// Hiring the first processed-goods porter reveals its counter automatically, once a processor is unlocked.
+// The machine unlock reveals both category counters; the porter hire starts automatic tray delivery.
 import { CFG } from '../js/config.js';
 import { World } from '../js/world.js';
 
@@ -35,19 +35,18 @@ for (let i = 0; i < CFG.levels.length; i++) {
   if (w.tiles.some((t) => t.id === 'x_ps')) fail(label, 'processed counter still requires a separate paid purchase');
   const firstMachine = terminal[0];
   const machineUnlock = w.tiles.find((t) => t.effect?.show?.includes(firstMachine.id));
-  const unlock = w.tiles.find((t) => t.effect?.worker?.porter && t.effect?.show?.includes(goods.id));
+  const unlock = w.tiles.find((t) => t.effect?.worker?.porter && t.effect.worker.to.includes(goods.id));
   if (!machineUnlock) fail(label, 'first terminal machine has no unlock tile');
-  if (!unlock) fail(label, 'first processed-goods porter does not reveal processed counter');
+  if (!unlock) fail(label, 'first processed-goods porter hire is missing');
   if (!machineUnlock || !unlock) continue;
 
   buyReadyExcept(w, unlock.id);
   if (!unlock.visible) fail(label, 'could not unlock first terminal machine in generated purchase flow');
   w.completeTile(machineUnlock, true);
   if (firstMachine.hidden) fail(label, 'first terminal machine did not unlock');
-  if (goods.hidden) {
-    w.completeTile(unlock, true);
-  }
-  if (visible(w).length !== 2 || goods.hidden) fail(label, 'processed counter did not appear with first porter hire');
+  if (visible(w).length !== 2 || goods.hidden) fail(label, 'both category counters did not appear with first machine unlock');
+  if (!unlock.done) w.completeTile(unlock, true);
+  if (goods.hidden) fail(label, 'processed counter became hidden after porter hire');
 
   if ([...made].some((item) => !goods.items.includes(item))) fail(label, 'processed counter missing terminal product');
   if (raw.items.some((item) => made.has(item))) fail(label, 'terminal processed goods remain on ordinary counter');

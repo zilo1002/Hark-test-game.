@@ -172,7 +172,7 @@ export const CFG = {
   // ≥ checkShare of them at the clear. Levels 54–60: add them to VL.specs, then node sim/hard-tune.mjs --level=N --write, set-par.
   v49: { fullBuild: { from: 45, share: 1.0, margin: 0.1, minMul: 3, maxMul: 4, time: [360, 15, 540], checkShare: 0.9 } },
   v46: { rawLow: 30, rawFull: 80, starve: 0.5, holdAt: 0.5 },
-  v45: { batch: 1, backAt: 0.5, porterBack: 10 },   // v4.5: feeders fill a worker load before a machine trip when input space allows; return early only for a near-empty machine or limited sink room
+  v45: { batch: 1, backAt: 0.5, porterBack: 10 },   // feeders always collect a full worker load before a machine trip; they wait at a full machine until it can accept the load
   v43: { machine: 0.5, machine2: 0.7, sale: 0.35, raw: [0.4, 0.8], porter: [0.4, 0.8], clerk: 0.7,
          cup: { base: 0.5, mul: 1.6, times: 2, serve: 1.6, interval: 0.75, buy: 4 },
          mup: { base: 0.45, mul: 1.7, times: 2 } },

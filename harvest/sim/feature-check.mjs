@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { CFG } from '../js/config.js';
 import { World } from '../js/world.js';
 import { saveRun } from '../js/run-save.js';
-import { isPackableCargo, hasPackableCargo, makeWoodCrate } from '../js/cargo-crate.js';
+import { isPackableCargo, hasPackableCargo, makeWoodCrate, cargoCratePosition } from '../js/cargo-crate.js';
 import { collectWaitLimit } from '../js/worker-policy.js';
 
 function buyReady(w, skip = () => false) {
@@ -91,22 +91,22 @@ function buyReady(w, skip = () => false) {
     for (const worker of feeders) {
       const size = worker.stack.length + worker.incoming; maxLoad = Math.max(maxLoad, size);
       assert.ok(size <= worker.cap);
-      if (before.get(worker) === 'collect' && worker.state === 'deliver') loads.get(worker).push(size);
+      if (before.get(worker) === 'collect' && worker.state === 'deliver') loads.get(worker).push({ size, cap: worker.cap });
     }
   }
   const allLoads = [...loads.values()].flat();
   assert.ok(allLoads.length > 0, 'pond feeders delivered to the smokehouse');
-  assert.equal(allLoads.filter((n) => n <= 1).length, 0, 'fish supply must never be dumped as one-fish trips');
-  const usefulLoads = allLoads.filter((n) => n >= 25).length;
-  assert.ok(usefulLoads / allLoads.length >= 0.9, `at least 90% of smoked-fish trips should carry 25+ items (${usefulLoads}/${allLoads.length})`);
-  assert.ok(Math.max(...allLoads) >= 25, `a smoked-fish supply trip should be a useful batch (max ${Math.max(...allLoads)})`);
+  assert.ok(allLoads.every(({ size, cap }) => size === cap), `each smokehouse feeder trip should start with a full load (${allLoads.filter(({ size, cap }) => size !== cap).map(({ size, cap }) => `${size}/${cap}`).join(', ')})`);
   assert.ok(maxLoad <= Math.max(...feeders.map((worker) => worker.cap)));
   // While a fish batch is on the carrier it remains visibly packable; cargo identity is untouched.
   assert.ok(isPackableCargo('fish') && isPackableCargo('tomato') && isPackableCargo('apple'));
   assert.ok(hasPackableCargo(['fish', 'smoked'])); assert.ok(!hasPackableCargo(['smoked']));
   const crate = makeWoodCrate(); assert.equal(crate.name, 'harvest-wood-crate'); assert.ok(crate.children.length >= 20);
+  const crate0 = cargoCratePosition(0), crate1 = cargoCratePosition(1), crate2 = cargoCratePosition(2);
+  assert.deepEqual([crate0.x, crate0.z, crate1.x, crate1.z, crate2.x, crate2.z], [0, 0, 0, 0, 0, 0], 'carried crates should occupy one vertical column, never a 2x2 layout');
+  assert.ok(crate0.base < crate1.base && crate1.base < crate2.base, 'each carried crate should stack above the last');
   assert.ok(w.counters.some((c) => !c.sale2 && !c.items.includes('smoked')));
   assert.ok(w.counters.some((c) => c.sale2 && c.items.includes('smoked')));
 }
 
-console.log('feature checks: PASS · resumable snapshot + persistence status · 50→150 carrying · smoked-fish hauling has no 1-item trips and ≥90% loads are 25+ · crate identity/presentation helpers');
+console.log('feature checks: PASS · resumable snapshot + persistence status · 50→150 carrying · smoked-fish feeders carry full loads · single-column crate geometry');

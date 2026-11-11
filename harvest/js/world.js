@@ -88,16 +88,24 @@ export class Pile {
     const nb = [c > 0 ? i - 1 : -1, c < C - 1 ? i + 1 : -1, r > 0 ? i - C : -1, r < R - 1 ? i + C : -1];
     for (const j of nb) if (j >= 0 && hs[j] - hs[i] > s) { hs[j]--; hs[i]++; this.bump[j] = 1; this.bump[i] = 1; }
   }
-  hottest(px, py, t) {
+  hottest(px, py, t, lane = null) {
     if (this.total <= 0) return -1;
-    if (t - this._hotT < 0.35 && this._hot >= 0 && this.hs[this._hot] > 0) return this._hot;
-    let best = -1, bs = -1e9; const hs = this.hs, n = hs.length;
-    for (let i = 0; i < n; i += 1) {
-      const h = hs[i]; if (!h) continue;
-      const s = Math.min(h, 8) * 30 - Math.sqrt(d2(this.cx(i), this.cy(i), px, py));
-      if (s > bs) { bs = s; best = i; }
-    }
-    this._hot = best; this._hotT = t;
+    // Shared-source workers use separate pile lanes, avoiding a crowd at the same hottest cell.
+    if (!lane && t - this._hotT < 0.35 && this._hot >= 0 && this.hs[this._hot] > 0) return this._hot;
+    const hs = this.hs, n = hs.length;
+    const find = (separated) => {
+      let best = -1, bs = -1e9;
+      for (let i = 0; i < n; i += 1) {
+        if (separated && i % lane.count !== lane.index) continue;
+        const h = hs[i]; if (!h) continue;
+        const score = Math.min(h, 8) * 30 - Math.sqrt(d2(this.cx(i), this.cy(i), px, py));
+        if (score > bs) { bs = score; best = i; }
+      }
+      return best;
+    };
+    let best = lane ? find(true) : -1;
+    if (best < 0) best = find(false);
+    if (!lane) { this._hot = best; this._hotT = t; }
     return best;
   }
   prefill(n, rnd, biasFar) {
@@ -619,7 +627,7 @@ export class World {
       const w = this.addWorker(e.worker.from, e.worker.to, t.x, t.y, t.icon === 'cart' || t.icon === 'milker');
       if (e.worker.porter) w.porter = true;     // v4.3 加工品搬运工 (tray → 加工品 counter)
       if (e.worker.raw) w.rawCarrier = true;    // v4.3 原料搬运工 (fields → raw counter)
-      if (e.worker.feeder) w.feedFor = e.worker.feeder;   // v4.5 the machine's own feeder (small batches; v4.7 never anything else)
+      if (e.worker.feeder) w.feedFor = e.worker.feeder;   // v4.5 the machine's own feeder (full loads; v4.7 never anything else)
       if (e.worker.tray) w.trayOf = e.worker.tray;        // v4.7 the porter's own machine tray
     }
     if (e.upgradeWorkers === 'loader') {
@@ -1227,22 +1235,12 @@ export class World {
     w.holding = false;
     const space = w.cap - w.stack.length - w.incoming;
     if (w.state === 'collect' && space <= 0) w.state = 'deliver';
-    // Feeders make one trip with the fullest load the machine can accept; near-empty machines still get emergency partial loads
+    // Feeders collect a full carrying load before starting a machine trip. If the input is full,
+    // they keep that load and wait at the machine until it can accept the next items.
     if (w.state === 'collect' && w.feedFor) {
-      const m = this.objs[w.feedFor];
-      const batch = Math.max(m.ratio, Math.min(Math.ceil(w.cap * CFG.v45.batch), CFG.proc.inMax - m.buf - m.inc));
-      let have = w.incoming; for (const t of w.stack) if (t === m.inItem) have++;
+      const batch = Math.ceil(w.cap * CFG.v45.batch);
+      let have = w.incoming; for (const t of w.stack) if (t === this.objs[w.feedFor].inItem) have++;
       if (have >= batch) { w.state = 'deliver'; w.batch = batch; }
-      else {
-        const pondFeed = srcs.some((source) => source.kind === 'pond');
-        const waitedForFish = pondFeed && w.wait >= collectWaitLimit(w, srcs, CFG);
-        const emergency = pondFeed ? Math.max(m.ratio, Math.ceil(batch * 0.75)) : m.ratio;
-        if (this.smart && have >= emergency && m.buf + m.inc < m.ratio * 2 && !(m.work > 0) && !this.mateBrings(w) && (!pondFeed || waitedForFish)) {
-          // Fishers wait through a school respawn and deliver a full useful batch whenever possible;
-          // only flush a smaller batch after the bounded pond wait or to fill the machine's remaining room.
-          w.state = 'deliver'; w.batch = Math.min(have, batch);
-        }
-      }   // v4.6: machine about to run dry → bring a useful batch
     }
     // v4.7 porter: leave the tray with a fair batch, or at once when the goods counter is running low
     if (w.state === 'collect' && w.porter && this.smart) {
@@ -1260,7 +1258,7 @@ export class World {
       if (nl > w.lv) { w.lv = nl; w.lvT = T; this.refreshStats(); this.emit('workerLevel', { x: w.x, y: w.y, lv: nl }); }
     }
     // v4.6 分工: nobody fills up for a sink that has no room (full counter / machine) — collect a fair batch, then wait at a post
-    if (this.smart && w.state === 'collect' && w.stack.length >= Math.ceil(w.cap * CFG.v46.holdAt)) {
+    if (this.smart && !w.feedFor && w.state === 'collect' && w.stack.length >= Math.ceil(w.cap * CFG.v46.holdAt)) {
       const items = new Set(srcs.map((o) => o.item));
       if (!sinks.some((k) => this.sinkOpen(w, k) && (k.kind === 'counter' ? [...items].some((t) => k.items.includes(t)) : items.has(k.inItem)))) w.state = 'deliver';
     }
@@ -1275,7 +1273,7 @@ export class World {
       if (!best) {
         w.wait += dt; w.idleT = (w.idleT || 0) + dt;
         const collectWait = collectWaitLimit(w, srcs, CFG);
-        if (w.stack.length > 0 && w.wait > collectWait) w.state = 'deliver';
+        if (w.stack.length > 0 && w.wait > collectWait && !w.feedFor) w.state = 'deliver';
         // v4.7 nothing to pick up: wait at its own post (porter by its tray, others at the edge of their field)
         else if (this.smart && w.idleT > CFG.v47.idleWait) { const o = this.idlePost(w, srcs); tx = o.x; ty = o.y; }
       } else {
@@ -1289,7 +1287,12 @@ export class World {
         } else if (w.retarget <= 0 || !w.tgt) {
           w.retarget = 0.4;
           const pl = best.pile;
-          const i = pl && pl.total > 0 ? pl.hottest(w.x, w.y, T) : -1;
+          let lane = null;
+          if (this.smart && pl) {
+            const crew = this.workers.filter((o) => o.sources && o.sources.includes(best));
+            if (crew.length > 1) lane = { index: Math.max(0, crew.indexOf(w)), count: crew.length };
+          }
+          const i = pl && pl.total > 0 ? pl.hottest(w.x, w.y, T, lane) : -1;
           if (i >= 0) w.tgt = pl.safe(i);
           else if (best.kind === 'field') {
             // v4.6: each worker works its own lane of the field (no crowding on one corner)

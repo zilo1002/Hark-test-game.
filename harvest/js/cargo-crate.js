@@ -13,9 +13,15 @@ export function hasPackableCargo(stack = [], incomingItems = {}) {
   return items.some(isPackableCargo);
 }
 
+// Carried crates form one vertical column: the next box goes directly above the last.
+export function cargoCratePosition(boxIndex) {
+  const tier = Math.max(0, Math.floor(boxIndex));
+  return { x: 0, z: 0, base: tier * 18 };
+}
 
-// A low-draw-call stack of small open crates carried as one batch. Each box holds
-// 24 visible units; boxes arrange in a compact 2×2 tower, like the supplied reference.
+
+// A low-draw-call single-column stack of small open crates carried as one batch. Each box holds
+// 24 visible units; every additional box sits directly above the previous one.
 const CRATE_MAX = 32;
 const crateUnit = new THREE.BoxGeometry(1, 1, 1);
 const railMat = new THREE.MeshLambertMaterial({ color: 0xC77A37 });
@@ -46,8 +52,7 @@ export function updateCargoCrateStack(frame, packedCount) {
     _crateM.compose(_crateP, _crateQ, _crateS); mesh.setMatrixAt(index, _crateM);
   };
   for (let b = 0; b < boxes; b++) {
-    const tier = Math.floor(b / 4), cell = b % 4;
-    const cx = cell % 2 ? 17.5 : -17.5, cz = cell < 2 ? -14.5 : 14.5, base = tier * 18;
+    const { x: cx, z: cz, base } = cargoCratePosition(b);
     // Three warm horizontal slats on every side keep each box visibly open and crafted.
     for (const h of [4, 9, 14]) {
       write(data.rails, nr++, cx, base + h, cz - 13.5, 33, 2, 2);

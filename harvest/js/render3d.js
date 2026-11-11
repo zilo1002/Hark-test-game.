@@ -12,7 +12,7 @@ import { FONT, elastic, hash } from './util.js';
 import { customerStyle } from './chars.js';
 import * as M from './models.js';
 import * as A from './animals3d.js';
-import { makeWoodCrate, makeCargoCrateStack, updateCargoCrateStack, hasPackableCargo, isPackableCargo } from './cargo-crate.js';
+import { makeWoodCrate, makeCargoCrateStack, updateCargoCrateStack, hasPackableCargo, isPackableCargo, cargoCratePosition } from './cargo-crate.js';
 
 const H2 = Math.PI / 2, TAU = Math.PI * 2, PITCH = 0.84, SINP = Math.sin(PITCH), COSP = Math.cos(PITCH), R2 = Math.SQRT1_2;
 const VIEW = { landW: 620, landH: 350, portW: 380, portH: 600, fov: 30 };
@@ -830,13 +830,11 @@ export class Renderer {
   crateCargoPoint(o, slot) {
     const crate = o && o.crate;
     if (!crate) return null;
-    // Each small crate neatly holds 24 goods (12 per layer); loaded boxes stack in
-    // a 2×2 tower instead of silently overlapping once a carrier has a full batch.
-    const box = Math.floor(slot / 24), tier = Math.floor(box / 4), cell = box % 4;
-    const cx = cell % 2 ? 17.5 : -17.5, cz = cell < 2 ? -14.5 : 14.5;
+    // Each small crate holds 24 goods (12 per layer); extra boxes rise in one column.
+    const box = Math.floor(slot / 24), { x: cx, z: cz, base: tierBase } = cargoCratePosition(box);
     const item = slot % 24, pos = item % 12, row = Math.floor(pos / 4), col = pos % 4;
     const x = cx + [-11, -3.5, 3.5, 11][col], z = cz + [-8, -2.7, 2.7, 8][row];
-    const y = tier * 18 + 4.5 + Math.floor(item / 12) * 5.0;
+    const y = tierBase + 4.5 + Math.floor(item / 12) * 5.0;
     crate.updateWorldMatrix(true, false);
     const p = crate.localToWorld(_v.set(x, y, z));
     return { x: p.x, y: p.z, z: p.y };
