@@ -633,6 +633,20 @@ export function posePerson(pp, s) {
     arms[0].rotation.set(-sw * 0.85, 0, 0.12); arms[1].rotation.set(sw * 0.85, 0, -0.12);
     tool.visible = !!s.showTool; torso.rotation.y = 0;
   }
+  const bd = s.bend || 0;
+  if (bd > 0) {
+    // v4.8.6 set-down bow: lean forward, reach the arms down toward the load, dip the body.
+    // Lerped toward fixed targets so it composes with any base pose (walk/carry/idle).
+    torso.rotation.x += (0.45 - torso.rotation.x) * bd;
+    head.rotation.x += (0.3 - head.rotation.x) * bd;
+    arms[0].rotation.x += (-0.7 - arms[0].rotation.x) * bd;
+    arms[1].rotation.x += (-0.7 - arms[1].rotation.x) * bd;
+    arms[0].rotation.z += (0.18 - arms[0].rotation.z) * bd;
+    arms[1].rotation.z += (-0.18 - arms[1].rotation.z) * bd;
+    legs[0].rotation.x += (0.45 - legs[0].rotation.x) * bd;
+    legs[1].rotation.x += (-0.35 - legs[1].rotation.x) * bd;
+    body.position.y -= bd * 2;
+  }
   if (s.seated) { legs[0].rotation.x = -1.4; legs[1].rotation.x = -1.4; body.position.y = 0; }
 }
 

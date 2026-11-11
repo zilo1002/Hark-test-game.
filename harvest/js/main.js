@@ -31,7 +31,7 @@ snd.on = data.settings.sound; hap.on = data.settings.vib;
 
 let mode = 'home', world = null, guide = null, guideT = 0, saveT = 0, hudT = 0, time = 0, last = performance.now();
 let feverFxT = 0, fullFxT = -9, goldFxT = -9, catchFxT = -9, scatFxT = -9;
-let modalOpen = false, cashFxT = 0, winDone = false, harvestFxT = 0, saleHapT = 0;
+let modalOpen = false, cashFxT = 0, winDone = false, harvestFxT = 0, saleHapT = 0, dustT = 0;
 const restoredAt = {};            // session-only animation stamps for the home screen
 
 const ITEM_BITS = { wheat: ['#F6CB4A', '#FFE07A', '#C9962A'], potato: ['#5DBB3A', '#9C6331', '#C98A4B'], egg: ['#FFF3D6', '#FFFFFF'], tomato: ['#EE4630', '#5DBB3A'],
@@ -283,12 +283,12 @@ function handleEvents() {
   const ev = world.events; const coin = ui.coinCenter();
   for (const e of ev) {
     switch (e.type) {
-      case 'pick': snd.play('pick'); break;
+      case 'pick': snd.play('pick'); fx.num('pick', world.player.x, world.player.y, 34, 1, '#FFE16B'); if (time - dustT > 0.12) { dustT = time; fx.burst(world.player.x, world.player.y, 2, 5, ['#D9C49A', '#C9B184', '#B59A6B'], 40, 26, 2.4, 'dot', 0.5); } break;
       case 'harvest':   // blooms burst up in a spray of petals and leaves
         if (e.who === 'player' || time - harvestFxT > 0.05) { harvestFxT = time; fx.burst(e.x, e.y, 10, Math.min(14, 3 + e.n * 2), ITEM_BITS[e.item] || ['#fff'], 70, 120, 2.2, 'petal', 0.7); }
         if (e.who === 'player') { snd.play('harvest'); if (world.feverT > 0) hap.tick(18, 38, 255); else hap.tick(16, 70, 235); }   // continuous strong rumble while cutting (faster in fever)
         break;
-      case 'drop': snd.play('drop'); break;
+      case 'drop': snd.play('drop'); if (time - dustT > 0.12) { dustT = time; fx.burst(world.player.x, world.player.y, 2, 7, ['#D9C49A', '#C9B184', '#B59A6B'], 45, 30, 2.6, 'dot', 0.55); } break;
       case 'sale': ui.earn(e.amount, performance.now() / 1000); snd.play('sale'); if (time - saleHapT > 0.18) { saleHapT = time; hap.buzz(34, 255); } break;
       case 'pay': for (let i = 0; i < Math.min(4, 1 + Math.floor(e.amount / 6)); i++) fx.wbill(e.x, e.y, e.tx + (Math.random() - 0.5) * 20, e.ty + (Math.random() - 0.5) * 8, i * 0.06); break;
       case 'cashierPay': for (let i = 0; i < 3; i++) fx.bill(R.X(e.x, e.y), R.Y(e.x, e.y, 30), coin.x, coin.y, i * 0.07); setTimeout(() => ui.bumpCoin(), 450); snd.play('coin'); break;

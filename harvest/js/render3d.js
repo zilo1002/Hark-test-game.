@@ -564,7 +564,10 @@ export class Renderer {
         for (let j = 0; j < h && k < pl.cap + 64; j++) {
           const hv = hash(i * 64 + j), hv2 = hash(i * 64 + j + 31);
           const top = j === h - 1 ? bb * 3 : 0;
-          put(arr, k++, cx + (hv - 0.5) * pl.cw * 0.6, j * L + half + top, cy + (hv2 - 0.5) * pl.ch * 0.6, hv * TAU, 1.05 + hv2 * 0.2);
+          // v4.8.6: the newest layer pops in small and grows as its bump settles, so a
+          // fresh delivery reads as a little "thunk" instead of silently appearing.
+          const grow = j === h - 1 ? 1 - bb * 0.45 : 1;
+          put(arr, k++, cx + (hv - 0.5) * pl.cw * 0.6, j * L + half + top, cy + (hv2 - 0.5) * pl.ch * 0.6, hv * TAU, (1.05 + hv2 * 0.2) * grow);
         }
       }
       o.im.count = k; o.im.instanceMatrix.needsUpdate = true;
@@ -764,6 +767,13 @@ export class Renderer {
     const cutting = fishing || actionAge < 0.22;
     const actionProgress = fishing ? actionAge / 0.72 : 0;
     const carry = c.stack.length + c.incoming > 0;
+    // v4.8.6: bend-to-set-down — a stack change while not cutting/fishing is a pickup or
+    // a drop, so bow once (0.45 s sine). Trigger lives on the render object only.
+    const stackN = c.stack.length;
+    if (o.lastStackN !== undefined && stackN !== o.lastStackN && !cutting && !fishing && !c.vehicle) o.bendT = this.wt;
+    o.lastStackN = stackN;
+    const bendAge = this.wt - (o.bendT ?? -99);
+    const bend = bendAge >= 0 && bendAge < 0.45 ? Math.sin((bendAge / 0.45) * Math.PI) : 0;
     const packed = hasPackableCargo(c.stack, c.incomingItems);
     if (o.crate) {
       const packCount = c.stack.reduce((n, item) => n + (isPackableCargo(item) ? 1 : 0), 0)
@@ -782,7 +792,7 @@ export class Renderer {
       o.mow.root.children[0].visible = veh; for (const wl of o.mow.wheels) { wl.visible = veh; if (veh && c.moving) wl.rotation.x += dt * sp * 0.2; }
       o.pp.root.position.set(0, veh ? 9 : 0, veh ? -4 : 0);
       o.pp.blob.visible = !veh;
-      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving && !veh, carry: carry && !veh, cutting: cutting && !veh, fishing: fishing && !veh, actionProgress, seated: veh, seed: 1, axe: c.cutItem === 'log', net: c.cutItem === 'fish' });
+      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving && !veh, carry: carry && !veh, cutting: cutting && !veh, fishing: fishing && !veh, actionProgress, seated: veh, seed: 1, axe: c.cutItem === 'log', net: c.cutItem === 'fish', bend: veh ? 0 : bend });
       if (veh) { o.pp.arms[0].rotation.set(-1.2, 0, 0.3); o.pp.arms[1].rotation.set(-1.2, 0, -0.3); o.pp.tool.visible = false; }
     } else if (o.loader) {
       M.posePerson(o.pp, { t, walk: c.walk, moving: false, carry: false, cutting: false, seated: true, seed: c.seed + 2 });
@@ -791,7 +801,7 @@ export class Renderer {
       o.ld.body.position.y = c.moving ? Math.abs(Math.sin(c.walk * 1.5)) * 0.6 : 0;
       o.ld.root.rotation.x = cutting ? Math.sin(t * 30) * 0.015 : 0;
     } else {
-      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving, carry: carry && !c.cart && !cutting, cutting: cutting && !c.cart, fishing: fishing && !c.cart, actionProgress, seed: c.seed + 2, showTool: !c.cart && !carry, axe: !!c.lumber, net: !!c.fisher });
+      M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving, carry: carry && !c.cart && !cutting, cutting: cutting && !c.cart, fishing: fishing && !c.cart, actionProgress, seed: c.seed + 2, showTool: !c.cart && !carry, axe: !!c.lumber, net: !!c.fisher, bend });
       if (o.cart) for (const wl of o.cart.wheels) if (c.moving) wl.rotation.x += dt * sp * 0.3;
     }
   }
@@ -962,11 +972,22 @@ export class Renderer {
     for (const o of this.procObjs) {
       const p = o.p, a = p.hidden ? 0 : elastic((this.wt - p.appearT) / 0.6);
       o.grp.visible = o.zone.visible = a > 0; if (a <= 0) continue;
+      // v4.8.6: intake/produce feedback, render-side only. buf rising = the machine just
+      // swallowed a batch (group gulps); buf falling = a finished piece just popped out
+      // (body jolt). Spin speeds ease toward their targets so the works wind down
+      // instead of stopping dead when p.work drops.
+      if (o.lastBuf === undefined) o.lastBuf = p.buf;
+      if (p.buf > o.lastBuf) o.swallowT = time;
+      if (p.buf < o.lastBuf) o.produceT = time;
+      o.lastBuf = p.buf;
+      const swallow = o.swallowT !== undefined ? Math.max(0, 1 - (time - o.swallowT) / 0.3) : 0;
+      const produce = o.produceT !== undefined ? Math.max(0, 1 - (time - o.produceT) / 0.25) : 0;
       const sh = p.work ? Math.sin(time * 40) * 0.5 : 0;
-      o.grp.scale.setScalar(a); o.body.position.x = sh; o.zone.scale.setScalar(a);
-      if (p.work) o.gear.rotation.x += dt * 5;
-      if (o.grp.userData.blade) o.grp.userData.blade.rotation.z -= dt * (p.work ? 14 : 1.2);
-      if (o.grp.userData.sails) o.grp.userData.sails.rotation.z -= dt * (p.work ? 4 : 0.6);
+      o.grp.scale.setScalar(a * (1 + swallow * 0.08)); o.body.position.x = sh + produce * 1.6 * Math.sin(time * 55); o.zone.scale.setScalar(a);
+      o.gearSpeed = (o.gearSpeed || 0) + ((p.work ? 5 : 0) - (o.gearSpeed || 0)) * Math.min(1, dt * 4);
+      o.gear.rotation.x += dt * o.gearSpeed;
+      if (o.grp.userData.blade) { o.bladeSpeed = (o.bladeSpeed || 0) + ((p.work ? 14 : 1.2) - (o.bladeSpeed || 0)) * Math.min(1, dt * 4); o.grp.userData.blade.rotation.z -= dt * o.bladeSpeed; }
+      if (o.grp.userData.sails) { o.sailSpeed = (o.sailSpeed || 0) + ((p.work ? 4 : 0.6) - (o.sailSpeed || 0)) * Math.min(1, dt * 4); o.grp.userData.sails.rotation.z -= dt * o.sailSpeed; }
       o.sign.rotation.y = time * 0.8; if (p.outItem === 'smoked') o.sign.position.x = 19; o.sign.position.y = CFG.proc.bodyH + 10 + Math.sin(time * 2) * 1.2;
       o.puffs.forEach((s, i) => {
         const u = (time * 0.8 + i / 3) % 1; s.visible = p.work > 0;
