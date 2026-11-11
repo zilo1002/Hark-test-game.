@@ -2,7 +2,7 @@
 
 > 种菜，卖菜，雇人替你干活。
 
-> 🆕 另一个小游戏：**[半亩·丰收](./harvest/)** —— 走进鸡蛋堆、土豆堆，背起高高一摞去卖，解锁新田地、雇工和小红车。共 30 关（v3.3 新增砍树、奶牛挤奶、玉米、南瓜、草莓、绵羊、蜂蜜、苹果；v3.4 新增金币商店：服装与庄园装饰）。**安卓 APK 在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 下载**。说明见 [harvest/README.md](./harvest/README.md)。
+> 🆕 另一个小游戏：**[半亩·丰收](./harvest/)** —— 走进田地收获、加工、装箱并出售，解锁新关卡、雇工和庄园。现有 60 关；当前 Android 版本为 4.9.6（versionCode 36），第 54–60 关加入早餐与茶点加工。**[在线试玩](https://zilo1002.github.io/Hark-test-game./harvest/)**；安卓 APK 可在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 查看。版本、测试状态和关卡说明见 [harvest/README.md](./harvest/README.md)。
 
 一个月下水墨风的放置种田小游戏。纯静态网页：没有构建步骤、没有外部依赖、不联网，打开即玩。手机竖屏优先，电脑用鼠标也行。
 
@@ -41,14 +41,9 @@ python3 -m http.server
 
 ## 如何开 GitHub Pages
 
-（本仓库已关闭 GitHub Pages，网页版不再在线提供；需要时可按下面的步骤自己重新打开。）
+**GitHub Pages 已启用。**「半亩·丰收」在线试玩页：[打开游戏](https://zilo1002.github.io/Hark-test-game./harvest/)（当前部署已验证可访问）。
 
-1. 打开仓库的 **Settings → Pages**
-2. **Source** 选 **Deploy from a branch**
-3. Branch 选 **main**，目录选 **/ (root)**，点 Save
-4. 一两分钟后，页面顶部会给出网址，形如 `https://<用户名>.github.io/<仓库名>/`
-
-所有路径都是相对路径，放在子目录下也能正常运行。
+本仓库的 Pages 通过 GitHub Actions 构建并部署；部署状态可在仓库的 **Actions → pages build and deployment** 查看。所有路径使用相对路径，游戏放在 `/harvest/` 子目录下运行。
 
 ## 文件结构
 
