@@ -31,7 +31,7 @@ function run(w, secs) {
     const before = new Map(w.workers.map((x) => [x, x.state]));
     const launchesBefore = batchLaunches.length;
     w.update(1 / 30, 0, 0);
-    for (const { f, sinkId } of batchLaunches.slice(launchesBefore)) batches.push({ sinkId, count: f.count, cap: f.batchCap });
+    for (const { f, sinkId } of batchLaunches.slice(launchesBefore)) batches.push({ sinkId, count: f.count, cap: f.batchCap, by: f.by });
     if (w.t > 20) for (const p of w.procs) if (p.pile && !p.hidden) { trayMax = Math.max(trayMax, p.pile.total); if (p.pile.total > p.pile.cap) trayOverflow = `${p.id}:${p.pile.total}/${p.pile.cap}`; }
     for (const x of w.workers) {
       let s = st.get(x); if (!s) st.set(x, (s = { held: new Set(), loads: [] }));
@@ -92,7 +92,9 @@ CFG.levels.forEach((L0, li) => {
       }
     } else if (w.tiles.some((t) => t.id === 'x_h' + p.id)) errs.push(`unexpected x_h${p.id}`);
     if (!f.some((x) => (x.drops || {})[p.id] > 0)) errs.push(`${p.id} feeders never delivered`);
-    const machineBatches = batches.filter((batch) => batch.sinkId === p.id);
+    // v4.8.5: only feeder batches must be full loads — a player batch is a whole-stack
+    // drop of whatever the player happens to carry, so it is exempt from count === cap
+    const machineBatches = batches.filter((batch) => batch.sinkId === p.id && batch.by === 'feeder');
     const delivered = f.reduce((sum, x) => sum + ((x.drops || {})[p.id] || 0), 0);
     if (delivered && !machineBatches.length) errs.push(`${p.id} has no atomic batch deposits`);
     for (const batch of machineBatches) if (batch.count !== batch.cap) errs.push(`${p.id} deposited a partial batch (${batch.count}/${batch.cap})`);

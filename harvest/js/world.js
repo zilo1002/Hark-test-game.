@@ -841,6 +841,53 @@ export class World {
     c.sway += ((-sx * 0.0035) - c.sway) * Math.min(1, dt * 5);
   }
 
+  // v4.8.5: whole-stack batch drop — one trip, everything at once. The player and
+  // non-feeder workers use the same 'procBatch' port as feeders for machines; counters
+  // and raw trays get one flight per item launched in the same frame. Returns true
+  // when the whole stack was dropped; otherwise the caller falls back to the old
+  // one-by-one trickle (a mixed stack, items still flying in, or a sink that cannot
+  // take the whole load at once).
+  tryBatchDrop(c, sink, accepts, isPlayer) {
+    const items = c.stack.slice(), n = items.length;
+    if (n === 0 || c.incoming > 0) return false;
+    // feeders keep their own frozen-batch gate above; never let one batch into another machine
+    if (sink.kind === 'proc' && c.feedFor) return false;
+    for (const t of items) if (!accepts(t)) return false;
+    if (sink.kind === 'proc') {
+      if (!items.every((t) => t === sink.inItem)) return false;
+      if (!this.procBatchRoom(sink, n)) return false;
+      const item = sink.inItem;
+      c.stack.length = 0; c.dropAcc = 0;
+      sink.inc += n;
+      if (!isPlayer) { c.done = (c.done || 0) + n; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + n; }
+      const f = this.launch(item, 'procBatch', c.x, c.y, 44 + Math.max(0, n - 1) * CFG.items[item].step, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop);
+      f.count = n; f.batchCap = c.batchCap || c.cap; f.by = isPlayer ? 'player' : 'worker';
+    } else if (sink.kind === 'counter') {
+      if (sink.stock.length + sink.incoming + n > CFG.counter.stockMax) return false;
+      if (!sink.sale2 && this.procs.length && this.rawStock(sink) + n > CFG.v46.rawFull + 4) return false;
+      if (!isPlayer && this.smart && !this.sinkOpen(c, sink)) return false;
+      c.stack.length = 0; c.dropAcc = 0;
+      if (!isPlayer) { c.done = (c.done || 0) + n; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + n; }
+      const made = this._made || (this._made = new Set(this.procs.map((q) => q.outItem)));
+      items.forEach((it, k) => {
+        sink.incoming++; if (made.has(it)) sink.incMade = (sink.incMade || 0) + 1;
+        this.launch(it, 'counter', c.x, c.y, 44 + k * CFG.items[it].step, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop);
+      });
+    } else if (sink.kind === 'tray') {
+      const pl = sink.pile;
+      if (pl.total + pl.pending + n > pl.cap) return false;
+      if (!isPlayer && this.smart && !this.sinkOpen(c, sink)) return false;
+      c.stack.length = 0; c.dropAcc = 0;
+      if (!isPlayer) { c.done = (c.done || 0) + n; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + n; }
+      items.forEach((it, k) => {
+        pl.pending++;
+        this.launch(it, 'pile', c.x, c.y, 44 + k * CFG.items[it].step, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop);
+      });
+    } else return false;
+    if (isPlayer) this.emit('drop', { item: items[0] });
+    return true;
+  }
+
   // ---- harvesting / picking / dropping (player, mower, gardeners share this) ----
   interact(c, dt, isPlayer) {
     const space = () => c.cap - c.stack.length - c.incoming;
@@ -974,8 +1021,10 @@ export class World {
             c.done = (c.done || 0) + count;
             const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + count;
             const f = this.launch(item, 'procBatch', c.x, c.y, 44 + Math.max(0, count - 1) * CFG.items[item].step, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop);
-            f.count = count; f.batchCap = c.batchCap || c.cap;
+            f.count = count; f.batchCap = c.batchCap || c.cap; f.by = 'feeder';
           }
+        } else if (this.tryBatchDrop(c, sink, accepts, isPlayer)) {
+          // v4.8.5: whole stack dropped at once (see tryBatchDrop); nothing left to trickle
         } else {
           c.dropAcc = Math.min(c.dropAcc + c.dropRate * dt, Math.max(1, c.dropRate * 0.1));
           while (c.dropAcc >= 1) {
