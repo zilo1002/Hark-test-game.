@@ -904,15 +904,16 @@ const fol = (c, kind) => {
 };
 export const Env = {
   stockStand(out, w = 64, d = 42) {
-    // Compact, readable wooden collection table; stored goods sit visibly above its slatted top.
-    const legX = w / 2 - 5, legZ = d / 2 - 5;
-    for (const x of [-legX, legX]) for (const z of [-legZ, legZ])
-      out.push(P(box(4, 18, 4), '#8E5627', [x, 9, z]));
-    out.push(P(box(w, 3, d), '#A86D37', [0, 19.5, 0]));
-    for (let z = -d / 2 + 5; z <= d / 2 - 5; z += 9)
-      out.push(P(box(w - 5, 1.2, 7), (Math.round(z) / 9) % 2 ? '#C8874A' : '#B8783D', [0, 21.6, z]));
-    out.push(P(box(w + 1, 1.8, 2.4), '#75471F', [0, 22.3, -d / 2 + 1]));
-    out.push(P(box(w + 1, 1.8, 2.4), '#75471F', [0, 22.3, d / 2 - 1]));
+    // v4.9.5: a flat wooden board lying on the ground — NOT a table. The old version was a
+    // legged table (top at 22) and Jin said the goods on it sometimes felt out of reach;
+    // a wooden platform is flat on the grass, goods sit right on the boards (board top = 2).
+    // The dark base slab shows through as the seams between the planks; planks run along the depth.
+    out.push(P(box(w, 1.4, d), '#7A4A22', [0, 0.7, 0]));
+    const n = Math.max(3, Math.round(w / 10));
+    for (let i = 0; i < n; i++) {
+      const x = -w / 2 + 1 + ((w - 2) * (i + 0.5)) / n;
+      out.push(P(box((w - 2) / n - 1.2, 0.6, d - 2), i % 2 ? '#A86D37' : '#C8874A', [x, 1.7, 0]));
+    }
   },
   stoneWall(out, x0, y0, x1, y1, pa, pb) {
     const L = Math.hypot(x1 - x0, y1 - y0), a = Math.atan2(x1 - x0, y1 - y0), mx = (x0 + x1) / 2, my = (y0 + y1) / 2;

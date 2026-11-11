@@ -237,6 +237,20 @@ export class Renderer {
     for (const t of w.trays || []) {   // v4.8.4: raw-goods tray, same dashed outline as a machine tray
       const pl = t.pile; pave(pl.x - 6, pl.y - 6, pl.w + 12, pl.h + 12); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.setLineDash([5, 4]); g.lineWidth = 1.6; g.strokeRect(pl.x - 2, pl.y - 2, pl.w + 4, pl.h + 4); g.setLineDash([]);
     }
+    // v4.9.5: wooden stands are flat boards lying on the ground (same board as the 3D mesh);
+    // paint the planks here too so the top-down map shows wood. Hidden stands are skipped —
+    // the ground repaints when they are revealed (world emits 'ground' on show).
+    const woodBoard = (x, y, pw, ph, seed) => {
+      g.fillStyle = '#5E3A1A'; g.fillRect(x - 2, y - 2, pw + 4, ph + 4);   // dark edge
+      g.fillStyle = '#7A4A22'; g.fillRect(x, y, pw, ph);                    // dark base (the seams)
+      const n = Math.max(3, Math.round(pw / 10));
+      for (let i = 0; i < n; i++) {
+        g.fillStyle = i % 2 ? '#A86D37' : '#C8874A';
+        g.fillRect(x + 1 + i * (pw - 2) / n, y + 1, (pw - 2) / n - 1.2, ph - 2);
+      }
+      for (let i = 0; i < 30; i++) { g.fillStyle = i % 2 ? 'rgba(90,50,20,0.3)' : 'rgba(255,220,160,0.3)'; g.fillRect(x + R(seed + i * 7) * pw, y + R(seed + i * 13) * ph, 2, 1); }
+    };
+    for (const a of Object.values(w.objs)) if (a.kind === 'stand' && !a.hidden) woodBoard(a.x - a.w / 2, a.y - a.h / 2, a.w, a.h, a.x * 1000 + a.y);
     // v4.2 鱼塘: the full basin is a damp grassy hollow; the water (and its stone-edged shore) grows with the pond level
     for (const pd of w.ponds) {
       g.fillStyle = 'rgba(70,130,40,0.35)'; g.fillRect(pd.X - 4, pd.Y - 4, pd.MW + 8, pd.MH + 8);
@@ -550,8 +564,8 @@ export class Renderer {
       if (pl.owner.kind === 'stand') {
         const grp = new THREE.Group(); grp.position.set(pl.owner.x, 0, pl.owner.y);
         const out = []; M.Env.stockStand(out, pl.owner.w, pl.owner.h);
-        const table = new THREE.Mesh(M.merge(out), M.vcMat()); table.castShadow = true; table.receiveShadow = true; table.userData.own = true; grp.add(table);
-        this.levelRoot.add(grp); stand = { grp, table, baseH: 22 }; pl.baseH = 22;
+        const board = new THREE.Mesh(M.merge(out), M.vcMat()); board.castShadow = true; board.receiveShadow = true; board.userData.own = true; grp.add(board);
+        this.levelRoot.add(grp); stand = { grp, board, baseH: 2 }; pl.baseH = 2;
       }
       return { pl, im, stand, total: -1, any: true };
     });
