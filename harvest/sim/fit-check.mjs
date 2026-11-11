@@ -70,6 +70,7 @@ export function fitB(li, env = {}) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   let bad = 0, n = 0;
   CFG.levels.forEach((L, li) => {
+    if (L.foodLines) return; // Food levels use player-managed collection stands; see food-levels-check.mjs.
     if (only && +only !== li + 1) return;
     const seas = !Number.isInteger(L.valley) ? [null] : seaArg === 'all' ? [0, 1, 2, 3] : [seaArg !== null ? +seaArg : L.season];
     for (const sea of seas) {

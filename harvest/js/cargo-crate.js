@@ -1,75 +1,136 @@
-// Reusable open wooden harvest crate for loose crops and freshly caught fish.
-// Cargo remains the original item stack; the crate is purely visual.
+// Visual-only packages for carried harvest. Cargo stays in the original game stack.
 import * as THREE from '../vendor/three.module.min.js';
 
+// Vegetables remain loose. Fruit, grain, fish and the named finished foods are visibly packaged.
 export const PACKABLE_CARGO = Object.freeze(new Set([
-  'wheat', 'tulip', 'rose', 'potato', 'tomato', 'corn', 'pumpkin', 'berry',
-  'apple', 'fish', 'grape', 'pepper', 'gold',
+  'wheat', 'tulip', 'rose', 'berry', 'apple', 'fish', 'grape', 'gold', 'xiaolongbao', 'teasnack',
 ]));
-
+const PACKAGE_KIND = Object.freeze({ fish: 'fish-crate', xiaolongbao: 'steamer', teasnack: 'steamer' });
+const PACKAGE_CAPACITY = Object.freeze({ fish: 6, xiaolongbao: 6, teasnack: 6 });
+const MAX_PACKAGES = 48;
 export function isPackableCargo(item) { return PACKABLE_CARGO.has(item); }
+export function packageKind(item) { return PACKAGE_KIND[item] || 'wood-crate'; }
+export function packageCapacity(item) { return PACKAGE_CAPACITY[item] || 24; }
 export function hasPackableCargo(stack = [], incomingItems = {}) {
-  const items = [...stack, ...Object.entries(incomingItems).flatMap(([item, n]) => Array(n).fill(item))];
-  return items.some(isPackableCargo);
+  for (const item of stack) if (isPackableCargo(item)) return true;
+  for (const [item, n] of Object.entries(incomingItems)) if (n > 0 && isPackableCargo(item)) return true;
+  return false;
 }
 
-// Carried crates form one vertical column: the next box goes directly above the last.
+export function cargoPackageLayout(counts = {}) {
+  if (typeof counts === 'number') counts = { wheat: counts };
+  let nextBox = 0;
+  const groups = {};
+  for (const item of PACKABLE_CARGO) {
+    const count = Math.max(0, Math.floor(counts[item] || 0));
+    if (!count) continue;
+    const capacity = packageCapacity(item), boxes = Math.min(MAX_PACKAGES - nextBox, Math.ceil(count / capacity));
+    groups[item] = { startBox: nextBox, boxes, capacity, count, kind: packageKind(item) };
+    nextBox += boxes;
+    if (nextBox >= MAX_PACKAGES) break;
+  }
+  return { groups, boxes: nextBox };
+}
+export function cargoItemSlot(item, ordinal, counts = {}) {
+  const group = cargoPackageLayout(counts).groups[item];
+  if (!group) return null;
+  const n = Math.max(0, Math.floor(ordinal));
+  const box = group.startBox + Math.floor(n / group.capacity);
+  const within = n % group.capacity;
+  const kind = group.kind;
+  let x, z, y;
+  if (kind === 'steamer') {
+    const angle = (within / group.capacity) * Math.PI * 2 - Math.PI / 2;
+    x = Math.cos(angle) * 8; z = Math.sin(angle) * 8; y = 7;
+  } else if (kind === 'fish-crate') {
+    x = [-15, 0, 15][within % 3]; z = [-9, 9][Math.floor(within / 3) % 2]; y = 6;
+  } else {
+    const layer = Math.floor(within / 12), cell = within % 12;
+    x = [-11, -3.5, 3.5, 11][cell % 4]; z = [-8, -2.7, 2.7][Math.floor(cell / 4)]; y = 4.5 + layer * 5;
+  }
+  const { x: cx, z: cz, base } = cargoCratePosition(box);
+  return { x: cx + x, y: base + y, z: cz + z, box, kind };
+}
+
+// Packages form one vertical column; every box/steamer sits directly above the previous one.
 export function cargoCratePosition(boxIndex) {
   const tier = Math.max(0, Math.floor(boxIndex));
-  return { x: 0, z: 0, base: tier * 18 };
+  return { x: 0, z: 0, base: tier * 24 };
 }
 
-
-// A low-draw-call single-column stack of small open crates carried as one batch. Each box holds
-// 24 visible units; every additional box sits directly above the previous one.
-const CRATE_MAX = 32;
-const crateUnit = new THREE.BoxGeometry(1, 1, 1);
+const cube = new THREE.BoxGeometry(1, 1, 1);
 const railMat = new THREE.MeshLambertMaterial({ color: 0xC77A37 });
 const postMat = new THREE.MeshLambertMaterial({ color: 0x835027 });
 const floorMat = new THREE.MeshLambertMaterial({ color: 0xA9642D });
-const _crateM = new THREE.Matrix4(), _crateQ = new THREE.Quaternion(), _crateP = new THREE.Vector3(), _crateS = new THREE.Vector3();
+const bambooMat = new THREE.MeshLambertMaterial({ color: 0xC99552 });
+const bambooDark = new THREE.MeshLambertMaterial({ color: 0x80552D });
+const steamerFloor = new THREE.CylinderGeometry(16, 16, 3, 12);
+const steamerRim = new THREE.TorusGeometry(15.5, 1.5, 4, 12);
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
 
+function mesh(geo, mat, cap, name) {
+  const o = new THREE.InstancedMesh(geo, mat, cap);
+  o.name = name; o.count = 0; o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true;
+  o.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  return o;
+}
 export function makeCargoCrateStack() {
-  const frame = new THREE.Group(); frame.name = 'carried-crate-stack';
-  const rails = new THREE.InstancedMesh(crateUnit, railMat, CRATE_MAX * 12);
-  const posts = new THREE.InstancedMesh(crateUnit, postMat, CRATE_MAX * 4);
-  const floors = new THREE.InstancedMesh(crateUnit, floorMat, CRATE_MAX);
-  for (const mesh of [rails, posts, floors]) {
-    mesh.count = 0; mesh.frustumCulled = false; mesh.castShadow = true; mesh.receiveShadow = true;
-    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); frame.add(mesh);
-  }
-  frame.userData.crateMeshes = { rails, posts, floors, count: -1 };
+  const frame = new THREE.Group(); frame.name = 'carried-package-stack';
+  const parts = {
+    rails: mesh(cube, railMat, MAX_PACKAGES * 12, 'wood-crate-rails'),
+    posts: mesh(cube, postMat, MAX_PACKAGES * 4, 'wood-crate-posts'),
+    floors: mesh(cube, floorMat, MAX_PACKAGES, 'wood-crate-floors'),
+    fishRails: mesh(cube, railMat, MAX_PACKAGES * 12, 'fish-crate-rails'),
+    fishPosts: mesh(cube, postMat, MAX_PACKAGES * 4, 'fish-crate-posts'),
+    fishFloors: mesh(cube, floorMat, MAX_PACKAGES, 'fish-crate-floors'),
+    steamFloors: mesh(steamerFloor, bambooMat, MAX_PACKAGES, 'bamboo-steamer-floors'),
+    steamRims: mesh(steamerRim, bambooDark, MAX_PACKAGES, 'bamboo-steamer-rims'),
+    steamBands: mesh(cube, bambooDark, MAX_PACKAGES * 4, 'bamboo-steamer-bands'),
+    signature: '',
+  };
+  for (const [key, value] of Object.entries(parts)) if (value?.isObject3D) frame.add(value);
+  frame.userData.packageMeshes = parts;
   return frame;
 }
+function write(target, i, x, y, z, sx, sy, sz, rx = 0) {
+  _p.set(x, y, z); _q.setFromEuler(new THREE.Euler(rx, 0, 0)); _s.set(sx, sy, sz);
+  _m.compose(_p, _q, _s); target.setMatrixAt(i, _m);
+}
+function setCount(target, n) { target.count = n; if (n) target.instanceMatrix.needsUpdate = true; }
 
-export function updateCargoCrateStack(frame, packedCount) {
-  const data = frame?.userData?.crateMeshes; if (!data) return;
-  const boxes = Math.min(CRATE_MAX, Math.ceil(Math.max(0, packedCount) / 24));
-  if (data.count === boxes) return;
-  let nr = 0, np = 0, nf = 0;
-  const write = (mesh, index, x, y, z, sx, sy, sz) => {
-    _crateP.set(x, y, z); _crateQ.identity(); _crateS.set(sx, sy, sz);
-    _crateM.compose(_crateP, _crateQ, _crateS); mesh.setMatrixAt(index, _crateM);
-  };
-  for (let b = 0; b < boxes; b++) {
-    const { x: cx, z: cz, base } = cargoCratePosition(b);
-    // Three warm horizontal slats on every side keep each box visibly open and crafted.
-    for (const h of [4, 9, 14]) {
-      write(data.rails, nr++, cx, base + h, cz - 13.5, 33, 2, 2);
-      write(data.rails, nr++, cx, base + h, cz + 13.5, 33, 2, 2);
-      write(data.rails, nr++, cx - 15.5, base + h, cz, 2, 2, 25);
-      write(data.rails, nr++, cx + 15.5, base + h, cz, 2, 2, 25);
+export function updateCargoCrateStack(frame, counts = {}) {
+  const data = frame?.userData?.packageMeshes; if (!data) return;
+  if (typeof counts === 'number') counts = { wheat: counts };
+  const layout = cargoPackageLayout(counts), sig = JSON.stringify(layout.groups);
+  if (data.signature === sig) return;
+  data.signature = sig;
+  let r=0,p=0,f=0, fr=0,fp=0,ff=0,sf=0,sr=0,sb=0;
+  for (const [item, group] of Object.entries(layout.groups)) for (let i=0;i<group.boxes;i++) {
+    const box = group.startBox + i, { x: cx, z: cz, base } = cargoCratePosition(box);
+    if (group.kind === 'steamer') {
+      write(data.steamFloors,sf++,cx,base+2,cz,1,1,1);
+      write(data.steamRims,sr++,cx,base+5,cz,1,1,1,Math.PI/2);
+      for (const dx of [-6,6]) write(data.steamBands,sb++,cx+dx,base+2.5,cz,1,2,30,0);
+      for (const dz of [-6,6]) write(data.steamBands,sb++,cx,base+2.5,cz+dz,30,2,1,0);
+      continue;
     }
-    for (const dx of [-15.5, 15.5]) for (const dz of [-13.5, 13.5]) write(data.posts, np++, cx + dx, base + 8.5, cz + dz, 3, 17, 3);
-    write(data.floors, nf++, cx, base + 1, cz, 30, 2, 24);
+    const fish = group.kind === 'fish-crate';
+    const W = fish ? 48 : 33, D = fish ? 38 : 28, wx=W/2, dz=D/2;
+    const rails=fish?data.fishRails:data.rails, posts=fish?data.fishPosts:data.posts, floors=fish?data.fishFloors:data.floors;
+    if (fish) { fr+=12; fp+=4; ff++; } else { r+=12; p+=4; f++; }
+    let ri=fish?fr-12:r-12, pi=fish?fp-4:p-4;
+    for (const h of [4,9,14]) {
+      write(rails,ri++,cx,base+h,cz-dz, W,2,2); write(rails,ri++,cx,base+h,cz+dz,W,2,2);
+      write(rails,ri++,cx-wx,base+h,cz,2,2,D); write(rails,ri++,cx+wx,base+h,cz,2,2,D);
+    }
+    for (const dx of [-wx,wx]) for (const z0 of [-dz,dz]) write(posts,pi++,cx+dx,base+8.5,cz+z0,3,17,3);
+    write(floors,fish?ff-1:f-1,cx,base+1,cz,W-3,2,D-3);
   }
-  data.rails.count = nr; data.posts.count = np; data.floors.count = nf; data.count = boxes;
-  for (const mesh of [data.rails, data.posts, data.floors]) if (mesh.count) mesh.instanceMatrix.needsUpdate = true;
+  for (const [key,n] of [['rails',r],['posts',p],['floors',f],['fishRails',fr],['fishPosts',fp],['fishFloors',ff],['steamFloors',sf],['steamRims',sr],['steamBands',sb]]) setCount(data[key],n);
 }
 
 export function makeWoodCrate() {
-  const crate = new THREE.Group();
-  crate.name = 'harvest-wood-crate';
+  const crate = new THREE.Group(); crate.name = 'harvest-wood-crate';
   const wood = new THREE.MeshLambertMaterial({ color: 0xC77A37 });
   const light = new THREE.MeshLambertMaterial({ color: 0xE5A65C });
   const dark = new THREE.MeshLambertMaterial({ color: 0x835027 });
@@ -78,28 +139,12 @@ export function makeWoodCrate() {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
     m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; crate.add(m); return m;
   };
-  // Warm, open slatted box: contents stay visible rather than being hidden in a solid cube.
-  plank(33, 2.2, 28, dark, 0, 1.2, 0); // floor
+  plank(33, 2.2, 28, dark, 0, 1.2, 0);
   for (const side of [-1, 1]) {
-    plank(33, 4.2, 2, wood, 0, 4.2, side * 13);
-    plank(33, 3.2, 2, light, 0, 9.0, side * 13);
-    plank(33, 2.2, 2, wood, 0, 13.0, side * 13);
+    plank(33, 4.2, 2, wood, 0, 4.2, side * 13); plank(33, 3.2, 2, light, 0, 9.0, side * 13); plank(33, 2.2, 2, wood, 0, 13.0, side * 13);
+    plank(2, 4.2, 22, wood, side * 15.5, 4.2, 0); plank(2, 3.2, 22, light, side * 15.5, 9.0, 0); plank(2, 2.2, 22, wood, side * 15.5, 13.0, 0);
   }
-  for (const side of [-1, 1]) {
-    plank(2, 4.2, 22, wood, side * 15.5, 4.2, 0);
-    plank(2, 3.2, 22, light, side * 15.5, 9.0, 0);
-    plank(2, 2.2, 22, wood, side * 15.5, 13.0, 0);
-  }
-  // Corner uprights, pale top rails, and small dark nail heads add crafted detail at game scale.
-  for (const x of [-15.5, 15.5]) for (const z of [-13, 13]) {
-    plank(3, 16, 3, dark, x, 8, z);
-    plank(3.4, 1.8, 3.4, light, x, 16.0, z);
-  }
-  for (const x of [-11, 0, 11]) for (const z of [-14.2, 14.2]) {
-    const nail = new THREE.Mesh(new THREE.SphereGeometry(0.85, 8, 6), iron);
-    nail.position.set(x, 8.8, z); nail.castShadow = true; crate.add(nail);
-  }
-  crate.userData.parts = crate.children.length;
-  crate.userData.packable = true;
-  return crate;
+  for (const x of [-15.5, 15.5]) for (const z of [-13, 13]) { plank(3,16,3,dark,x,8,z); plank(3.4,1.8,3.4,light,x,16,z); }
+  for (const x of [-11,0,11]) for (const z of [-14.2,14.2]) { const nail=new THREE.Mesh(new THREE.SphereGeometry(.85,8,6),iron); nail.position.set(x,8.8,z); nail.castShadow=true; crate.add(nail); }
+  crate.userData.parts=crate.children.length; crate.userData.packable=true; return crate;
 }

@@ -256,6 +256,16 @@ function flour(g) {
   g.fillStyle = '#D9C9A0'; g.beginPath(); g.roundRect(-2.4, -7.6, 4.8, 2.4, 1); g.fill();
   g.fillStyle = '#FFC21A'; E(g, 0, -1.6, 1.4, 2); g.fill(); g.strokeStyle = '#C9962A'; g.lineWidth = 0.6; g.beginPath(); g.moveTo(0, -3.4); g.lineTo(0, 0.4); g.stroke();
 }
+function xiaolongbao(g) {
+  ol(g, '#FFF2DA', '#B99464', 0.7); g.beginPath(); g.ellipse(0, 2, 6.4, 5.8, 0, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = '#FFF9EA'; g.beginPath(); g.ellipse(0, -0.2, 4.1, 3.4, 0, 0, TAU); g.fill();
+  g.strokeStyle = '#D5B47F'; g.lineWidth = 0.8; for (let i=-2;i<=2;i++) { g.beginPath(); g.moveTo(i*1.25,-4); g.lineTo(i*0.7,-6); g.stroke(); }
+  g.fillStyle = '#D7A96D'; g.beginPath(); g.arc(0,-6,1.1,0,TAU); g.fill();
+}
+function teasnack(g) {
+  ol(g, '#E8C99A', '#9A7148', 0.8); g.beginPath(); g.moveTo(-6,0); g.lineTo(-4,-5); g.lineTo(4,-5); g.lineTo(6,0); g.lineTo(5,5); g.lineTo(-5,5); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#C9475B'; g.beginPath(); g.arc(0,-1,2.3,0,TAU); g.fill(); g.fillStyle='#5B9C4B'; g.beginPath(); g.ellipse(2.2,-3.8,1.3,0.7,-0.5,0,TAU); g.fill();
+}
 function bread(g) {
   ol(g, '#D9822E', '#8E4A1E', 0.8); E(g, 0, 1, 7.6, 4.4); g.fill(); g.stroke();
   g.fillStyle = '#F2A64E'; E(g, 0, 0, 6.4, 3.2); g.fill();
@@ -301,11 +311,11 @@ function chips(g) {   // v4.6 薯条: golden fries in a red paper scoop
 }
 export const ITEM_DRAW = { egg, potato, tomato, wheat, crate, ketchup, bill, cash, tulip, rose, gold, bouquet, basket, perfume,
   log, plank, chair, milk, cheese, icecream, corn, popcorn, pumpkin, pie, berry, jam, wool, yarn, honey, apple, juice,
-  flour, bread, fish, smoked, grape, gjuice, pepper, wine, chips };
+  flour, bread, xiaolongbao, teasnack, fish, smoked, grape, gjuice, pepper, wine, chips };
 const ITEM_SIZE = { egg: [12, 13], potato: [14, 12], tomato: [13, 13], wheat: [18, 12], crate: [18, 15], ketchup: [11, 20], bill: [16, 10], cash: [18, 13],
                     tulip: [18, 12], rose: [18, 12], gold: [14, 10], bouquet: [16, 15], basket: [15, 16], perfume: [12, 16],
                     log: [18, 12], plank: [18, 12], chair: [14, 18], milk: [10, 18], cheese: [16, 12], icecream: [11, 19], corn: [18, 12], popcorn: [13, 17], pumpkin: [16, 14], pie: [17, 11], berry: [12, 14], jam: [12, 16], wool: [16, 15], yarn: [15, 15], honey: [12, 16], apple: [13, 14], juice: [10, 18],
-                    flour: [15, 17], bread: [17, 11], fish: [19, 12], smoked: [19, 12], grape: [12, 17], gjuice: [10, 18], pepper: [14, 15], wine: [9, 19], chips: [13, 17] };
+                    flour: [15, 17], bread: [17, 11], xiaolongbao: [14, 13], teasnack: [15, 13], fish: [19, 12], smoked: [19, 12], grape: [12, 17], gjuice: [10, 18], pepper: [14, 15], wine: [9, 19], chips: [13, 17] };
 
 // ---- field plants: (0,0) is the ground point, -y up. stage 0 stubble … 4 in bloom ----------------
 const TULIP_C = [['#F2486E', '#B5183E'], ['#FF6F9C', '#C9356A'], ['#E8243C', '#9E0E22'], ['#FF8FB0', '#D0507A']];

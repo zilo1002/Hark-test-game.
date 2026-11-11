@@ -99,7 +99,8 @@ function buyReady(w, skip = () => false) {
   assert.ok(allLoads.every(({ size, cap }) => size === cap), `each smokehouse feeder trip should start with a full load (${allLoads.filter(({ size, cap }) => size !== cap).map(({ size, cap }) => `${size}/${cap}`).join(', ')})`);
   assert.ok(maxLoad <= Math.max(...feeders.map((worker) => worker.cap)));
   // While a fish batch is on the carrier it remains visibly packable; cargo identity is untouched.
-  assert.ok(isPackableCargo('fish') && isPackableCargo('tomato') && isPackableCargo('apple'));
+  assert.ok(isPackableCargo('fish') && isPackableCargo('apple') && isPackableCargo('berry'));
+  for (const vegetable of ['potato', 'tomato', 'corn', 'pumpkin', 'pepper']) assert.ok(!isPackableCargo(vegetable), `${vegetable} stays unpackaged`);
   assert.ok(hasPackableCargo(['fish', 'smoked'])); assert.ok(!hasPackableCargo(['smoked']));
   const crate = makeWoodCrate(); assert.equal(crate.name, 'harvest-wood-crate'); assert.ok(crate.children.length >= 20);
   const crate0 = cargoCratePosition(0), crate1 = cargoCratePosition(1), crate2 = cargoCratePosition(2);

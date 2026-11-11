@@ -105,6 +105,8 @@ export const CFG = {
     // v3.7 — levels 31–38: mill & bakery, fish pond & smokehouse, vineyard, greenhouse, night farm
     flour:    { name: '面粉',   unit: '袋', price: 7,  step: 6.0 },
     bread:    { name: '面包',   unit: '个', price: 26, step: 5.2 },
+    xiaolongbao: { name: '小笼包', unit: '个', price: 24, step: 5.0 },
+    teasnack: { name: '莓果茶点', unit: '份', price: 22, step: 5.2 },
     fish:     { name: '鱼',     unit: '条', price: 3,  step: 3.8 },
     smoked:   { name: '熏鱼',   unit: '条', price: 18, step: 4.0 },
     grape:    { name: '葡萄',   unit: '串', price: 2,  step: 5.0 },
@@ -164,7 +166,9 @@ export const CFG = {
   v48: { feeder3: 1.2, feed3: { 蛋箱工坊: ['M1'], 麦田番茄: ['M1'], 青青大庄园: ['M2'], 木椅工坊: ['M1', 'M2'], 葡萄酒庄: ['M1'], 夜钓: ['M1', 'M2'],
                                  羊毛牧场: ['M1'], 湖畔渔村: ['M1'], 秋收集市: ['M2'], 半亩大庄园: ['M1', 'M4'], 夜间农场: ['M1'], 早市面包摊: ['M1'],
                                  湖畔集市: ['M3'], 湖畔酒庄大庄园: ['M1', 'M3'], 山谷小作坊: ['M1'], 溪畔双坊: { 0: ['M1'], 1: ['M1'], 2: ['M1', 'M2'], 3: ['M1'] }, 山谷集市: ['M1'],
-                                 四季山谷大庄园: { 0: ['M1'], 1: ['M1'], 2: ['M1', 'M2', 'M3'], 3: ['M1'] } } },
+                                 四季山谷大庄园: { 0: ['M1'], 1: ['M1'], 2: ['M1', 'M2', 'M3'], 3: ['M1'] },
+                                 晨光面包房: ['M1'], 果香早餐铺: ['M1'], 山谷茶点坊: ['M1'], 早市烘焙铺: ['M1', 'M3', 'M4'],
+                                 咸香茶歇屋: ['M1'], 山谷早餐工坊: ['M1', 'M3', 'M4'], 晨茶丰收宴: ['M3'] } },
   // v4.9 全建好才过关: from level `from` (45) on, a level clears only once essentially everything is built (every plot, machine,
   // staff tile and upgrade). sim/hard-tune.mjs sets each goal n = max(the goal's measure when the sharp bot has made `share` of
   // all purchases × (1 + margin), min(the measure at the target time, old n × maxMul), old n × minMul); target time = time[0] +
@@ -1446,6 +1450,185 @@ const VL = {
         { id: 'k', x: 780, y: 470, price: 440, icon: 'gear', label: '快机器', req: ['d'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }, { id: 'M3', mul: 0.6 }] } },
       ],
       deco: { theme: 'garden', paths: [[480, 580, 580, 100], [800, 220, 80, 360]], hedges: [[960, 880, 120, 22]], trees: [[1080, 920, 'round'], [1080, 60, 'cone']], bushes: [[700, 40], [1080, 780]] } },
+
+    // 54–60 — breakfast and tea-time food workshops. Their recipes stay the same in every chosen season;
+    // the season still changes the valley look and the season-specific growth bonus where applicable.
+    // 54 — breakfast bakery and berry preserves: two direct, independently collectable products
+    { name: '晨光面包房', W: 960, H: 780, start: [490, 420], par: 500, bill: 30, customer: { processed: { buyMin: 1, buyMax: 2 } },
+      foodLines: { A: { crop: 'wheat', gap: 9, out: 'bread', ratio: 4 }, B: { crop: 'berry', gap: 9, out: 'jam', ratio: 5 } },
+      goal: { type: 'earn', n: [36000, 36000, 36000, 36000] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 50, w: 270, h: 260 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 420, w: 270, h: 260, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', out: 'bread', ratio: 4, time: 0.55, x: 610, y: 150, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'B', out: 'jam', ratio: 5, time: 0.55, x: 720, y: 380, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B'], x: 850, y: 590 },
+      ],
+      tiles: [
+        { id: 'a', x: 430, y: 580, price: 60, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 50 } } },
+        { id: 'b', x: 420, y: 190, price: 170, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 390, y: 390, price: 170, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'd', x: 660, y: 300, price: 250, icon: 'jam', label: '果酱熬煮锅', req: ['c'], effect: { show: ['M2'] } },
+        { id: 'e', x: 900, y: 470, price: 300, icon: 'cashier', label: '早餐店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'f', x: 570, y: 650, price: 360, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'g', x: 520, y: 280, price: 310, icon: 'gear', label: '厨房升级', req: ['d'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'garden', paths: [[350, 350, 480, 80], [600, 210, 70, 180]], hedges: [[790, 730, 70, 18]], trees: [[920, 730, 'round'], [900, 50, 'cone']], bushes: [[360, 50], [780, 70]], barn: [500, 70] } },
+
+    // 55 — a quick breakfast counter: apple juice and berry preserves
+    { name: '果香早餐铺', foodMarketMultiplier: 2.6, W: 1040, H: 820, start: [520, 430], par: 500, bill: 30, extraPorters: 2, customer: { processed: { buyMin: 2, buyMax: 4 } },
+      foodLines: { A: { crop: 'apple', gap: 11, out: 'juice', ratio: 5 }, B: { crop: 'berry', gap: 9, out: 'jam', ratio: 5 } },
+      goal: { type: 'earn', n: [52250, 52000, 52000, 52000] },
+      objects: [
+        { id: 'A1', type: 'coop', item: 'A', producer: 'appletree', x: 60, y: 60, w: 280, h: 270, n: 4, max: 10, prefill: 650 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 460, w: 280, h: 270, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.55, x: 680, y: 150, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'B', time: 0.55, x: 680, y: 560, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B'], x: 900, y: 360 },
+      ],
+      tiles: [
+        { id: 'a', x: 470, y: 430, price: 70, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 50 } } },
+        { id: 'b', x: 430, y: 170, price: 190, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 420, y: 570, price: 190, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'd', x: 500, y: 690, price: 240, icon: '$mach', ln: 'B', req: ['c'], effect: { show: ['M2'] } },
+        { id: 'e', x: 430, y: 300, price: 230, icon: '$hire', ln: 'A', req: ['b'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'f', x: 550, y: 730, price: 250, icon: '$hire', ln: 'B', req: ['d'], effect: { worker: { from: ['F2'], to: ['M2'] } } },
+        { id: 'g', x: 960, y: 270, price: 320, icon: 'cashier', label: '早餐店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'h', x: 530, y: 270, price: 370, icon: 'loader', label: '园丁换铲车', req: ['e'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'i', x: 830, y: 650, price: 330, icon: 'gear', label: '榨汁与果酱机升级', req: ['d'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'garden', paths: [[360, 360, 540, 90], [760, 260, 70, 270]], hedges: [[880, 760, 70, 18]], trees: [[1000, 760, 'round'], [1000, 50, 'cone']], bushes: [[520, 50], [820, 70]] } },
+
+    // 56 — tea snacks: pumpkin pies, popcorn, and berry jam
+    { name: '山谷茶点坊', foodMarketMultiplier: 2.2, W: 1100, H: 900, start: [560, 450], par: 520, bill: 40, extraPorters: 4, customer: { processed: { buyMin: 2, buyMax: 4 } },
+      foodLines: { A: { crop: 'pumpkin', gap: 22, out: 'pie', ratio: 4 }, B: { crop: 'corn', gap: 10, out: 'popcorn', ratio: 6 }, C: { crop: 'berry', gap: 9, out: 'teasnack', ratio: 5 } },
+      goal: { type: 'earn', n: [68000, 68000, 68000, 68000] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 280, h: 230 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 330, w: 280, h: 230, hidden: true },
+        { id: 'F3', type: 'field', crop: 'C', x: 40, y: 620, w: 280, h: 230, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.6, x: 700, y: 140, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'B', time: 0.5, x: 700, y: 440, outTo: 'C1', hidden: true },
+        { id: 'M3', type: 'proc', in: 'C', out: 'teasnack', time: 0.55, x: 700, y: 740, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B', 'C'], x: 950, y: 430 },
+      ],
+      tiles: [
+        { id: 'a', x: 480, y: 470, price: 80, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
+        { id: 'b', x: 420, y: 140, price: 210, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 410, y: 350, price: 180, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'd', x: 440, y: 600, price: 180, icon: '$plot', ln: 'C', req: ['c'], effect: { show: ['F3'] } },
+        { id: 'e', x: 550, y: 300, price: 230, icon: '$mach', ln: 'B', req: ['c'], effect: { show: ['M2'] } },
+        { id: 'f', x: 550, y: 720, price: 230, icon: '$mach', ln: 'C', req: ['d'], effect: { show: ['M3'] } },
+        { id: 'g', x: 420, y: 250, price: 260, icon: '$hire', ln: 'A', req: ['b'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'h', x: 420, y: 500, price: 250, icon: '$hire', ln: 'B', req: ['e'], effect: { worker: { from: ['F2'], to: ['M2'] } } },
+        { id: 'i', x: 440, y: 820, price: 250, icon: '$hire', ln: 'C', req: ['f'], effect: { worker: { from: ['F3'], to: ['M3'] } } },
+        { id: 'j', x: 1020, y: 330, price: 340, icon: 'cashier', label: '茶点铺店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'k', x: 590, y: 500, price: 400, icon: 'loader', label: '园丁换铲车', req: ['h'], effect: { upgradeWorkers: 'loader' } },
+      ],
+      deco: { theme: 'garden', paths: [[350, 280, 600, 80], [780, 220, 90, 430]], hedges: [[930, 850, 100, 20]], trees: [[1050, 860, 'round'], [1050, 40, 'cone']], bushes: [[550, 50], [840, 60]], barn: [490, 50] } },
+
+    // 57 — a morning bakery with bread and apple juice as its two products
+    { name: '早市烘焙铺', foodMarketMultiplier: 2.0, W: 1120, H: 900, start: [560, 460], par: 530, bill: 40, customer: { processed: { buyMin: 2, buyMax: 4 } },
+      foodLines: { A: { crop: 'wheat', gap: 9, out: 'bread', ratio: 4 }, B: { crop: 'apple', gap: 11, out: 'juice', ratio: 5 } },
+      goal: { type: 'earn', n: [55500, 55500, 55500, 55500] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 280, h: 230 },
+        { id: 'A1', type: 'coop', item: 'B', producer: 'appletree', x: 60, y: 330, w: 280, h: 230, n: 4, max: 10, prefill: 600, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', out: 'bread', ratio: 4, time: 0.65, x: 700, y: 130, outTo: 'C1' },
+        { id: 'M3', type: 'proc', in: 'B', out: 'juice', time: 0.55, x: 700, y: 650, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B'], x: 900, y: 450 },
+      ],
+      tiles: [
+        { id: 'a', x: 480, y: 470, price: 80, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
+        { id: 'b', x: 430, y: 130, price: 220, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'd', x: 420, y: 360, price: 180, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['A1'] } },
+        { id: 'f', x: 450, y: 220, price: 260, icon: '$hire', ln: 'A', req: ['b'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'g', x: 560, y: 620, price: 220, icon: '$mach', ln: 'B', req: ['d'], effect: { show: ['M3'] } },
+        { id: 'i', x: 560, y: 520, price: 250, icon: '$hire', ln: 'B', req: ['g'], effect: { worker: { from: ['A1'], to: ['M3'] } } },
+        { id: 'k', x: 1070, y: 390, price: 360, icon: 'cashier', label: '早市店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'l', x: 940, y: 760, price: 420, icon: 'loader', label: '园丁换铲车', req: ['i'], effect: { upgradeWorkers: 'loader' } },
+      ],
+      deco: { theme: 'farm', paths: [[350, 290, 600, 80], [770, 180, 70, 220], [760, 500, 80, 220]], hedges: [[930, 850, 120, 20]], trees: [[1080, 860, 'round'], [1080, 40, 'cone']], bushes: [[540, 50], [880, 60]], barn: [470, 70] } },
+
+    // 58 — savory teatime snacks: fries, tomato sauce, and popcorn
+    { name: '咸香茶歇屋', foodMarketMultiplier: 3.4, W: 1120, H: 900, start: [560, 460], par: 540, bill: 40, extraPorters: 4,
+      foodLines: { A: { crop: 'potato', gap: 30, out: 'chips', ratio: 5 }, B: { crop: 'tomato', gap: 11, out: 'ketchup', ratio: 5 }, C: { crop: 'corn', gap: 10, out: 'popcorn', ratio: 6 } },
+      goal: { type: 'earn', n: [71500, 74250, 71500, 73750] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 280, h: 230 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 330, w: 280, h: 230, hidden: true },
+        { id: 'F3', type: 'field', crop: 'C', x: 40, y: 620, w: 280, h: 230, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.55, x: 700, y: 140, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'B', time: 0.55, x: 700, y: 440, outTo: 'C1', hidden: true },
+        { id: 'M3', type: 'proc', in: 'C', time: 0.5, x: 700, y: 740, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B', 'C'], x: 950, y: 440 },
+      ],
+      tiles: [
+        { id: 'a', x: 480, y: 460, price: 90, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
+        { id: 'b', x: 420, y: 140, price: 220, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 420, y: 350, price: 200, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'd', x: 420, y: 630, price: 200, icon: '$plot', ln: 'C', req: ['c'], effect: { show: ['F3'] } },
+        { id: 'e', x: 550, y: 350, price: 240, icon: '$mach', ln: 'B', req: ['c'], effect: { show: ['M2'] } },
+        { id: 'f', x: 550, y: 700, price: 240, icon: '$mach', ln: 'C', req: ['d'], effect: { show: ['M3'] } },
+        { id: 'g', x: 430, y: 250, price: 260, icon: '$hire', ln: 'A', req: ['b'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'h', x: 430, y: 510, price: 260, icon: '$hire', ln: 'B', req: ['e'], effect: { worker: { from: ['F2'], to: ['M2'] } } },
+        { id: 'i', x: 440, y: 820, price: 260, icon: '$hire', ln: 'C', req: ['f'], effect: { worker: { from: ['F3'], to: ['M3'] } } },
+        { id: 'j', x: 1010, y: 330, price: 380, icon: 'cashier', label: '茶歇店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'k', x: 590, y: 520, price: 410, icon: 'loader', label: '园丁换铲车', req: ['h'], effect: { upgradeWorkers: 'loader' } },
+      ],
+      deco: { theme: 'garden', paths: [[350, 280, 600, 80], [770, 220, 80, 430]], hedges: [[930, 850, 100, 20]], trees: [[1050, 860, 'round'], [1050, 40, 'cone']], bushes: [[540, 50], [850, 60]], barn: [500, 70] } },
+
+    // 59 — breakfast workshop: pumpkin pie and berry jam
+    { name: '山谷早餐工坊', foodMarketMultiplier: 2.0, W: 1160, H: 940, start: [590, 480], par: 560, bill: 50, customer: { processed: { buyMin: 2, buyMax: 4 } },
+      foodLines: { A: { crop: 'wheat', gap: 9, out: 'flour', ratio: 5 }, B: { crop: 'pumpkin', gap: 14, out: 'pie', ratio: 4 }, C: { crop: 'berry', gap: 9, out: 'jam', ratio: 5 } },
+      goal: { type: 'earn', n: [66000, 66000, 66000, 66000] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 270, h: 230 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 340, w: 270, h: 230, hidden: true },
+        { id: 'F3', type: 'field', crop: 'C', x: 40, y: 640, w: 270, h: 230, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.55, x: 700, y: 130, outTo: 'M2' },
+        { id: 'M2', type: 'proc', in: 'A+', out: 'bread', ratio: 4, time: 0.65, x: 810, y: 300, outTo: 'C1' },
+        { id: 'M3', type: 'proc', in: 'B', time: 0.4, x: 700, y: 600, outTo: 'C1', hidden: true },
+        { id: 'M4', type: 'proc', in: 'C', time: 0.45, x: 860, y: 760, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B', 'C'], x: 1030, y: 480 },
+      ],
+      tiles: [
+        { id: 'a', x: 500, y: 480, price: 100, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 70 } } },
+        { id: 'b', x: 430, y: 130, price: 240, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 640, y: 260, price: 280, icon: 'bread', label: '面包烤炉', req: ['b'], effect: { show: ['M2'] } },
+        { id: 'd', x: 430, y: 360, price: 210, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'e', x: 430, y: 650, price: 210, icon: '$plot', ln: 'C', req: ['d'], effect: { show: ['F3'] } },
+        { id: 'f', x: 440, y: 220, price: 280, icon: '$hire', ln: 'A', req: ['b'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'g', x: 570, y: 390, price: 260, icon: '$mach', ln: 'B', req: ['d'], effect: { show: ['M3'] } },
+        { id: 'h', x: 580, y: 760, price: 260, icon: '$mach', ln: 'C', req: ['e'], effect: { show: ['M4'] } },
+        { id: 'i', x: 450, y: 500, price: 280, icon: '$hire', ln: 'B', req: ['g'], effect: { worker: { from: ['F2'], to: ['M3'] } } },
+        { id: 'j', x: 450, y: 850, price: 280, icon: '$hire', ln: 'C', req: ['h'], effect: { worker: { from: ['F3'], to: ['M4'] } } },
+        { id: 'k', x: 1090, y: 380, price: 420, icon: 'cashier', label: '早餐店员', req: ['b'], effect: { cashier: ['C1'] } },
+      ],
+      deco: { theme: 'farm', paths: [[350, 300, 620, 80], [770, 190, 80, 180], [770, 500, 80, 200]], hedges: [[960, 890, 120, 20]], trees: [[1120, 900, 'round'], [1120, 40, 'cone']], bushes: [[560, 50], [900, 60]], barn: [500, 70] } },
+
+    // 60 — the valley breakfast-and-tea feast: steamed xiaolongbao and pumpkin pie
+    { name: '晨茶丰收宴', foodMarketMultiplier: 2.05, W: 1200, H: 1000, start: [610, 500], par: 590, bill: 60, extraPorters: 3, customer: { processed: { buyMin: 2, buyMax: 4 } },
+      foodLines: { A: { crop: 'wheat', gap: 9, out: 'xiaolongbao', ratio: 4 }, B: { crop: 'pumpkin', gap: 22, out: 'pie', ratio: 4 } },
+      goal: { type: 'earn', n: [75000, 75000, 75000, 75000] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 30, y: 35, w: 260, h: 210 },
+        { id: 'F2', type: 'field', crop: 'B', x: 30, y: 285, w: 260, h: 210, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', out: 'xiaolongbao', ratio: 4, time: 0.65, x: 730, y: 105, outTo: 'C1' },
+        { id: 'M3', type: 'proc', in: 'B', out: 'pie', time: 0.6, x: 730, y: 500, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B'], x: 930, y: 430 },
+      ],
+      tiles: [
+        { id: 'a', x: 500, y: 500, price: 110, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 80 } } },
+        { id: 'b', x: 430, y: 100, price: 260, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'd', x: 420, y: 300, price: 220, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'g', x: 450, y: 200, price: 300, icon: '$hire', ln: 'A', req: ['b'], effect: { worker: { from: ['F1'], to: ['M1'] } } },
+        { id: 'h', x: 560, y: 400, price: 280, icon: '$mach', ln: 'B', req: ['d'], effect: { show: ['M3'] } },
+        { id: 'k', x: 440, y: 460, price: 300, icon: '$hire', ln: 'B', req: ['h'], effect: { worker: { from: ['F2'], to: ['M3'] } } },
+        { id: 'n', x: 1110, y: 330, price: 480, icon: 'cashier', label: '宴席店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'o', x: 600, y: 880, price: 520, icon: 'loader', label: '园丁换铲车', req: ['k'], effect: { upgradeWorkers: 'loader' } },
+      ],
+      deco: { theme: 'farm', paths: [[330, 260, 640, 80], [790, 170, 80, 180], [790, 430, 80, 370]], hedges: [[1000, 950, 130, 22]], trees: [[1160, 960, 'round'], [1160, 35, 'cone']], bushes: [[560, 40], [980, 60]], barn: [520, 70] } },
   ],
 };
 const HIRE = { log: ['lumber', '雇伐木工'], fish: ['fisher', '拉网捕鱼'] };
@@ -1456,15 +1639,16 @@ const VCACHE = new Map();
 export function valleyLevel(k, season = 0) {
   const s = ((season | 0) % 4 + 4) % 4, key = k * 4 + s;
   if (VCACHE.has(key)) return VCACHE.get(key);
-  const sp = VL.specs[k], ln = VL.lines[s];
-  const tok = (t) => { if (typeof t !== 'string') return t; const m = /^([ABC])(\+?)$/.exec(t); return m ? (m[2] ? ln[m[1]].out : ln[m[1]].crop) : t; };
+  const sp = VL.specs[k], ln = sp.foodLines || VL.lines[s];
+  const tok = (t) => { if (typeof t !== 'string') return t; const m = /^([ABCD])(\+?)$/.exec(t); return m ? (m[2] ? ln[m[1]].out : ln[m[1]].crop) : t; };
   const L = JSON.parse(JSON.stringify(sp));
   L.valley = k; L.season = s; L.smartStaff = true;
   L.goal = { ...L.goal, n: Array.isArray(sp.goal.n) ? sp.goal.n[s] : sp.goal.n };
   if (L.goal.item) L.goal.item = tok(L.goal.item);
   for (const o of L.objects) {
     if (o.type === 'field') { const l = ln[o.crop]; o.crop = l.crop; o.gap = o.gap || l.gap; if (l.gapY) o.gapY = l.gapY; }
-    if (o.type === 'proc') { const l = ln[o.in]; o.in = l.crop; o.out = l.out; o.ratio = l.ratio; o.time = o.time || 0.5; }
+    if (o.type === 'coop' && ln[o.item]) o.item = ln[o.item].crop;
+    if (o.type === 'proc') { const m = /^([ABCD])(\+?)$/.exec(o.in), l = m && ln[m[1]]; if (m) o.in = m[2] ? l.out : l.crop; o.out = o.out || (l && l.out); o.ratio = o.ratio || (l && l.ratio) || 5; o.time = o.time || 0.5; }
     if (o.type === 'counter') o.items = [...new Set(o.items.map(tok))];
   }
   for (const t of L.tiles) {
@@ -1480,7 +1664,7 @@ export function valleyLevel(k, season = 0) {
   return L;
 }
 export const isValley = (li) => li >= VL.from && li < VL.from + VL.specs.length;
-// the area holds 15 levels (46–60); 46–53 are built, 54–60 are planned (shown as「即将开放」): append specs to VL.specs
+// the area holds 15 levels (46–60); all level specs are appended here and become playable in place
 // and they appear in place. estatePage 4 is reserved for the valley's own estate (not built yet).
 CFG.valley = { from: VL.from, n: VL.specs.length, size: 15, unlockAfter: 45, estatePage: 4, lines: VL.lines };
 // level-select areas (tabs): [first index, slots]; an area's slots past CFG.levels.length show as「即将开放」

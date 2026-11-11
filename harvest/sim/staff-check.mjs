@@ -42,6 +42,7 @@ function run(w, secs) {
   return { st, batches, trayMax, trayOverflow };
 }
 CFG.levels.forEach((L0, li) => {
+  if (L0.foodLines) return; // Dedicated food-level checks cover player collection tables rather than legacy sales porters.
   if (only && +only.split('=')[1] !== li + 1) return;
   const probe = new World(li, { quiet: true });
   if (!probe.procs.length) return;
@@ -55,7 +56,10 @@ CFG.levels.forEach((L0, li) => {
   const sale = ps;
   if (!sale) errs.push('no 加工品 counter');
   const ordinary = w.counters.find((c) => !c.sale2);
-  const machineUnlock = w.tiles.find((t) => t.effect?.show?.includes(w.procs.find((p) => p.outObj?.kind === 'counter')?.id));
+  const firstProc = w.procs.find((p) => !w.procs.some((q) => q.outObj === p));
+  const firstMachineUnlock = w.tiles.find((t) => t.effect?.show?.includes(firstProc?.id));
+  const firstTerminalProc = w.procs.find((p) => p.outObj?.kind === 'counter');
+  const machineUnlock = w.tiles.find((t) => t.effect?.show?.includes(firstTerminalProc?.id));
   const psTile = w.tiles.find((t) => t.effect?.worker?.porter && t.effect.worker.to.includes('PS'));
   if (!ordinary || ordinary.hidden) errs.push('no visible ordinary counter at start');
   if (w.counters.filter((c) => !c.sale2 && !c.hidden).length !== 1) errs.push('should start with exactly one visible ordinary counter');
@@ -70,7 +74,7 @@ CFG.levels.forEach((L0, li) => {
   if (ps && !ps.hidden) free.push('the 加工品 counter');
   if (free.length) errs.push('FREE AT START: ' + free.join(', '));
   // The first processor unlock reveals the second desk; its first porter staffs the delivery route.
-  if (ps && (!machineUnlock || !machineUnlock.effect.show.includes(ps.id))) errs.push('first processor unlock does not reveal the processed counter');
+  if (ps && (!firstMachineUnlock || !firstMachineUnlock.effect.show.includes(ps.id))) errs.push('first processor unlock does not reveal the processed counter');
   // A) every tile bought
   buyAll(w);
   const { st, batches, trayMax, trayOverflow } = run(w, SECS);

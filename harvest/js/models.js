@@ -232,6 +232,17 @@ const ITEM_PARTS = {
     P(cyl(1.0, 1.6, 1.8, 7), '#D9C9A0', [6.6, 0, 0], [0, 0, H]), P(ico(1.3, 0), '#F6F0E0', [8.0, 0, 0]),
     P(box(2.6, 0.5, 2.2), '#FFC21A', [1.8, 2.75, 0], [0, 0.3, 0]),
   ],
+  xiaolongbao: () => [
+    P(sph(4.4, 9, 6), '#FFF1D6', [0, 0.2, 0], [0, 0, 0], [1, 0.65, 1]),
+    P(sph(2.1, 7, 4), '#FFF8E8', [0, 2.8, 0], [0, 0, 0], [1, 0.55, 1]),
+    P(cone(1.1, 1.8, 6), '#E8C58F', [0, 4.1, 0]),
+  ],
+  teasnack: () => [
+    P(box(12, 3, 8), '#D7A96D', [0, -1.4, 0]),
+    P(box(10, 5, 7), '#F4D9A5', [0, 1.2, 0]),
+    P(sph(2.5, 7, 5), '#C9475B', [0, 4.5, 0]),
+    P(sph(1.6, 6, 4), '#5B9C4B', [2.6, 3.8, 1.8]),
+  ],
   bread: () => [   // golden loaf with three slashes
     P(cap(2.9, 6, 3, 9), '#D9822E', [0, 0, 0], [0, 0, H], [1, 0.82, 1.15]),
     P(cap(2.5, 5.4, 3, 9), '#F2A64E', [0, 0.5, 0], [0, 0, H], [1, 0.8, 1.05]),
@@ -283,7 +294,7 @@ export function itemGeo(type) { return ITEM_GEO[type] || (ITEM_GEO[type] = merge
 export const ITEM_TYPES = Object.keys(ITEM_PARTS);
 // half height of each item, so stacks and piles rest items on their bottom face
 export const ITEM_HALF = { wheat: 2.6, tulip: 2.2, gold: 1.7, rose: 2.2, egg: 2.2, potato: 2.4, tomato: 2.8, crate: 3.3, ketchup: 4.4, bouquet: 3.4, basket: 3.4, perfume: 4.0, bill: 0.45, cash: 1.4,
-  log: 2.8, plank: 1.3, chair: 5.9, milk: 4.6, cheese: 2.7, icecream: 6, corn: 2.2, popcorn: 4.4, pumpkin: 3.7, pie: 1.9, berry: 3.4, jam: 3.8, wool: 3.6, yarn: 4, honey: 3.8, apple: 3.3, juice: 4.9,
+  log: 2.8, plank: 1.3, chair: 5.9, milk: 4.6, cheese: 2.7, icecream: 6, corn: 2.2, popcorn: 4.4, pumpkin: 3.7, pie: 1.9, berry: 3.4, jam: 3.8, wool: 3.6, yarn: 4, honey: 3.8, apple: 3.3, juice: 4.9, xiaolongbao: 3.0, teasnack: 3.2,
   flour: 2.9, bread: 2.4, fish: 2.4, smoked: 2.4, grape: 1.6, gjuice: 4.9, pepper: 3.4, wine: 5.1, chips: 4.4 };
 
 // ------------------------------------------------------------------ crops (field plants)
@@ -788,7 +799,7 @@ export function hiveGeo() {   // stacked white bee box with a yellow roof and a 
 }
 export function appleTreeGeo() {   // round orchard tree full of red apples
   const parts = [P(cyl(1.8, 2.6, 13, 7), '#8E5627', [0, 6.5, 0]), P(ico(10, 1), '#3FA236', [0, 19, 0]), P(ico(7, 0), '#5DBB3A', [4, 24, 3]), P(ico(6.5, 0), '#2F8A2A', [-5, 17, -3])];
-  for (const [x, y, z] of [[7, 18, 6], [-7, 20, 5], [3, 25, 8], [-4, 14, 8], [8, 14, -2], [-8, 23, -2], [0, 28, 2], [5, 21, -8]]) parts.push(P(sph(1.8, 6, 5), '#E8283C', [x, y, z]));
+  for (const [x, y, z] of [[7,18,6],[-7,20,5],[3,25,8],[-4,14,8],[8,14,-2],[-8,23,-2],[0,28,2],[5,21,-8],[0,17,-8],[9,22,2],[-3,27,-6],[-9,17,1],[3,12,4],[-1,23,8]]) parts.push(P(sph(2.5, 7, 5), '#E8283C', [x, y, z]));
   return merge(parts);
 }
 
@@ -892,6 +903,17 @@ const fol = (c, kind) => {
   return m[c] || c;
 };
 export const Env = {
+  stockStand(out, w = 64, d = 42) {
+    // Compact, readable wooden collection table; stored goods sit visibly above its slatted top.
+    const legX = w / 2 - 5, legZ = d / 2 - 5;
+    for (const x of [-legX, legX]) for (const z of [-legZ, legZ])
+      out.push(P(box(4, 18, 4), '#8E5627', [x, 9, z]));
+    out.push(P(box(w, 3, d), '#A86D37', [0, 19.5, 0]));
+    for (let z = -d / 2 + 5; z <= d / 2 - 5; z += 9)
+      out.push(P(box(w - 5, 1.2, 7), (Math.round(z) / 9) % 2 ? '#C8874A' : '#B8783D', [0, 21.6, z]));
+    out.push(P(box(w + 1, 1.8, 2.4), '#75471F', [0, 22.3, -d / 2 + 1]));
+    out.push(P(box(w + 1, 1.8, 2.4), '#75471F', [0, 22.3, d / 2 - 1]));
+  },
   stoneWall(out, x0, y0, x1, y1, pa, pb) {
     const L = Math.hypot(x1 - x0, y1 - y0), a = Math.atan2(x1 - x0, y1 - y0), mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
     out.push(P(box(10, 12, L), '#E9E0CC', [mx, 6, my], [0, a, 0]));
@@ -1005,7 +1027,7 @@ export const Env = {
     out.push(P(box(18, 12, 1), '#FFFFFF', [cx, H0 * 0.55, b.y + b.h + 0.6]));
   },
 };
-export const PROC_COL = { chips: ['#FFE16B', '#E8302C'], flour: ['#FFF3DC', '#D9A05A'], bread: ['#F2C08A', '#B8552E'], smoked: ['#A0703A', '#5A3A22'], gjuice: ['#C89AF0', '#7A3EA8'], wine: ['#E8C8A0', '#7A2A3A'], plank: ['#C8874A', '#8E5627'], chair: ['#F2C08A', '#C98A4B'], cheese: ['#FFE16B', '#E8B21E'], icecream: ['#FFC2DA', '#8DB6FF'], popcorn: ['#FF8A6E', '#E8452C'], pie: ['#F2C08A', '#E8871E'], jam: ['#FF8FB0', '#C8102E'], yarn: ['#FFB3D8', '#B07ACC'], juice: ['#9BE460', '#4CB24E'], bouquet: ['#FFE16B', '#E8B21E'], basket: ['#F2C08A', '#C98A4B'], perfume: ['#FFB8D8', '#E86AA6'], crate: ['#8DB6FF', '#5B8FE8'], ketchup: ['#FF8A6E', '#E8452C'] };
+export const PROC_COL = { chips: ['#FFE16B', '#E8302C'], xiaolongbao: ['#FFF1D6', '#C98A4B'], teasnack: ['#F4D9A5', '#C9475B'], flour: ['#FFF3DC', '#D9A05A'], bread: ['#F2C08A', '#B8552E'], smoked: ['#A0703A', '#5A3A22'], gjuice: ['#C89AF0', '#7A3EA8'], wine: ['#E8C8A0', '#7A2A3A'], plank: ['#C8874A', '#8E5627'], chair: ['#F2C08A', '#C98A4B'], cheese: ['#FFE16B', '#E8B21E'], icecream: ['#FFC2DA', '#8DB6FF'], popcorn: ['#FF8A6E', '#E8452C'], pie: ['#F2C08A', '#E8871E'], jam: ['#FF8FB0', '#C8102E'], yarn: ['#FFB3D8', '#B07ACC'], juice: ['#9BE460', '#4CB24E'], bouquet: ['#FFE16B', '#E8B21E'], basket: ['#F2C08A', '#C98A4B'], perfume: ['#FFB8D8', '#E86AA6'], crate: ['#8DB6FF', '#5B8FE8'], ketchup: ['#FF8A6E', '#E8452C'] };
 
 // ------------------------------------------------------------------ 商店 decorations (v3.4)
 // Each sits on its origin, ~person-sized to a little bigger; used outside the fence in levels.

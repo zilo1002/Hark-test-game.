@@ -329,7 +329,11 @@ export class World {
     this.combo = 0; this.comboIdle = 0; this.feverT = 0; this.comboGain = 0; this.loaders = false;
     this.deco = this.L.deco || {};
     for (const o of this.L.objects) this.build(o);
-    for (const p of this.procs) p.outObj = p.outTo ? this.objs[p.outTo] : null;
+    for (const p of this.procs) {
+      p.outObj = p.outTo ? this.objs[p.outTo] : null;
+      // A collection stand is both the machine's output destination and its visible stock pile.
+      if (p.outObj && p.outObj.kind === 'stand') { p.pile = p.outObj.pile; p.pile.owner = p.outObj; }
+    }
     this.L.tiles.forEach((t, i) => {
       const price = t.effect && t.effect.proc ? Math.max(1, Math.round(t.price * CFG.procUp.price)) : t.price;   // v4.1 cheaper machine upgrades
       this.tiles.push({ ...t, price, order: i, paid: 0, bought: 0, done: false, visible: false, price0: price, payFx: 0, appearT: -9, cool: 0 });
@@ -398,11 +402,16 @@ export class World {
       if (o.prefill) c.pile.prefill(o.prefill, this.rnd, true);
       c.pile.owner = c;
       this.piles.push(c.pile); this.coops.push(c); this.objs[o.id] = c;
+    } else if (o.type === 'stand') {
+      const c = { ...base, kind: 'stand', zone: rectAt(o.x, o.y, o.w + 28, o.h + 28), pile: new Pile(o.item, o.x - o.w / 2 + 6, o.y - o.h / 2 + 6, o.w - 12, o.h - 12, o.cap) };
+      c.pile.owner = c; this.piles.push(c.pile); this.objs[o.id] = c;
     } else if (o.type === 'counter') {
       const K = CFG.counter, cu = CFG.customer;
-      const c = { ...base, kind: 'counter', stock: [], incoming: 0, everStocked: false, queue: [], cash: 0, cashier: false, clerks: 1, upLv: 0, buyBonus: 0,   // v4.3: every 店员 is a tile (none free)
+      const profile = this.L.customer && this.L.customer[o.sale2 ? 'processed' : 'raw'];
+      const customer = { ...cu, ...(profile || {}) };
+      const c = { ...base, kind: 'counter', stock: [], incoming: 0, everStocked: false, queue: [], cash: 0, cashier: false, clerks: 1, upLv: 0, buyBonus: 0, customer,   // v4.9: a food level may tune order size per stand
                   spawnT: 0.5,
-                  interval: cu.interval, serveRate: cu.serveRate, buyAcc: 0,
+                  interval: customer.interval, serveRate: customer.serveRate, buyAcc: 0,
                   desk: rectAt(o.x, o.y, K.deskW, K.deskD),
                   zone: rectAt(o.x + K.zoneDx, o.y + K.zoneDy, K.zoneW, K.zoneH),
                   serve: { x: o.x + K.serveDx, y: o.y },
@@ -437,6 +446,7 @@ export class World {
     const s = [];
     for (const c of this.counters) if (!c.hidden) s.push(c.desk);
     for (const p of this.procs) if (!p.hidden) s.push(p.body);
+    for (const a of Object.values(this.objs)) if (a.kind === 'stand' && !a.hidden) s.push(rectAt(a.x, a.y, a.w, a.h));
     for (const c of this.coops) if (!c.hidden) {
       s.push({ x: c.x - 26, y: c.y - 30, w: c.w + 32, h: 22 });           // north fence + nests
       s.push({ x: c.x - 30, y: c.y - 30, w: 22, h: c.h + 30 });           // west fence + nests
@@ -533,6 +543,11 @@ export class World {
     return P[w.pathI];
   }
 
+  itemPrice(item) {
+    const base = itemPrice(item);
+    return base * (this.L.foodMarketMultiplier || 1);
+  }
+
   refreshStats() {
     const p = this.player, u = this.upg;
     if (p.vehicle) {
@@ -564,9 +579,8 @@ export class World {
     f.type = type; f.kind = kind; f.x0 = x0; f.y0 = y0; f.z0 = z0; f.ref = ref; f.tx = tx; f.ty = ty; f.tz = tz;
     f.t = 0; f.dur = dur * (0.85 + this.rnd() * 0.3); f.active = true;
     if (kind === 'stack' && ref && isPackableCargo(type)) {
-      const packed = ref.stack.reduce((n, item) => n + (isPackableCargo(item) ? 1 : 0), 0);
-      const inbound = Object.entries(ref.incomingItems || {}).reduce((n, [item, count]) => n + (isPackableCargo(item) ? count : 0), 0);
-      f.crateSlot = packed + inbound;
+      const packed = ref.stack.reduce((n, item) => n + (item === type ? 1 : 0), 0);
+      f.crateSlot = packed + (ref.incomingItems?.[type] || 0);
     }
     // Boxable harvest should visibly settle into the open crate, not burst high above it.
     // Keep a small, lively sideways wobble and a short hop; ordinary drops keep their old arc.
@@ -589,6 +603,11 @@ export class World {
         if (isPackableCargo(f.type)) r.packPulse = 0.42;
         break;
       case 'pile': r.pending--; r.add(f.tx, f.ty, this.rnd); break;
+      case 'pileBatch': {
+        const count = f.count || 0; r.pending = Math.max(0, r.pending - count);
+        for (let i = 0; i < count; i++) r.add(f.tx + (this.rnd() - 0.5) * 8, f.ty + (this.rnd() - 0.5) * 8, this.rnd);
+        break;
+      }
       case 'counter': r.incoming--; if (r.incMade && this._made && this._made.has(f.type)) r.incMade--; r.stock.push(f.type); r.everStocked = true; r.bumpT = 1; break;
       case 'cust': r.incoming--; r.bag.push(f.type); break;
       case 'procIn': r.inc--; r.buf++; break;
@@ -631,15 +650,16 @@ export class World {
     }
     if (e.up) { this.upg[e.up.key] += e.up.v; this.refreshStats(); }
     if (e.worker) {
-      const w = this.addWorker(e.worker.from, e.worker.to, t.x, t.y, t.icon === 'cart' || t.icon === 'milker');
+      const w = this.addWorker(e.worker.from, e.worker.to, t.x, t.y, t.icon === 'cart' || t.icon === 'milker', e.worker.feeder || null);
       if (e.worker.porter) w.porter = true;     // v4.3 加工品搬运工 (tray → 加工品 counter)
       if (e.worker.raw) w.rawCarrier = true;    // v4.3 原料搬运工 (fields → raw counter)
-      if (e.worker.feeder) w.feedFor = e.worker.feeder;   // v4.5 the machine's own feeder (full loads; v4.7 never anything else)
       if (e.worker.tray) w.trayOf = e.worker.tray;        // v4.7 the porter's own machine tray
+      if (e.worker.standCarrier) w.standCarrier = true;
+      if (e.worker.fullBatch) w.fullBatch = true;
     }
     if (e.upgradeWorkers === 'loader') {
       this.loaders = true;
-      for (const w of this.workers) if (!w.cart && !w.loader && !w.porter) { w.loader = true; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
+      for (const w of this.workers) if (!w.cart && !w.loader && !w.porter && (!this.L.foodCollectionTables || !w.feedFor)) { w.loader = true; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
       this.refreshStats();
     }
     if (e.sprinkler) for (const id of e.sprinkler) { const f = this.objs[id]; if (f && (f.kind === 'field' || f.kind === 'pond')) { f.growMul = CFG.sprinkler.growMul; f.sprinkler = true; f.sprinklerT = this.t; } }
@@ -657,7 +677,7 @@ export class World {
     }
   }
 
-  addWorker(from, to, x, y, cart) {
+  addWorker(from, to, x, y, cart, feeder = null) {
     {
       const t = { x, y };
       const w = makeCollector('worker', t.x, t.y);
@@ -665,7 +685,7 @@ export class World {
       w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = cart;
       w.lumber = w.from.some((id) => this.objs[id] && this.objs[id].item === 'log');
       w.fisher = w.from.some((id) => this.objs[id] && this.objs[id].item === 'fish');   // Fisher look applies to ponds and the valley's winter fish field.
-      w.lv = 1; w.trips = 0; w.lvT = -9; w.loader = this.loaders && !w.cart;
+      w.lv = 1; w.trips = 0; w.lvT = -9; w.feedFor = feeder; w.loader = this.loaders && !w.cart && (!this.L.foodCollectionTables || !w.feedFor);
       w.done = 0; const cm = this.crew && this.crew[this.workers.length];
       if (cm) { w.crewId = cm.id; w.crewName = cm.name; w.crewMul = cm.mul; }
       this.workers.push(w); this.refreshStats();
@@ -927,7 +947,7 @@ export class World {
         for (const i of list) {
           const px = f.px(i), py = f.py(i);
           if (f.gold[i]) {   // 金色作物: pays straight into the wallet
-            const amount = itemPrice(f.item) * CFG.golden.mul;
+            const amount = this.itemPrice(f.item) * CFG.golden.mul;
             this.money += amount; this.stats.earned += amount;
             this.stats.golden[f.item] = (this.stats.golden[f.item] || 0) + 1;   // v4.0 B 图鉴 金色变种
             this.emit('golden', { x: px, y: py, amount, who: c.kind });
@@ -965,7 +985,7 @@ export class World {
           const room = space(); if (room <= 0) break;
           pd.remove(i); pd.caught++; got++; cx += f.x; cy += f.y;
           if (f.gold) {   // 金锦鲤: pays straight into the wallet, counts for the 图鉴 金色变种
-            const amount = itemPrice('fish') * CFG.golden.mul * CFG.pond.goldMul;
+            const amount = this.itemPrice('fish') * CFG.golden.mul * CFG.pond.goldMul;
             this.money += amount; this.stats.earned += amount;
             this.stats.golden.fish = (this.stats.golden.fish || 0) + 1;
             this.emit('golden', { x: f.x, y: f.y, amount, who: c.kind, koi: true });
@@ -1008,12 +1028,19 @@ export class World {
     // drop into sinks
     if (c.canDrop && c.stack.length > 0) {
       let sink = null, accepts = null;
-      for (const k of this.counters) if (!k.hidden && inRect(c.x, c.y, k.zone) && (!c.toObjs || c.toObjs.includes(k)) && c.stack.some((t) => k.items.includes(t))) { sink = k; accepts = (t) => k.items.includes(t); break; }
+      for (const a of Object.values(this.objs)) if (!isPlayer && a.kind === 'stand' && !a.hidden && inRect(c.x, c.y, a.zone) && (!c.toObjs || c.toObjs.includes(a)) && c.stack.every((t) => t === a.item) && a.pile.total + a.pile.pending + c.stack.length <= a.pile.cap) { sink = a; accepts = (t) => t === a.item; break; }
+      if (!sink) for (const k of this.counters) if (!k.hidden && inRect(c.x, c.y, k.zone) && (!c.toObjs || c.toObjs.includes(k)) && c.stack.some((t) => k.items.includes(t))) { sink = k; accepts = (t) => k.items.includes(t); break; }
       if (!sink) for (const p of this.procs) if (!p.hidden && inRect(c.x, c.y, p.inZone) && (!c.toObjs || c.toObjs.includes(p)) && c.stack.includes(p.inItem) && (c.feedFor === p.id ? this.canDropFeederBatch(c, p) : !this.procFull(p))) { sink = p; accepts = (t) => t === p.inItem; break; }
       if (!sink) for (const tr of this.trays) if (!tr.hidden && inRect(c.x, c.y, tr.zone) && (!c.toObjs || c.toObjs.includes(tr)) && c.stack.includes(tr.item)) { sink = tr; accepts = (it) => it === tr.item; break; }
       c.dropping = !!sink;
       if (sink) {
-        if (sink.kind === 'proc' && c.feedFor === sink.id) {
+        if (sink.kind === 'stand' && !isPlayer && c.standCarrier && c.stack.length === c.cap && c.incoming === 0) {
+          const count = c.stack.length, item = sink.item; c.stack.length = 0; c.dropAcc = 0;
+          sink.pile.pending += count; c.done = (c.done || 0) + count;
+          const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + count;
+          const f = this.launch(item, 'pileBatch', c.x, c.y, 44 + Math.max(0, count - 1) * CFG.items[item].step, sink.pile, sink.pile.x + sink.pile.w / 2, sink.pile.y + sink.pile.h / 2, 4, CFG.fly.drop);
+          f.count = count; f.batchCap = c.cap; f.workerSeed = c.seed;
+        } else if (sink.kind === 'proc' && c.feedFor === sink.id) {
           if (this.canDropFeederBatch(c, sink) && (!this.smart || this.sinkOpen(c, sink))) {
             const count = c.stack.length, item = sink.inItem;
             c.stack.length = 0; c.dropAcc = 0;
@@ -1021,7 +1048,7 @@ export class World {
             c.done = (c.done || 0) + count;
             const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + count;
             const f = this.launch(item, 'procBatch', c.x, c.y, 44 + Math.max(0, count - 1) * CFG.items[item].step, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop);
-            f.count = count; f.batchCap = c.batchCap || c.cap; f.by = 'feeder';
+            f.count = count; f.batchCap = c.batchCap || c.cap; f.by = 'feeder'; f.workerSeed = c.seed;
           }
         } else if (this.tryBatchDrop(c, sink, accepts, isPlayer)) {
           // v4.8.5: whole stack dropped at once (see tryBatchDrop); nothing left to trickle
@@ -1161,7 +1188,7 @@ export class World {
   }
 
   updateCounter(c, dt) {
-    const C = CFG.customer;
+    const C = c.customer || CFG.customer;
     c.bumpT = Math.max(0, c.bumpT - dt * 4);
     c.spawnT -= dt;
     // v4.9 排队不断: a customer walks up whenever the line has room (the walk takes time, so the line never looks empty);
@@ -1172,7 +1199,7 @@ export class World {
       const cu = { x: c.spawn.x + this.rnd() * 30, y: c.spawn.y + (this.rnd() - 0.5) * 20, counter: c, state: 'in',
                    want: C.buyMin + Math.floor(this.rnd() * (C.buyMax - C.buyMin + 1)) + (c.buyBonus || 0),
                    bag: [], incoming: 0, wait: 0, dry: 0, stockoutWait: 0, t0: this.t, hue: Math.floor(this.rnd() * 8), walk: this.rnd() * 6, face: -1, vx: 0, vy: 0, leg: 0 };
-      if (this.rnd() < CFG.vip.chance * this.vipMul) { cu.vip = true; cu.wish = c.items.reduce((a, b) => (itemPrice(b) > itemPrice(a) ? b : a), c.items[0]); }
+      if (this.rnd() < CFG.vip.chance * this.vipMul) { cu.vip = true; cu.wish = c.items.reduce((a, b) => (this.itemPrice(b) > this.itemPrice(a) ? b : a), c.items[0]); }
       c.queue.push(cu); this.customers.push(cu);
     }
     if (this.quiet) { const k = Math.floor(this.t), q = c.qEmpty || (c.qEmpty = []); q[k] = (q[k] || 0) + (c.queue.some((x) => x.tArr !== undefined) ? 0 : dt); }   // v4.9 metric: nobody standing in line
@@ -1211,7 +1238,7 @@ export class World {
       if (done && front.incoming === 0 && got === 0) { front.state = 'out'; front.leg = 0; c.queue.shift(); }
       else if (done && front.incoming === 0) {
         let amount = 0;
-        for (const it of front.bag) { amount += itemPrice(it); this.stats.sold[it] = (this.stats.sold[it] || 0) + 1; }
+        for (const it of front.bag) { amount += this.itemPrice(it); this.stats.sold[it] = (this.stats.sold[it] || 0) + 1; }
         if (front.vip) { amount *= CFG.vip.mul; this.emit('vipPay', { x: c.x, y: c.y, tx: c.cashPos.x, ty: c.cashPos.y, amount, cashier: c.cashier }); }
         this.stats.earned += amount;
         if (c.cashier) { this.money += amount; this.emit('cashierPay', { x: c.x, y: c.y, amount }); }
@@ -1223,9 +1250,8 @@ export class World {
   }
 
   updateCustomers(dt) {
-    const C = CFG.customer;
     for (let i = this.customers.length - 1; i >= 0; i--) {
-      const cu = this.customers[i], c = cu.counter;
+      const cu = this.customers[i], c = cu.counter, C = c.customer || CFG.customer;
       let tx, ty;
       if (cu.state === 'out') { const wp = cu.leg === 0 ? c.exitA : c.exit; tx = wp.x; ty = wp.y; }
       else { const qi = c.queue.indexOf(cu); tx = c.serve.x + qi * CFG.counter.queueGap; ty = c.serve.y; }
@@ -1256,6 +1282,7 @@ export class World {
   rawNeedsTopUp() { return this.counters.some((c) => !c.hidden && !c.sale2 && this.rawStock(c) < CFG.v46.rawLow); }
   sinkOpen(w, s) {
     if (s.kind === 'tray') return s.pile.total + s.pile.pending < s.pile.cap;   // v4.8.4: a raw tray takes goods while it has room
+    if (s.kind === 'stand') { const need = w.stack.length || w.cap; return s.pile.total + s.pile.pending + need <= s.pile.cap; }
     if (s.kind === 'proc') return w.feedFor === s.id ? this.procBatchRoom(s, w.stack.length || w.cap) : !this.procFull(s) && s.buf + s.inc < CFG.proc.inMax;
     if (s.sale2 || w.porter) return s.stock.length + s.incoming < CFG.counter.stockMax;
     const n = this.rawStock(s);
@@ -1295,6 +1322,7 @@ export class World {
   }
   workerAI(w, dt) {
     const T = this.t;
+    w.waitReason = null;
     // v4.7 fixed roles: everyone only ever works its own sources → its own sinks (no farm help, no assisting machines)
     let srcs = w.from.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
     // a porter works its own tray; when that one is empty and another tray of the same counter is heaping up, it fetches
@@ -1324,6 +1352,7 @@ export class World {
       const batch = Math.ceil(w.cap * CFG.v45.batch);
       let have = w.incoming; for (const t of w.stack) if (t === this.objs[w.feedFor].inItem) have++;
       if (have >= batch) { w.state = 'deliver'; w.batch = batch; w.batchCap = w.cap; }
+      else if (have > 0) w.waitReason = srcs.some((source) => (source.kind === 'coop' ? source.pile.total : (source.pile ? source.pile.total : 0) + (source.ripe || 0)) > 0) ? '装满整批' : '等原料补充';
     }
     // v4.7 porter: leave the tray with a fair batch, or at once when the goods counter is running low
     if (w.state === 'collect' && w.porter && this.smart) {
@@ -1343,7 +1372,7 @@ export class World {
     // v4.6 分工: nobody fills up for a sink that has no room (full counter / machine) — collect a fair batch, then wait at a post
     if (this.smart && !w.feedFor && w.state === 'collect' && w.stack.length >= Math.ceil(w.cap * CFG.v46.holdAt)) {
       const items = new Set(srcs.map((o) => o.item));
-      if (!sinks.some((k) => this.sinkOpen(w, k) && (k.kind === 'counter' ? [...items].some((t) => k.items.includes(t)) : items.has(k.inItem)))) w.state = 'deliver';
+      if (!sinks.some((k) => this.sinkOpen(w, k) && (k.kind === 'counter' ? [...items].some((t) => k.items.includes(t)) : k.kind === 'stand' ? items.has(k.item) : items.has(k.inItem)))) w.state = 'deliver';
     }
     w.canPick = w.state === 'collect';
     let tx = w.x, ty = w.y;
@@ -1356,7 +1385,8 @@ export class World {
       if (!best) {
         w.wait += dt; w.idleT = (w.idleT || 0) + dt;
         const collectWait = collectWaitLimit(w, srcs, CFG);
-        if (w.stack.length > 0 && w.wait > collectWait && !w.feedFor) w.state = 'deliver';
+        if (w.stack.length > 0 && w.wait > collectWait && !w.feedFor && !w.fullBatch) w.state = 'deliver';
+        if ((w.feedFor || w.fullBatch) && w.stack.length + w.incoming > 0) w.waitReason = '等原料补齐整批';
         // v4.7 nothing to pick up: wait at its own post (porter by its tray, others at the edge of their field)
         else if (this.smart && w.idleT > CFG.v47.idleWait) { const o = this.idlePost(w, srcs); tx = o.x; ty = o.y; }
       } else {
@@ -1387,19 +1417,19 @@ export class World {
         if (w.tgt) { tx = w.tgt.x; ty = w.tgt.y; }
         // Machine feeders never leave with a partial load just because a field is temporarily bare;
         // they wait for regrowth and only deliver a complete, frozen batch.
-        if (bv === 0 && w.stack.length > 0 && !w.feedFor) w.state = 'deliver';
+        if (bv === 0 && w.stack.length > 0 && !w.feedFor && !w.fullBatch) w.state = 'deliver';
       }
     }
     if (w.state === 'deliver') {
       let bs = null, bd = 1e18, bo = null;
       let anyTakes = false;
       for (const s of sinks) {
-        const ok = s.kind === 'counter' ? w.stack.some((t) => s.items.includes(t)) : s.kind === 'tray' ? w.stack.includes(s.item) : w.stack.includes(s.inItem);
+        const ok = s.kind === 'counter' ? w.stack.some((t) => s.items.includes(t)) : s.kind === 'tray' ? w.stack.includes(s.item) : s.kind === 'stand' ? w.stack.every((t) => t === s.item) : w.stack.includes(s.inItem);
         if (!ok) continue;
         anyTakes = true;
         if (s.kind === 'tray' && s.pile.total + s.pile.pending >= s.pile.cap) { w.blocked = s; continue; }   // v4.8.4: a full raw tray waits for the player to carry it off
-        if (s.kind === 'proc' && (w.feedFor === s.id ? !this.procBatchRoom(s, w.batchCap || w.cap) : this.procFull(s))) { w.blocked = s; continue; }   // feeders wait until the whole frozen load fits
-        if (this.smart && !this.sinkOpen(w, s)) { if (s.kind === 'proc') w.blocked = s; continue; }
+        if (s.kind === 'proc' && (w.feedFor === s.id ? !this.procBatchRoom(s, w.batchCap || w.cap) : this.procFull(s))) { w.blocked = s; if (w.feedFor === s.id) w.waitReason = '等加工台空位'; continue; }   // feeders wait until the whole frozen load fits
+        if (this.smart && !this.sinkOpen(w, s)) { if (s.kind === 'proc' || s.kind === 'stand') w.blocked = s; continue; }
         const z = s.kind === 'proc' ? s.inZone : s.zone; let dd = d2(z.cx, z.cy, w.x, w.y);
         // v4.6: a raw counter that is being topped up (it ran low) comes first, then a machine that needs crops
         // order: a raw counter that ran low → a starving machine → a counter being topped up / a machine with input
@@ -1412,10 +1442,10 @@ export class World {
       if (bs && this.smart) { const o = this.slot(bs, w); tx = o.x; ty = o.y; w.blocked = null; }
       else if (bs) { const k = (w.seed + (w.sinkRot || 0)) | 0; tx = bs.cx + ((k % 3) - 1) * 8; ty = bs.cy + ((k % 2) ? 6 : -6); w.blocked = null; }
       else if (this.smart && anyTakes && w.feedFor && w.stack.includes(this.objs[w.feedFor].inItem) && !this.objs[w.feedFor].hidden) {
-        const o = this.slot(this.objs[w.feedFor].inZone, w); tx = o.x; ty = o.y; w.holding = true; w.blocked = null;   // its machine is full: wait in its input zone, topping it up
+        const o = this.slot(this.objs[w.feedFor].inZone, w); tx = o.x; ty = o.y; w.holding = true; w.waitReason = '等加工台空位'; w.blocked = null;   // its machine is full: wait in its input zone, topping it up
       }
-      else if (this.smart && anyTakes) { const o = this.post(w, srcs); tx = o.x; ty = o.y; w.holding = true; w.blocked = null; }
-      else if (w.blocked && !w.blocked.hidden) { const z = w.blocked.inZone || w.blocked.zone, k = w.seed | 0; tx = z.cx - 30 + (k % 3) * 8; ty = z.cy + 34 + (k % 2) * 8; w.blocked = null; }   // v4.8.4: a blocked raw tray waits by its zone (a proc waits by its inZone)
+      else if (this.smart && anyTakes) { const o = this.post(w, srcs); tx = o.x; ty = o.y; w.holding = true; if (w.blocked?.kind === 'stand') w.waitReason = '等木台腾出空间'; w.blocked = null; }
+      else if (w.blocked && !w.blocked.hidden) { const z = w.blocked.inZone || w.blocked.zone, k = w.seed | 0; tx = z.cx - 30 + (k % 3) * 8; ty = z.cy + 34 + (k % 2) * 8; w.blocked = null; }   // a blocked sink waits nearby
       else if (w.stack.length) { const o = this.post(w, srcs); tx = o.x; ty = o.y; w.holding = true; w.blocked = null; } // preserve cargo until a compatible sink is available
     }
     const goal = Math.hypot(tx - w.x, ty - w.y), body = w.loader ? CFG.loader.body : 9;
@@ -1521,7 +1551,7 @@ export class World {
   }
   sourceTarget(p, free) {
     let best = null, bs = -1;
-    const value = (item) => { let v = 0; for (const pr of this.procs) if (!pr.hidden && pr.inItem === item && !this.procFull(pr)) v = Math.max(v, this.procSells(pr) ? itemPrice(pr.outItem) / pr.ratio : 0.3); for (const k of this.counters) if (!k.hidden && k.items.includes(item)) v = Math.max(v, itemPrice(item)); return v; };
+    const value = (item) => { let v = 0; for (const pr of this.procs) if (!pr.hidden && pr.inItem === item && !this.procFull(pr)) v = Math.max(v, this.procSells(pr) ? this.itemPrice(pr.outItem) / pr.ratio : 0.3); for (const k of this.counters) if (!k.hidden && k.items.includes(item)) v = Math.max(v, this.itemPrice(item)); return v; };
     for (const pl of this.piles) if (!pl.owner.hidden && pl.total > 0) {
       const val = value(pl.type); if (!val) continue;
       const i = pl.hottest(p.x, p.y, this.t); if (i < 0) continue;

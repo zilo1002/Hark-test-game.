@@ -12,7 +12,7 @@ import { FONT, elastic, hash } from './util.js';
 import { customerStyle } from './chars.js';
 import * as M from './models.js';
 import * as A from './animals3d.js';
-import { makeWoodCrate, makeCargoCrateStack, updateCargoCrateStack, hasPackableCargo, isPackableCargo, cargoCratePosition } from './cargo-crate.js';
+import { makeWoodCrate, makeCargoCrateStack, updateCargoCrateStack, hasPackableCargo, isPackableCargo, cargoCratePosition, cargoItemSlot } from './cargo-crate.js';
 
 const H2 = Math.PI / 2, TAU = Math.PI * 2, PITCH = 0.84, SINP = Math.sin(PITCH), COSP = Math.cos(PITCH), R2 = Math.SQRT1_2;
 const VIEW = { landW: 620, landH: 350, portW: 380, portH: 600, fov: 30 };
@@ -454,7 +454,7 @@ export class Renderer {
       const gold = new THREE.InstancedMesh(M.cropGeo(f.item, 0), GOLD_MAT, 96);
       gold.count = 0; gold.frustumCulled = false; gold.castShadow = true; gold.instanceMatrix.setUsage(THREE.DynamicDrawUsage); grp.add(gold);
       const spr = M.makeSprinkler(); spr.root.position.set(f.x + f.w / 2, 0, f.y + f.h / 2); spr.root.visible = false; this.levelRoot.add(spr.root);
-      this.fieldObjs.push({ f, grp, meshes, stub, gold, spr, goldPrev: new Uint8Array(f.n), stubOn: new Uint8Array(f.n), slot, vi, ang, sz, last, scale: (f.gap / 9) * ({ wheat: 1.3, tulip: 1.15, gold: 1.2, rose: 1.15, potato: 0.42, log: 0.95, corn: 1.3, pumpkin: 0.8, berry: 1.35, fish: 0.68, grape: 1.0, tomato: 1.15, pepper: 1.15 }[f.item] || 1) });
+      this.fieldObjs.push({ f, grp, meshes, stub, gold, spr, goldPrev: new Uint8Array(f.n), stubOn: new Uint8Array(f.n), slot, vi, ang, sz, last, scale: (f.gap / 9) * ({ wheat: 1.3, tulip: 1.15, gold: 1.2, rose: 1.15, potato: 0.42, log: 0.95, corn: 1.3, pumpkin: 0.8, berry: 1.85, apple: 1.35, fish: 0.68, grape: 1.3, tomato: 1.15, pepper: 1.15 }[f.item] || 1) });
     }
   }
   updateFields() {
@@ -546,13 +546,20 @@ export class Renderer {
       const im = new THREE.InstancedMesh(M.itemGeo(pl.type), M.vcMat(), pl.cap + 64);
       im.count = 0; im.frustumCulled = false; im.castShadow = true; im.receiveShadow = true; im.userData.plant = true; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       this.levelRoot.add(im);
-      return { pl, im, total: -1, any: true };
+      let stand = null;
+      if (pl.owner.kind === 'stand') {
+        const grp = new THREE.Group(); grp.position.set(pl.owner.x, 0, pl.owner.y);
+        const out = []; M.Env.stockStand(out, pl.owner.w, pl.owner.h);
+        const table = new THREE.Mesh(M.merge(out), M.vcMat()); table.castShadow = true; table.receiveShadow = true; table.userData.own = true; grp.add(table);
+        this.levelRoot.add(grp); stand = { grp, table, baseH: 22 }; pl.baseH = 22;
+      }
+      return { pl, im, stand, total: -1, any: true };
     });
   }
   updatePiles() {
     const L = CFG.pile.layer;
     for (const o of this.pileObjs) {
-      const pl = o.pl; o.im.visible = !pl.owner.hidden; if (pl.owner.hidden) continue;
+      const pl = o.pl; o.im.visible = !pl.owner.hidden; if (o.stand) o.stand.grp.visible = !pl.owner.hidden; if (pl.owner.hidden) continue;
       let any = false; const b = pl.bump; for (let i = 0; i < b.length; i++) if (b[i] > 0) { any = true; break; }
       if (!any && !o.any && pl.total === o.total) continue;
       o.any = any; o.total = pl.total;
@@ -567,7 +574,7 @@ export class Renderer {
           // v4.8.6: the newest layer pops in small and grows as its bump settles, so a
           // fresh delivery reads as a little "thunk" instead of silently appearing.
           const grow = j === h - 1 ? 1 - bb * 0.45 : 1;
-          put(arr, k++, cx + (hv - 0.5) * pl.cw * 0.6, j * L + half + top, cy + (hv2 - 0.5) * pl.ch * 0.6, hv * TAU, (1.05 + hv2 * 0.2) * grow);
+          put(arr, k++, cx + (hv - 0.5) * pl.cw * 0.6, (pl.baseH || 0) + j * L + half + top, cy + (hv2 - 0.5) * pl.ch * 0.6, hv * TAU, (1.05 + hv2 * 0.2) * grow);
         }
       }
       o.im.count = k; o.im.instanceMatrix.needsUpdate = true;
@@ -776,9 +783,10 @@ export class Renderer {
     const bend = bendAge >= 0 && bendAge < 0.45 ? Math.sin((bendAge / 0.45) * Math.PI) : 0;
     const packed = hasPackableCargo(c.stack, c.incomingItems);
     if (o.crate) {
-      const packCount = c.stack.reduce((n, item) => n + (isPackableCargo(item) ? 1 : 0), 0)
-        + Object.entries(c.incomingItems || {}).reduce((n, [item, count]) => n + (isPackableCargo(item) ? count : 0), 0);
-      updateCargoCrateStack(o.crate, packCount);
+      const packCounts = Object.create(null);
+      for (const item of c.stack) if (isPackableCargo(item)) packCounts[item] = (packCounts[item] || 0) + 1;
+      for (const [item, count] of Object.entries(c.incomingItems || {})) if (isPackableCargo(item)) packCounts[item] = (packCounts[item] || 0) + count;
+      updateCargoCrateStack(o.crate, packCounts);
       o.crate.visible = packed;
       const pulse = Math.max(0, Math.min(1, c.packPulse || 0));
       const flourish = pulse > 0 ? 1 + Math.sin((1 - pulse) * Math.PI * 5) * 0.08 * pulse : 1;
@@ -840,16 +848,18 @@ export class Renderer {
       if (n) { im.instanceMatrix.clearUpdateRanges(); im.instanceMatrix.addUpdateRange(0, n * 16); im.instanceMatrix.needsUpdate = true; }
     }
   }
-  crateCargoPoint(o, slot) {
+  crateCargoPoint(o, type, slot, counts = null) {
     const crate = o && o.crate;
-    if (!crate) return null;
-    // Each small crate holds 24 goods (12 per layer); extra boxes rise in one column.
-    const box = Math.floor(slot / 24), { x: cx, z: cz, base: tierBase } = cargoCratePosition(box);
-    const item = slot % 24, pos = item % 12, row = Math.floor(pos / 4), col = pos % 4;
-    const x = cx + [-11, -3.5, 3.5, 11][col], z = cz + [-8, -2.7, 2.7, 8][row];
-    const y = tierBase + 4.5 + Math.floor(item / 12) * 5.0;
+    if (!crate || !isPackableCargo(type)) return null;
+    if (!counts) {
+      counts = Object.create(null);
+      for (const item of o.c?.stack || []) if (isPackableCargo(item)) counts[item] = (counts[item] || 0) + 1;
+      for (const [item, n] of Object.entries(o.c?.incomingItems || {})) if (isPackableCargo(item)) counts[item] = (counts[item] || 0) + n;
+    }
+    const slotPos = cargoItemSlot(type, slot, counts);
+    if (!slotPos) return null;
     crate.updateWorldMatrix(true, false);
-    const p = crate.localToWorld(_v.set(x, y, z));
+    const p = crate.localToWorld(_v.set(slotPos.x, slotPos.y, slotPos.z));
     return { x: p.x, y: p.z, z: p.y };
   }
   drawStack(c, o, labels, isPlayer) {
@@ -859,12 +869,16 @@ export class Renderer {
     const t = this.time, sp = Math.hypot(c.vx, c.vy);
     const rx = b.fz, rz = -b.fx;          // right vector
     o.lean = (o.lean || 0) + ((c.moving ? -sp / 160 : 0) - (o.lean || 0)) * 0.12;
-    let top = { x: b.x, y: b.y, z: b.z }, packedIndex = 0;
+    let top = { x: b.x, y: b.y, z: b.z };
+    const packedCounts = Object.create(null), packedOrdinals = Object.create(null);
+    for (const type of c.stack) if (isPackableCargo(type)) packedCounts[type] = (packedCounts[type] || 0) + 1;
+    for (const [type, count] of Object.entries(c.incomingItems || {})) if (isPackableCargo(type)) packedCounts[type] = (packedCounts[type] || 0) + count;
     for (let i = 0; i < n; i++) {
       const type = c.stack[i], step = CFG.items[type].step;
       if (packed && isPackableCargo(type)) {
-        const pos = this.crateCargoPoint(o, packedIndex++);
-        if (pos) this.item(type, pos.x, pos.y, pos.z + (M.ITEM_HALF[type] || 2), o.ang + Math.PI / 2, 0.42);
+        const ordinal = packedOrdinals[type] || 0; packedOrdinals[type] = ordinal + 1;
+        const pos = this.crateCargoPoint(o, type, ordinal, packedCounts);
+        if (pos) this.item(type, pos.x, pos.y, pos.z + (M.ITEM_HALF[type] || 2), o.ang + Math.PI / 2, type === 'apple' || type === 'berry' || type === 'grape' ? 0.58 : 0.46);
         continue;
       }
       const cell = i % per, col = cell % b.cols, row = (cell / b.cols) | 0;
@@ -886,6 +900,7 @@ export class Renderer {
     if (isPlayer && n === 0) this.comboScreen = null;
     if (isPlayer) this.comboAnchor = n > 0 ? { x: top.x, y: top.y, z: top.z + 6, stack: true } : { x: c.x, y: c.y, z: 54, stack: false };
     else if (c.lv) labels.push({ k: 'lv', x: c.x, y: c.y, z: o.loader ? 50 : 50, lv: c.lv, pop: this.wt - c.lvT, name: c.crewName });
+    if (!isPlayer && c.waitReason && c.stack.length > 0) labels.push({ k: 'workerWait', x: c.x, y: c.y, z: 64, text: `${c.waitReason} ${c.stack.length}/${c.batchCap || c.cap}` });
   }
   flyItem(f) {
     const p = Math.min(1, f.t / f.dur), e = p * p * (3 - 2 * p);
@@ -893,7 +908,7 @@ export class Renderer {
     if (f.kind === 'stack') {
       const o = this.chars.get(f.ref);
       if (isPackableCargo(f.type) && o && o.crate) {
-        const target = this.crateCargoPoint(o, f.crateSlot || 0);
+        const target = this.crateCargoPoint(o, f.type, f.crateSlot || 0);
         if (target) { tx = target.x; ty = target.y; tz = target.z; }
       } else { const s = o && o.top ? o.top : { x: f.ref.x, y: f.ref.y, z: 30 }; tx = s.x; ty = s.y; tz = s.z; }
     }
@@ -1123,6 +1138,11 @@ export class Renderer {
         g.fillStyle = L.lv >= 5 ? '#FF8A1E' : L.lv >= 3 ? '#FFC21A' : '#6FC3FF';
         g.beginPath(); g.roundRect(sx - tw / 2 - 5, sy - px * 0.7, tw + 10, px * 1.4, px * 0.7); g.fill();
         this.label(txt, sx, sy, px, '#FFFFFF', '#5A3A10');
+      } else if (L.k === 'workerWait') {
+        const [sx, sy] = this.proj(L.x, L.y, L.z), px = Math.max(9, 8.5 * z);
+        g.font = FONT(px); const tw = g.measureText(L.text).width, ww = tw + px * 1.1, hh = px * 1.65;
+        g.fillStyle = 'rgba(38,57,62,0.86)'; g.beginPath(); g.roundRect(sx - ww / 2, sy - hh / 2, ww, hh, hh / 2); g.fill();
+        this.label(L.text, sx, sy, px, '#FFF3C4', '#24353A');
       } else if (L.k === 'vip') {   // VIP thought bubble: the item + ×2
         const [sx, sy] = this.proj(L.x, L.y, L.z), s = Math.max(0.8, z * 0.8), bob = 0;   // v3.7: no bobbing
         g.save(); g.translate(sx, sy - 16 * s + bob);

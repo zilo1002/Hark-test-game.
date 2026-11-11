@@ -37,6 +37,7 @@ function objRects(L, o) {
   if (o.type === 'counter') return counterRects(o.x, o.y, L.W);
   if (o.type === 'proc') return procRects(o).concat(o.tray ? [{ x: o.tray[0], y: o.tray[1], w: o.tray[2], h: o.tray[3] }] : []);
   if (o.type === 'tray') return [{ x: o.x, y: o.y, w: o.w, h: o.h }];
+  if (o.type === 'stand') return [{ x: o.x - o.w / 2, y: o.y - o.h / 2, w: o.w, h: o.h }];
   if (o.type === 'field') return [{ x: o.x, y: o.y, w: o.w, h: o.h }];
   if (o.type === 'coop') return [{ x: o.x - 30, y: o.y - 30, w: o.w + 30, h: o.h + 30 }];
   return [];
@@ -62,8 +63,147 @@ export function feed3Of(L) {
 }
 export function splitSales(L) {
   if (cache.has(L)) return cache.get(L);
-  const out = splitSales0(L); cache.set(L, out); return out;
+  const out = L.foodLines ? splitFoodLevel(L) : splitSales0(L); cache.set(L, out); return out;
 }
+
+// Food levels use player-facing collection tables instead of a second customer cashier.
+// Farms fill one raw table per crop; each machine specialist takes a full load from its
+// matching raw/intermediate table; machine outputs go to a distinct finished-goods table.
+const FOOD_OUTPUTS = {
+  8: ['bread', 'jam'], 9: ['juice', 'jam'], 10: ['pie', 'teasnack'],
+  11: ['bread', 'juice'], 12: ['chips', 'popcorn'], 13: ['pie', 'jam'], 14: ['xiaolongbao', 'pie'],
+};
+function splitFoodLevel(L0) {
+  const L = { ...L0, objects: L0.objects.map((o) => ({ ...o, items: o.items?.slice() })),
+    tiles: L0.tiles.map((t) => ({ ...t, effect: { ...t.effect, show: t.effect?.show?.slice(), cashier: t.effect?.cashier?.slice(), proc: t.effect?.proc?.map((x) => ({ ...x })), worker: t.effect?.worker ? { ...t.effect.worker, from: t.effect.worker.from?.slice(), to: t.effect.worker.to?.slice() } : undefined }, req: t.req?.slice() })) };
+  const byId = Object.fromEntries(L.objects.map((o) => [o.id, o]));
+  const allowed = new Set(FOOD_OUTPUTS[L.valley] || []);
+  const procs0 = L.objects.filter((o) => o.type === 'proc');
+  const keepProc = new Set();
+  const include = (item) => {
+    const p = procs0.find((q) => q.out === item);
+    if (!p || keepProc.has(p.id)) return;
+    keepProc.add(p.id);
+    const prior = procs0.find((q) => q.out === p.in);
+    if (prior) include(prior.out);
+  };
+  for (const item of allowed) include(item);
+  const procs = procs0.filter((p) => keepProc.has(p.id));
+  const neededRaw = new Set(procs.map((p) => p.in).filter((item) => !procs.some((q) => q.out === item)));
+  const sourceObj = (o) => o.type === 'field' ? o.crop : o.type === 'coop' ? o.item : null;
+  const sources = L.objects.filter((o) => ['field', 'coop'].includes(o.type) && neededRaw.has(sourceObj(o)));
+  const keepObjectIds = new Set([...sources.map((o) => o.id), ...procs.map((p) => p.id)]);
+  const outItems = [...new Set(procs.map((p) => p.out))];
+  // Replaced processing trays become output collection stands; do not reserve their former footprint.
+  for (const p of procs) delete p.tray;
+  const main = L.objects.find((o) => o.type === 'counter' && o.id === 'C1') || L.objects.find((o) => o.type === 'counter');
+  if (main) { main.items = [...new Set([...sources.map(sourceObj), ...outItems])]; main.hidden = false; main.foodManualSupply = true; }
+  const removedObjects = new Set(L.objects.filter((o) => !keepObjectIds.has(o.id) && o !== main).map((o) => o.id));
+  L.objects = L.objects.filter((o) => !removedObjects.has(o.id));
+  // Keep common upgrades/cashier, and only machine/plot unlocks still attached to retained objects.
+  // Keep the ordinary upgrades and unlocks that still describe retained objects. Re-anchor
+  // branches whose former prerequisite was a removed food line to the opening upgrade, so
+  // deleting an over-complex recipe cannot strand a later retained machine behind a dead tile.
+  let tiles = L.tiles.filter((t) => !t.effect.worker).map((t) => {
+    const e = { ...t.effect };
+    if (e.show) e.show = e.show.filter((id) => keepObjectIds.has(id));
+    if (e.proc) e.proc = e.proc.filter((x) => keepProc.has(x.id));
+    if (e.procUp && !keepProc.has(e.procUp)) delete e.procUp;
+    return { ...t, effect: e, req: t.req?.slice(), reqAny: t.reqAny?.slice() };
+  }).filter((t) => {
+    const e = t.effect;
+    return !(e.show && e.show.length === 0) && !(e.proc && e.proc.length === 0) &&
+      !(e.show === undefined && !e.up && !e.cashier && !e.vehicle && !e.upgradeWorkers && !e.proc && !e.procUp && !e.hens && !e.sprinkler && !e.feeder && !e.counterUp);
+  });
+  if (!tiles.length) tiles = [{ id: 'food_start', x: L.start[0] - 60, y: L.start[1], price: 1, icon: 'cap', label: '开工', effect: { up: { key: 'cap', v: 0 } } }];
+  const rootTile = tiles.find((t) => t.effect.up) || tiles[0];
+  let validIds = new Set(tiles.map((t) => t.id));
+  tiles = tiles.map((t) => {
+    let req = (t.req || []).filter((id) => validIds.has(id));
+    if (t !== rootTile && (t.req || []).length && !req.length) req = [rootTile.id];
+    let reqAny = (t.reqAny || []).filter((id) => validIds.has(id));
+    if ((t.reqAny || []).length && !reqAny.length) reqAny = [];
+    return { ...t, req: req.length ? req : undefined, reqAny: reqAny.length ? reqAny : undefined };
+  });
+  // Ensure every retained source and processor has a real reveal tile. A hidden source gate
+  // or machine gate is a prerequisite to its staff tile and collection stand.
+  const reveal = (id) => tiles.find((t) => t.effect.show?.includes(id));
+  const addGate = (id, label, icon) => {
+    const o = L.objects.find((x) => x.id === id);
+    const tile = { id: `food_unlock_${id}`, x: o?.x ?? L.start[0], y: o?.y ?? L.start[1], price: Math.max(100, (rootTile.price || 100) * 1.2), icon, label, req: [rootTile.id], effect: { show: [id] } };
+    tiles.push(tile); return tile;
+  };
+  for (const src of sources) if (src.hidden && !reveal(src.id)) addGate(src.id, '解锁原料田', 'plot');
+  for (const proc of procs) if (!reveal(proc.id)) addGate(proc.id, '解锁加工机', proc.out);
+  // Restore all references after inserting the new gates.
+  validIds = new Set(tiles.map((t) => t.id));
+  tiles = tiles.map((t) => { const req = (t.req || []).filter((id) => validIds.has(id)); const reqAny = (t.reqAny || []).filter((id) => validIds.has(id)); return { ...t, req: req.length ? req : undefined, reqAny: reqAny.length ? reqAny : undefined }; });
+  const tileForObject = (id) => tiles.find((t) => t.effect.show?.includes(id));
+  const cropKinds = [...new Set(sources.map(sourceObj))];
+  const stands = [];
+  const standSpot = (px, py) => {
+    const size = { w: 64, h: 42 }, occupied = blockers(L, null).concat(stands.map((a) => R(a.x, a.y, a.w, a.h)));
+    let best = null, score = 1e18;
+    for (let x = 45; x <= L.W - 45; x += 16) for (let y = 45; y <= L.H - 45; y += 16) {
+      const r = R(x, y, size.w, size.h);
+      if (!inside(L, r, 18) || occupied.some((b) => ov(r, b, 3))) continue;
+      const d = Math.hypot(x - px, y - py); if (d < score) { score = d; best = [x, y]; }
+    }
+    return best || [Math.min(L.W - 50, Math.max(50, px)), Math.min(L.H - 50, Math.max(50, py))];
+  };
+  const saveStand = (stand) => { stands.push(stand); L.objects.push(stand); return stand; };
+  for (const item of cropKinds) {
+    const src = sources.filter((o) => sourceObj(o) === item);
+    const x = Math.min(L.W - 90, Math.max(90, Math.max(...src.map((o) => o.x + o.w)) + 38));
+    const y = src.reduce((n, o) => n + o.y + o.h / 2, 0) / src.length;
+    const id = `R_${item}`;
+    const [sx, sy] = standSpot(x, y);
+    saveStand({ id, type: 'stand', role: 'raw', item, x: sx, y: sy, w: 64, h: 42, cap: 700 });
+  }
+  for (const item of outItems) {
+    const p = procs.find((q) => q.out === item);
+    const id = `P_${item}`;
+    const [sx, sy] = standSpot(Math.min(L.W - 105, p.x + 76), p.y + 56);
+    const stand = saveStand({ id, type: 'stand', role: 'processed', item, x: sx, y: sy, w: 64, h: 42, cap: 500, hidden: true });
+    p.outTo = id;
+    const unlock = tileForObject(p.id);
+    if (unlock) unlock.effect.show = [...new Set([...(unlock.effect.show || []), id])];
+  }
+  L.tiles = tiles; // keep procedural hire tiles in the placement blockers as they are added.
+  const first = tiles[0];
+  const gen = [];
+  const add = (t) => { tiles.push(t); gen.push(t); return t; };
+  const hirePrice = Math.max(80, Math.min(240, Math.round((L.tiles.find((t) => t.effect.up)?.price || 160) * 1.8 / 10) * 10));
+  // One farmhand per field/co-op; every crop type shares its own raw table.
+  for (const src of sources) {
+    const item = sourceObj(src), stand = stands.find((x) => x.role === 'raw' && x.item === item);
+    const gate = tileForObject(src.id);
+    const req = gate ? [gate.id] : [first.id];
+    const pos = spot(L, stand.x - 10, stand.y + 55);
+    add({ id: `food_farm_${src.id}`, x: pos[0], y: pos[1], price: hirePrice, icon: src.type === 'coop' ? 'cart' : 'worker', label: '田间采收工', req,
+      effect: { worker: { from: [src.id], to: [stand.id], raw: true, standCarrier: true, fullBatch: true } } });
+  }
+  // Exactly one full-batch machine specialist per processor, including intermediate stages.
+  for (const proc of procs) {
+    const source = stands.find((x) => x.item === proc.in && (x.role === 'raw' || x.role === 'processed'));
+    const machineTile = tileForObject(proc.id);
+    if (!source || !machineTile) continue;
+    const upstream = procs.find((q) => q.out === proc.in);
+    const upstreamTile = upstream && tileForObject(upstream.id);
+    const pos = spot(L, proc.x - 80, proc.y + 65);
+    add({ id: `food_machine_${proc.id}`, x: pos[0], y: pos[1], price: hirePrice, icon: 'worker', label: '机器专员',
+      req: [...new Set([machineTile.id, ...(upstreamTile ? [upstreamTile.id] : [])])],
+      effect: { worker: { from: [source.id], to: [proc.id], feeder: proc.id, fullBatch: true } } });
+  }
+  // Keep every tile's prerequisite references valid and place the new hires early after the starter tile.
+  const ids = new Set(tiles.map((t) => t.id));
+  tiles = tiles.filter((t) => (t.req || []).every((id) => ids.has(id)));
+  L.tiles = tiles.length ? [tiles[0], ...gen, ...tiles.filter((t) => t !== tiles[0] && !gen.includes(t))] : gen;
+  L.foodCollectionTables = true;
+  L.objects = L.objects.map((o) => o.type === 'proc' ? { ...o, tray: undefined } : o);
+  return L;
+}
+
 const MNAME = { bouquet: '花束机', crate: '蛋箱机', ketchup: '番茄酱机', basket: '花篮机', perfume: '香水机', plank: '锯木机', chair: '木椅机',
   cheese: '奶酪机', icecream: '冰淇淋机', popcorn: '爆米花机', jam: '果酱机', pie: '南瓜派烤炉', yarn: '毛线机', juice: '榨汁机', flour: '磨坊',
   bread: '面包烤炉', smoked: '熏鱼房', gjuice: '葡萄榨汁机', wine: '橡木酒桶', chips: '薯条炸锅' };
@@ -179,7 +319,7 @@ function splitSales0(L0) {
   for (const p of procs) p.hidden = true;
   // Show both category stands as soon as the first processing machine unlocks.
   // Goods still route to the processed stand automatically; its porter hire remains a separate staff tile.
-  const firstMachineTile = mTile[T[0].id];
+  const firstMachineTile = mTile[procs[0].id];
   firstMachineTile.effect = { ...firstMachineTile.effect, show: [...new Set([...(firstMachineTile.effect.show || []), sale.id])] };
   for (const [p, src] of needFeeder) {
     const sp = spot(L, p.x - 90, p.y + 60);
@@ -260,7 +400,7 @@ function splitSales0(L0) {
     rawT.push(tile); rawCovered.add(item);
   }
   // v4.7 人员适配: one 加工品搬运工 per finished-goods machine, with at least two for a separate goods counter.
-  const nP = Math.max(T.length, 2);
+  const nP = Math.max(T.length, 2) + (L0.extraPorters || 0);
   const por = [];
   for (let k = 0; k < nP; k++) {
     const p = T[k % T.length], sp = spot(L, p.tray[0] + p.tray[2] / 2 + 10, p.tray[1] + p.tray[3] + 40);
@@ -273,11 +413,11 @@ function splitSales0(L0) {
                                             repeat: { times: V.cup.times, mul: V.cup.mul }, effect: { counterUp: ids } });
   let pc = null, pu = null;
   const existingCashiers = L.tiles.filter((t) => t.effect.cashier && t.effect.cashier.length);
-  if (existingCashiers.length) {
-    // One cashier can serve the paired counters; keep the new desk usable without adding a
-    // second paid cashier that competes with the level's original upgrades and objectives.
+  if (existingCashiers.length && !L0.separateProcessedCashier) {
+    // Most levels can reuse their original cashier for the paired goods counter.
     for (const t of existingCashiers) t.effect = { ...t.effect, cashier: [...new Set([...t.effect.cashier, sale.id])] };
   } else {
+    // Food workshops may explicitly give the busy processed counter its own cashier.
     const spC = spot(L, sale.x + CFG.counter.cashDx - 30, sale.y + CFG.counter.cashDy + 50);
     pc = add({ id: 'x_pc', x: spC[0], y: spC[1], price: r10(s * V.clerk), icon: 'cashier', label: '加工品店员', req: [firstMachineTile.id], effect: { cashier: [sale.id] } });
     pu = cup('x_pu', pc, [sale.id], 'x_pc');
