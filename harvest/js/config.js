@@ -238,7 +238,7 @@ export const CFG = {
       goal: { type: 'collect', item: 'egg', n: 4350 },
       objects: [
         { id: 'K1', type: 'coop', item: 'egg', producer: 'hen', x: 70, y: 70, w: 330, h: 280, n: 4, max: 20, prefill: 1800 },
-        { id: 'T1', type: 'tray', item: 'egg', x: 520, y: 360, w: 40, h: 44 },
+        { id: 'T1', type: 'stand', role: 'raw', item: 'egg', x: 540, y: 382, w: 64, h: 42, cap: 300 },   // v4.9.4: real wooden stand (was a dashed-outline raw tray); centre kept on the old tray's centre; cap 300 (was 120) so two porters can keep working while the player shuttles — 120 starved them, they waited with full loads
         { id: 'C1', type: 'counter', items: ['egg'], x: 600, y: 380 },
         { id: 'C2', type: 'counter', items: ['egg'], x: 600, y: 540, hidden: true },
       ],

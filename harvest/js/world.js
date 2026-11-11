@@ -863,7 +863,7 @@ export class World {
 
   // v4.8.5: whole-stack batch drop — one trip, everything at once. The player and
   // non-feeder workers use the same 'procBatch' port as feeders for machines; counters
-  // and raw trays get one flight per item launched in the same frame. Returns true
+  // and raw trays / wooden stands get one flight per item launched in the same frame. Returns true
   // when the whole stack was dropped; otherwise the caller falls back to the old
   // one-by-one trickle (a mixed stack, items still flying in, or a sink that cannot
   // take the whole load at once).
@@ -894,6 +894,19 @@ export class World {
         this.launch(it, 'counter', c.x, c.y, 44 + k * CFG.items[it].step, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop);
       });
     } else if (sink.kind === 'tray') {
+      const pl = sink.pile;
+      if (pl.total + pl.pending + n > pl.cap) return false;
+      if (!isPlayer && this.smart && !this.sinkOpen(c, sink)) return false;
+      c.stack.length = 0; c.dropAcc = 0;
+      if (!isPlayer) { c.done = (c.done || 0) + n; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + n; }
+      items.forEach((it, k) => {
+        pl.pending++;
+        this.launch(it, 'pile', c.x, c.y, 44 + k * CFG.items[it].step, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop);
+      });
+    } else if (sink.kind === 'stand') {
+      // v4.9.4: a wooden stand takes a whole stack exactly like a raw tray; without this,
+      // a non-standCarrier worker (e.g. level 3's egg porter) fell through to the trickle
+      // loop, which had no stand case and launched a 'procIn' flight at the stand.
       const pl = sink.pile;
       if (pl.total + pl.pending + n > pl.cap) return false;
       if (!isPlayer && this.smart && !this.sinkOpen(c, sink)) return false;
@@ -1056,13 +1069,16 @@ export class World {
           c.dropAcc = Math.min(c.dropAcc + c.dropRate * dt, Math.max(1, c.dropRate * 0.1));
           while (c.dropAcc >= 1) {
             let idx = -1; for (let j = c.stack.length - 1; j >= 0; j--) if (accepts(c.stack[j])) { idx = j; break; }
-            if (idx < 0 || (sink.kind === 'proc' && this.procFull(sink)) || (sink.kind === 'tray' && sink.pile.full())) break;
+            if (idx < 0 || (sink.kind === 'proc' && this.procFull(sink)) || (sink.kind === 'tray' && sink.pile.full()) || (sink.kind === 'stand' && sink.pile.full())) break;
             if (this.smart && !isPlayer && !this.sinkOpen(c, sink)) break;   // v4.6: staff never overfill a counter / machine
             const item = c.stack[idx];
             c.stack.splice(idx, 1); c.dropAcc--;
             if (!isPlayer) { c.done = (c.done || 0) + 1; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + 1; }   // 雇工 XP (+ v4.3 where it went)
             const z = 44 + idx * CFG.items[item].step;
             if (sink.kind === 'tray') {   // v4.8.4: heap it onto the raw tray (same 'pile' flight as machine output)
+              const pl = sink.pile; pl.pending++;
+              this.launch(item, 'pile', c.x, c.y, z, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop);
+            } else if (sink.kind === 'stand') {   // v4.9.4: heap it onto the wooden stand (same 'pile' flight as a raw tray)
               const pl = sink.pile; pl.pending++;
               this.launch(item, 'pile', c.x, c.y, z, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop);
             } else if (sink.kind === 'counter') { sink.incoming++; if ((this._made || (this._made = new Set(this.procs.map((q) => q.outItem)))).has(item)) sink.incMade = (sink.incMade || 0) + 1; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop); }
@@ -1121,7 +1137,8 @@ export class World {
     if (c.incoming > 0) return true;
     for (const w of this.workers) {
       // v4.8.4: a worker carrying goods to a raw tray that feeds this counter is supply in transit too
-      const viaTray = (w.to || []).some((id) => { const o = this.objs[id]; return o && o.kind === 'tray' && c.items.includes(o.item); });
+      // v4.9.4: a wooden stand feeding this counter counts the same way (level 3's raw stand)
+      const viaTray = (w.to || []).some((id) => { const o = this.objs[id]; return o && (o.kind === 'tray' || o.kind === 'stand') && c.items.includes(o.item); });
       if (!w.to || (!w.to.includes(c.id) && !viaTray)) continue;
       const cargo = w.stack.slice();
       for (const f of this.fly) if (f.active && f.kind === 'stack' && f.ref === w) cargo.push(f.type);
@@ -1174,7 +1191,8 @@ export class World {
       const w = t.effect && t.effect.worker;
       if (!w || !w.to) return false;
       // v4.8.4: a hire whose destination is a raw tray feeding this counter is a planned supply route for it
-      const viaTray = w.to.some((id) => { const o = this.objs[id]; return o && o.kind === 'tray' && c.items.includes(o.item); });
+      // v4.9.4: a wooden stand destination counts the same way (level 3's raw stand)
+      const viaTray = w.to.some((id) => { const o = this.objs[id]; return o && (o.kind === 'tray' || o.kind === 'stand') && c.items.includes(o.item); });
       if (!w.to.includes(c.id) && !viaTray) return false;
       if (w.porter) {
         const p = this.objs[w.tray];
@@ -1428,6 +1446,7 @@ export class World {
         if (!ok) continue;
         anyTakes = true;
         if (s.kind === 'tray' && s.pile.total + s.pile.pending >= s.pile.cap) { w.blocked = s; continue; }   // v4.8.4: a full raw tray waits for the player to carry it off
+        if (s.kind === 'stand' && s.pile.total + s.pile.pending + (w.stack.length || w.cap) > s.pile.cap) { w.blocked = s; continue; }   // v4.9.4: a stand that cannot take this whole load waits (same spot as a full tray); the smart path covers this via sinkOpen, this covers non-smart levels like level 3
         if (s.kind === 'proc' && (w.feedFor === s.id ? !this.procBatchRoom(s, w.batchCap || w.cap) : this.procFull(s))) { w.blocked = s; if (w.feedFor === s.id) w.waitReason = '等加工台空位'; continue; }   // feeders wait until the whole frozen load fits
         if (this.smart && !this.sinkOpen(w, s)) { if (s.kind === 'proc' || s.kind === 'stand') w.blocked = s; continue; }
         const z = s.kind === 'proc' ? s.inZone : s.zone; let dd = d2(z.cx, z.cy, w.x, w.y);
