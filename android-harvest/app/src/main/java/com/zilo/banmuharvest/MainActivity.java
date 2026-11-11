@@ -3,6 +3,7 @@ package com.zilo.banmuharvest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -69,6 +70,30 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** JS: window.AndroidApp.getVersionName() / .openUrl(url) — the About page + update check.
+     *  getVersionName reads the installed package's versionName (same value in both build
+     *  paths: Gradle versionName and the direct-SDK --version-name), so the game never
+     *  hard-codes its own version. openUrl hands a link to the system browser, which is
+     *  what downloads the new APK; tapping the finished download starts the installer. */
+    public static final class AndroidApp {
+        private final Activity act;
+        AndroidApp(Activity a) { act = a; }
+
+        @JavascriptInterface
+        public String getVersionName() {
+            try { return act.getPackageManager().getPackageInfo(act.getPackageName(), 0).versionName; }
+            catch (Exception e) { return ""; }
+        }
+
+        @JavascriptInterface
+        public void openUrl(String url) {
+            try {
+                Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                act.startActivity(i);
+            } catch (Exception ignored) { }
+        }
+    }
+
     private static final Map<String, String> MIME = new HashMap<>();
     static {
         MIME.put("html", "text/html"); MIME.put("js", "text/javascript"); MIME.put("mjs", "text/javascript");
@@ -102,6 +127,7 @@ public class MainActivity extends Activity {
         web.setVerticalScrollBarEnabled(false);
         web.setHorizontalScrollBarEnabled(false);
         web.addJavascriptInterface(new Haptics(this), "AndroidHaptics");
+        web.addJavascriptInterface(new AndroidApp(this), "AndroidApp");
         web.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {

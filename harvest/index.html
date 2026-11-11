@@ -88,6 +88,7 @@
       <button class="tile" id="mMode"><b>界面模式</b><small id="mModeSub"></small></button>
       <button class="tile" id="mQual"><b>画质</b><small id="mQualSub"></small></button>
       <button class="tile" id="mSave"><b>震动 · 存档</b><small id="mSaveSub"></small></button>
+      <button class="tile" id="mAbout"><b>关于这个游戏</b><small id="mAboutSub"></small></button>
     </section>
   </div></div>
 </div></div>
@@ -134,6 +135,16 @@
     <button class="small danger" id="btnReset">重置全部进度</button>
   </div>
   <div class="mfoot"><button class="big" data-close>好的</button></div>
+</div></div>
+
+<div id="about" class="modal hidden"><div class="card sheet">
+  <div class="mhead"><h2>关于这个游戏</h2><button class="xclose" data-close aria-label="关闭">✕</button></div>
+  <div class="mbody">
+    <div class="rowh">半亩·丰收</div>
+    <div class="note" id="aboutVer">当前版本：…</div>
+    <div class="note" id="aboutNote" role="status" aria-live="polite"></div>
+  </div>
+  <div class="mfoot"><button class="big" id="btnCheckUpdate">检查更新</button></div>
 </div></div>
 
 <div id="shop" class="modal hidden"><div class="card sheet wide shopCard">

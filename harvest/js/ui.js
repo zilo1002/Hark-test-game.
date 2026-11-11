@@ -21,13 +21,29 @@ function swipe(el, cb) {
   el.addEventListener('pointercancel', () => { x0 = null; });
 }
 
+// 关于这个游戏: compare dotted versions numerically ("4.8.9" > "4.8.8")
+function cmpVer(a, b) {
+  const pa = String(a).split('.').map((x) => parseInt(x, 10) || 0), pb = String(b).split('.').map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) { const d = (pa[i] || 0) - (pb[i] || 0); if (d) return d; }
+  return 0;
+}
+// latest GitHub release for this game (public API, no auth); 15 s timeout
+async function fetchLatestRelease() {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), 15000);
+  try {
+    const r = await fetch('https://api.github.com/repos/zilo1002/Hark-test-game./releases/latest', { signal: c.signal, headers: { Accept: 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error(`http ${r.status}`);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+
 export class UI {
   constructor(h) {
     this.h = h;
     this.el = { hud: $('hud'), money: $('money'), coin: $('coin'), lv: $('lvBadge'), goal: $('goalText'), bar: $('goalBar'), num: $('goalNum'),
                 tip: $('tip'), banner: $('banner'), home: $('home'), stars: $('starCount'), list: $('restoreList'), hint: $('restoreHint'),
                 play: $('btnPlay'), levels: $('levels'), grid: $('levelGrid'), settings: $('settings'), win: $('win'), pause: $('pause'),
-                menu: $('menu'), env: $('envInfo'), buildUI: $('build') };
+                menu: $('menu'), env: $('envInfo'), buildUI: $('build'), about: $('about') };
     this.lastMoney = -1; this.lastGoal = ''; this.stack = []; this.page = 0; this.build = false; this.trayTab = 'build'; this.lvPage = -1;
     const tapped = (fn) => () => { h.tap(); fn(); };
     // v4.1 home: estate + 开始游戏 / 选择关卡; top-right 商店 · 设置 · 声音; bottom-right ★ = 装扮庄园
@@ -51,6 +67,7 @@ export class UI {
     $('mMode').onclick = tapped(() => this.openSettings('mode'));
     $('mQual').onclick = tapped(() => this.openSettings('qual'));
     $('mSave').onclick = tapped(() => this.openSettings());
+    $('mAbout').onclick = tapped(() => this.openAbout());
     $('btnPause').onclick = () => this.openPause();
     $('btnResume').onclick = () => this.closeModal(this.el.pause);
     $('btnPRestart').onclick = () => { h.restart(); };
@@ -93,7 +110,7 @@ export class UI {
     $('btnDrHome').onclick = () => { this.el.dres.classList.add('hidden'); h.home(); };
     this.el.play.onclick = () => h.play();
     $('btnNext').onclick = () => { this.el.win.classList.add('hidden'); h.next(); };
-    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop, this.el.orders, this.el.crew, this.el.daily, this.el.book, this.el.menu, this.el.env]) {
+    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop, this.el.orders, this.el.crew, this.el.daily, this.el.book, this.el.menu, this.el.env, this.el.about]) {
       m.addEventListener('click', (e) => { if ((e.target === m && !m.classList.contains('dock')) || (e.target.closest && e.target.closest('[data-close]'))) this.closeModal(m); });
     }
     $('optSound').onchange = (e) => { h.setting('sound', e.target.checked); this.renderSound(); };
@@ -101,6 +118,7 @@ export class UI {
     for (const b of $('optQual').children) b.onclick = () => { h.setting('quality', b.dataset.q === 'auto' ? 'auto' : +b.dataset.q); h.tap(); this.renderSettings(); };
     for (const b of $('optMode').children) b.onclick = () => { h.setting('mode', b.dataset.m); h.tap(); this.renderSettings(); };
     const reset = $('btnReset');
+    $('btnCheckUpdate').onclick = () => { h.tap(); this.checkUpdate(); };
     reset.onclick = () => {
       if (!reset.dataset.armed) { reset.dataset.armed = '1'; reset.textContent = '再点一次：确定清空所有进度'; setTimeout(() => { delete reset.dataset.armed; reset.textContent = '重置全部进度'; }, 3000); return; }
       delete reset.dataset.armed; reset.textContent = '重置全部进度';
@@ -298,6 +316,7 @@ export class UI {
     const L = this.h.layoutInfo(); $('mModeSub').textContent = d.settings.mode && d.settings.mode !== 'auto' ? MODES[d.settings.mode] : `自动 · ${MODES[L.detected]}`;
     $('mQualSub').textContent = QNAME[d.settings.quality ?? 'auto'];
     $('mSaveSub').textContent = `震动${d.settings.vib ? '开' : '关'} · 重置进度`;
+    $('mAboutSub').textContent = `版本 ${this.appVersion() || '未知'}`;
   }
   openEnv() {
     const si = seasonInfo(), fi = festivalInfo(), nf = nextFestival(), data = this.h.data();
@@ -523,6 +542,65 @@ export class UI {
     const vibOk = typeof navigator.vibrate === 'function' || !!window.AndroidHaptics;
     $('storeNote').textContent = (storageAvailable() ? '进度自动保存在本机。' : '这个浏览器不能保存进度，关掉页面后会从头开始。') + (vibOk ? '' : ' 这台设备不支持震动。');
     this.renderSound();
+  }
+  // ---------------------------------------------------------------- 关于这个游戏
+  // current version, from the Android shell bridge (window.AndroidApp.getVersionName);
+  // '' when the game is not running inside the installed app (e.g. a browser preview)
+  appVersion() {
+    try { const w = typeof window !== 'undefined' ? window.AndroidApp : null; if (w && typeof w.getVersionName === 'function') { const v = w.getVersionName(); return v || ''; } } catch (e) { /* not in the app shell */ }
+    return '';
+  }
+  openAbout() { this.renderAbout(); this.openModal(this.el.about); }
+  renderAbout() {
+    const v = this.appVersion();
+    $('aboutVer').textContent = v ? `当前版本：v${v}` : '当前版本：未知（不在安装包里运行时看不到版本号）';
+    const b = $('btnCheckUpdate'), n = $('aboutNote');
+    delete b.dataset.armed; b.disabled = false; b.textContent = '检查更新'; this._updUrl = null;
+    n.textContent = '';
+  }
+  // open an external URL: in the app the shell hands it to the system browser
+  // (which downloads the APK; tapping the finished download starts the installer);
+  // in a plain browser it just opens a new tab
+  openExternal(url) {
+    try { const w = typeof window !== 'undefined' ? window.AndroidApp : null; if (w && typeof w.openUrl === 'function') { w.openUrl(url); return; } } catch (e) { /* fall through */ }
+    window.open(url, '_blank');
+  }
+  // 检查更新: ask GitHub for the latest release tag and compare with this build.
+  // newer → arm the button (same two-tap idiom as 重置全部进度); second tap downloads.
+  // same → "当前为最新版"; unreachable → say so plainly, never pretend success.
+  async checkUpdate() {
+    const b = $('btnCheckUpdate'), n = $('aboutNote');
+    if (b.dataset.armed) {
+      delete b.dataset.armed; b.textContent = '检查更新';
+      const url = this._updUrl;
+      if (!url) return;
+      n.textContent = '已打开浏览器下载，下载完成后点一下安装包就能安装。';
+      this.openExternal(url);
+      return;
+    }
+    const cur = this.appVersion();
+    b.disabled = true; b.textContent = '正在检查…'; n.textContent = '正在向 GitHub 查询最新版本…';
+    try {
+      const latest = await fetchLatestRelease();
+      const ver = String(latest.tag_name || '').replace(/^harvest-v/, '');
+      const assets = Array.isArray(latest.assets) ? latest.assets : [];
+      const asset = assets.find((a) => a.name === 'banmu-harvest.apk') || assets[0];
+      if (!ver || !asset || !asset.browser_download_url) throw new Error('bad release');
+      if (cur && cmpVer(ver, cur) <= 0) {
+        n.textContent = `当前为最新版（v${cur}）。`;
+      } else {
+        this._updUrl = asset.browser_download_url;
+        b.dataset.armed = '1';
+        b.textContent = cur ? `下载新版本 v${ver}` : `下载最新版 v${ver}`;
+        n.textContent = cur ? `发现新版本 v${ver}（当前 v${cur}），再点一次开始下载。` : `最新版本是 v${ver}，再点一次开始下载。`;
+        setTimeout(() => { if (b.dataset.armed) { delete b.dataset.armed; b.textContent = '检查更新'; } }, 10000);
+      }
+    } catch (e) {
+      n.textContent = '检查失败：网络不通或 GitHub 打不开，请检查网络后稍后再试。';
+    } finally {
+      b.disabled = false;
+      if (!b.dataset.armed) b.textContent = '检查更新';
+    }
   }
   showWin(li, stars, t, earned, coins = 0) {
     $('winTitle').textContent = `第 ${li + 1} 关 完成！`;
