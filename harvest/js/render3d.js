@@ -837,8 +837,9 @@ export class Renderer {
     // sways against the carrier's turn, making the layers read as physical objects in 3D.
     const bob = c.moving ? 1.15 + Math.abs(Math.sin(c.walk)) * 2.1 : Math.sin(this.time * 2.1 + (c.seed || 0)) * 0.16;
     const sway = c.moving ? Math.sin(c.walk * 0.5) * 1.25 : Math.sin(this.time * 1.7 + (c.seed || 0)) * 0.25;
-    // bigger loads hug a wider tower so a full 100+ stack stays a readable height
-    const cols = c.cap > 220 ? 3 : c.cap > 70 ? 2 : 1, deep = c.cap > 70 ? 2 : 1;
+    // v4.9.6: the bag is no longer small (cap to 150) — every on-foot load spreads over a full 4×3
+    // basket instead of a single skinny column, so a full load reads as a plump pile, not a needle.
+    const cols = 4, deep = 3;
     return { x: c.x + fx * (12 + (deep - 1) * 3) + fz * sway, y: c.y + fz * (12 + (deep - 1) * 3) - fx * sway, z: 22 + bob, cols, deep, spread: 6.5, fx, fz, sway };
   }
 
@@ -896,14 +897,19 @@ export class Renderer {
         continue;
       }
       const cell = i % per, col = cell % b.cols, row = (cell / b.cols) | 0;
-      const h = hts[cell]; hts[cell] += step;
+      const h = hts[cell];
+      // v4.9.6: stack by the true visual top, not the hand-tuned step — the next item rests on the
+      // solid top of the one below (half height + bulk top), so mixed goods never float; where the
+      // step is smaller the load keeps its dense nestled look (the rise is capped, never stretched).
+      const half = M.ITEM_HALF[type] || 2, topOff = (M.ITEM_TOP && M.ITEM_TOP[type]) ?? half;
+      hts[cell] += Math.min(step, half + topOff);
       const bend = Math.pow(h, 1.35) * 0.018, wob = Math.sin(t * 2.4 + h * 0.02) * h * 0.01;
       const off = (col - (b.cols - 1) / 2) * b.spread + wob, dep = (row - (deep - 1) / 2) * b.spread;
       const layerSway = c.moving ? Math.sin(c.walk * 0.5 + h * 0.018) * Math.min(1.2, h * 0.008) : 0;
       const x = b.x + rx * (off + layerSway) + b.fx * (o.lean * bend * 2 + dep), y = b.y + rz * (off + layerSway) + b.fz * (o.lean * bend * 2 + dep), z = b.z + h + (M.ITEM_HALF[type] || 2);
       const headingSway = c.moving ? Math.sin(c.walk + i * 0.12) * 0.025 : 0;
       this.item(type, x, y, z, o.ang + Math.PI / 2 + headingSway + (hash(i) - 0.5) * 0.25, b.cols > 1 ? 1.0 : 1.15);
-      if (i >= n - per) top = { x: b.x, y: b.y, z: Math.max(top.z, z + step) };
+      if (i >= n - per) top = { x: b.x, y: b.y, z: Math.max(top.z, z + topOff) };
     }
     o.top = top;
     const full = c.stack.length + c.incoming >= c.cap;

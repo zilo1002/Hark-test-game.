@@ -1452,8 +1452,11 @@ export class World {
         const z = s.kind === 'proc' ? s.inZone : s.zone; let dd = d2(z.cx, z.cy, w.x, w.y);
         // v4.6: a raw counter that is being topped up (it ran low) comes first, then a machine that needs crops
         // order: a raw counter that ran low → a starving machine → a counter being topped up / a machine with input
-        if (this.smart) dd *= s.kind === 'counter' && !s.sale2 && !w.porter && this.rawStock(s) < CFG.v46.rawLow ? 0.004   // (weights on squared distance)
-          : s.kind === 'proc' && s.buf + s.inc < CFG.proc.inMax * CFG.v46.starve ? 0.02 : 1;
+        // v4.9.6: the low-counter preference is no longer smart-only — in plain levels (e.g. 18) a worker with two
+        // counters always walked to the nearer one, so the second counter never got a delivery and its customers
+        // waited forever at an empty desk (their patience kept resetting on the worker's phantom "inbound" cargo).
+        dd *= s.kind === 'counter' && !s.sale2 && !w.porter && this.rawStock(s) < CFG.v46.rawLow ? 0.004   // (weights on squared distance)
+          : this.smart && s.kind === 'proc' && s.buf + s.inc < CFG.proc.inMax * CFG.v46.starve ? 0.02 : 1;
         if (this.smart && w.pick === s) dd *= 0.05;   // v4.6: stick with the sink already chosen (no dithering between two)
         if (dd < bd) { bd = dd; bs = z; bo = s; }
       }

@@ -283,8 +283,10 @@ const ITEM_PARTS = {
     P(cyl(2.9, 2.9, 3.2, 9), '#FFF3DC', [0, -1.8, 0]), P(sph(0.9, 5, 4), '#7A3EA8', [0, -1.8, 2.8]),
   ],
   chips: () => [   // v4.6 薯条: a red paper scoop of golden fries
+    // v4.9.6: the sticks used to poke to +8.2 while the scoop top is +2.0, so a jar stacked on top
+    // floated 2.1 above the scoop and got pierced by the sticks; now they peek just above the rim.
     P(box(7, 6.4, 4.4), '#E8302C', [0, -1.2, 0]), P(box(7.2, 1.2, 4.6), '#FFFFFF', [0, 0.9, 0]),
-    ...[[-2.4, 0.6, 0.12], [-0.8, 1.6, -0.08], [0.8, 1.1, 0.1], [2.4, 0.4, -0.14], [-1.6, 0.2, -0.2], [1.6, 1.8, 0.2]].map(([x, h, r], i) => P(box(1.1, 6 + h, 1.1), i % 2 ? '#FFD23F' : '#F6C030', [x, 3.4 + h / 2, (i % 3 - 1) * 1.1], [0, 0, r])),
+    ...[[-2.4, 0.6, 0.12], [-0.8, 1.6, -0.08], [0.8, 1.1, 0.1], [2.4, 0.4, -0.14], [-1.6, 0.2, -0.2], [1.6, 1.8, 0.2]].map(([x, h, r], i) => P(box(1.1, 2.2 + h, 1.1), i % 2 ? '#FFD23F' : '#F6C030', [x, 1.5 + h / 2, (i % 3 - 1) * 1.1], [0, 0, r])),
   ],
   bill: () => [P(box(11, 0.9, 6), '#57C35A'), P(box(3, 1.1, 3), '#E9FFE0', [0, 0.05, 0])],
   cash: () => [P(box(12, 2.6, 7), '#57C35A'), P(box(12.3, 2.8, 2), '#2F8F3A'), P(box(2.6, 2.9, 2.2), '#E9FFE0')],
@@ -296,6 +298,10 @@ export const ITEM_TYPES = Object.keys(ITEM_PARTS);
 export const ITEM_HALF = { wheat: 2.6, tulip: 2.2, gold: 1.7, rose: 2.2, egg: 2.2, potato: 2.4, tomato: 2.8, crate: 3.3, ketchup: 4.4, bouquet: 3.4, basket: 3.4, perfume: 4.0, bill: 0.45, cash: 1.4,
   log: 2.8, plank: 1.3, chair: 5.9, milk: 4.6, cheese: 2.7, icecream: 6, corn: 2.2, popcorn: 4.4, pumpkin: 3.7, pie: 1.9, berry: 3.4, jam: 3.8, wool: 3.6, yarn: 4, honey: 3.8, apple: 3.3, juice: 4.9, xiaolongbao: 3.0, teasnack: 3.2,
   flour: 2.9, bread: 2.4, fish: 2.4, smoked: 2.4, grape: 1.6, gjuice: 4.9, pepper: 3.4, wine: 5.1, chips: 4.4 };
+// Solid top of each item above its centre, for carried stacks: the next item rests on this.
+// Default is ITEM_HALF (compact blob); only items whose bulk top is not the half height are listed:
+// a crate's eggs sit on top (+5.3), a basket's rim is its top (+1.4, the handle is garnish).
+export const ITEM_TOP = { crate: 5.3, basket: 1.4 };
 
 // ------------------------------------------------------------------ crops (field plants)
 // Plants stand on y=0 and are ~11-14 units tall; scaled by growth. Stubble is what stays after a cut.

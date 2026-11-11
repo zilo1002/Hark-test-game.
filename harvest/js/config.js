@@ -436,7 +436,7 @@ export const CFG = {
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 300, h: 300, gap: 9 },
         { id: 'T1', type: 'coop', item: 'tomato', producer: 'bush', x: 70, y: 430, w: 280, h: 300, n: 8, max: 18, prefill: 900 },
-        { id: 'M1', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 3, time: 0.4, x: 740, y: 260, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->3 + time 0.5->0.4, B PS svc was 3.1s
+        { id: 'M1', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 3, time: 0.3, x: 740, y: 260, outTo: 'C1', hidden: true }, // v4.9.6: time 0.4->0.3, B PS svc was 3.2s (porter batches ~20/10s, desk drains in ~4s, dry-window customers wait ~8s); buf never starves so ratio untouched
         { id: 'C1', type: 'counter', items: ['wheat', 'tomato', 'ketchup'], x: 750, y: 480 },
       ],
       tiles: [

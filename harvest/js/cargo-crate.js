@@ -48,14 +48,17 @@ export function cargoItemSlot(item, ordinal, counts = {}) {
     const layer = Math.floor(within / 12), cell = within % 12;
     x = [-11, -3.5, 3.5, 11][cell % 4]; z = [-8, -2.7, 2.7][Math.floor(cell / 4)]; y = 4.5 + layer * 5;
   }
-  const { x: cx, z: cz, base } = cargoCratePosition(box);
+  const { x: cx, z: cz, base } = cargoCratePosition(box, kind);
   return { x: cx + x, y: base + y, z: cz + z, box, kind };
 }
 
-// Packages form one vertical column; every box/steamer sits directly above the previous one.
-export function cargoCratePosition(boxIndex) {
-  const tier = Math.max(0, Math.floor(boxIndex));
-  return { x: 0, z: 0, base: tier * 24 };
+// Packages fill a basket two boxes wide: each pair sits side by side, then the next tier,
+// instead of one tall needle. Column spacing fits the widest box of the kind (fish crates are wider).
+export function cargoCratePosition(boxIndex, kind = 'wood-crate') {
+  const tier = Math.max(0, Math.floor(boxIndex / 2));
+  const col = boxIndex % 2 === 0 ? -1 : 1;
+  const half = kind === 'fish-crate' ? 25 : 17;
+  return { x: col * half, z: 0, base: tier * 24 };
 }
 
 const cube = new THREE.BoxGeometry(1, 1, 1);
@@ -106,7 +109,7 @@ export function updateCargoCrateStack(frame, counts = {}) {
   data.signature = sig;
   let r=0,p=0,f=0, fr=0,fp=0,ff=0,sf=0,sr=0,sb=0;
   for (const [item, group] of Object.entries(layout.groups)) for (let i=0;i<group.boxes;i++) {
-    const box = group.startBox + i, { x: cx, z: cz, base } = cargoCratePosition(box);
+    const box = group.startBox + i, { x: cx, z: cz, base } = cargoCratePosition(box, group.kind);
     if (group.kind === 'steamer') {
       write(data.steamFloors,sf++,cx,base+2,cz,1,1,1);
       write(data.steamRims,sr++,cx,base+5,cz,1,1,1,Math.PI/2);

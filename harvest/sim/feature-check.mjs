@@ -103,11 +103,15 @@ function buyReady(w, skip = () => false) {
   for (const vegetable of ['potato', 'tomato', 'corn', 'pumpkin', 'pepper']) assert.ok(!isPackableCargo(vegetable), `${vegetable} stays unpackaged`);
   assert.ok(hasPackableCargo(['fish', 'smoked'])); assert.ok(!hasPackableCargo(['smoked']));
   const crate = makeWoodCrate(); assert.equal(crate.name, 'harvest-wood-crate'); assert.ok(crate.children.length >= 20);
-  const crate0 = cargoCratePosition(0), crate1 = cargoCratePosition(1), crate2 = cargoCratePosition(2);
-  assert.deepEqual([crate0.x, crate0.z, crate1.x, crate1.z, crate2.x, crate2.z], [0, 0, 0, 0, 0, 0], 'carried crates should occupy one vertical column, never a 2x2 layout');
-  assert.ok(crate0.base < crate1.base && crate1.base < crate2.base, 'each carried crate should stack above the last');
+  const crate0 = cargoCratePosition(0), crate1 = cargoCratePosition(1), crate2 = cargoCratePosition(2), crate3 = cargoCratePosition(3);
+  // v4.9.6: carried crates fill a basket two boxes wide (Jin: the old single column looked skinny) —
+  // boxes 0/1 share the bottom tier side by side, boxes 2/3 the tier above, and no two boxes share a spot.
+  assert.deepEqual([crate0.x, crate1.x], [-17, 17], 'carried crates should sit two boxes wide');
+  assert.equal(crate0.base, crate1.base, 'the first pair shares the bottom tier');
+  assert.ok(crate2.base > crate0.base && crate3.base === crate2.base, 'the second pair sits on the tier above');
+  assert.notDeepEqual([crate0.x, crate0.base], [crate2.x, crate2.base], 'no two carried crates share a spot');
   assert.ok(w.counters.some((c) => !c.sale2 && !c.items.includes('smoked')));
   assert.ok(w.counters.some((c) => c.sale2 && c.items.includes('smoked')));
 }
 
-console.log('feature checks: PASS · resumable snapshot + persistence status · 50→150 carrying · smoked-fish feeders carry full loads · single-column crate geometry');
+console.log('feature checks: PASS · resumable snapshot + persistence status · 50→150 carrying · smoked-fish feeders carry full loads · two-wide crate basket');
