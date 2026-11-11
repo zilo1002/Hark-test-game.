@@ -36,6 +36,7 @@ export function procRects(o) {
 function objRects(L, o) {
   if (o.type === 'counter') return counterRects(o.x, o.y, L.W);
   if (o.type === 'proc') return procRects(o).concat(o.tray ? [{ x: o.tray[0], y: o.tray[1], w: o.tray[2], h: o.tray[3] }] : []);
+  if (o.type === 'tray') return [{ x: o.x, y: o.y, w: o.w, h: o.h }];
   if (o.type === 'field') return [{ x: o.x, y: o.y, w: o.w, h: o.h }];
   if (o.type === 'coop') return [{ x: o.x - 30, y: o.y - 30, w: o.w + 30, h: o.h + 30 }];
   return [];

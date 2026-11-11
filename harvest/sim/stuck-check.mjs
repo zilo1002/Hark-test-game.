@@ -20,7 +20,7 @@ function hasWork(w, wk) {
   // v4.3: a machine with a full input (its goods can't be sold yet) is not work; neither is a crop nobody takes right now
   // v4.6 分工: a worker waiting at its post because every sink is full (smartStaff levels) has no work
   if (wk.holding) return false;
-  if (wk.state === 'deliver') return wk.stack.length > 0 && (wk.toObjs || []).some((s) => (s.kind === 'counter' ? wk.stack.some((t) => s.items.includes(t)) : !w.procFull(s) && wk.stack.includes(s.inItem)) && (!w.smart || w.sinkOpen(wk, s)));
+  if (wk.state === 'deliver') return wk.stack.length > 0 && (wk.toObjs || []).some((s) => (s.kind === 'counter' ? wk.stack.some((t) => s.items.includes(t)) : s.kind === 'tray' ? wk.stack.includes(s.item) && s.pile.total + s.pile.pending < s.pile.cap : !w.procFull(s) && wk.stack.includes(s.inItem)) && (!w.smart || w.sinkOpen(wk, s)));
   if (space <= 0) return false;
   return (wk.sources || []).some((s) => (s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + (s.ripe || 0)) > 0 && w.hasSink(s.kind === 'proc' ? s.outItem : s.item));
 }

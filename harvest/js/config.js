@@ -234,6 +234,7 @@ export const CFG = {
       goal: { type: 'collect', item: 'egg', n: 4350 },
       objects: [
         { id: 'K1', type: 'coop', item: 'egg', producer: 'hen', x: 70, y: 70, w: 330, h: 280, n: 4, max: 20, prefill: 1800 },
+        { id: 'T1', type: 'tray', item: 'egg', x: 520, y: 360, w: 40, h: 44 },
         { id: 'C1', type: 'counter', items: ['egg'], x: 600, y: 380 },
         { id: 'C2', type: 'counter', items: ['egg'], x: 600, y: 540, hidden: true },
       ],
@@ -244,7 +245,7 @@ export const CFG = {
         { id: 'd', x: 300, y: 430, price: 70, icon: 'speed', label: '跑鞋', req: ['b'], effect: { up: { key: 'speed', v: 25 } } },
         { id: 'e', x: 300, y: 530, price: 120, icon: 'cap', label: '大背篓', req: ['d'], effect: { up: { key: 'cap', v: 60 } } },
         { id: 'f', x: 460, y: 200, price: 150, icon: 'magnet', label: '大手', req: ['c'], effect: { up: { key: 'radius', v: 10 } } },
-        { id: 'g', x: 460, y: 310, price: 50, icon: 'cart', label: '鸡蛋搬运工', req: ['a'], repeat: { times: 2, mul: 2.2 }, effect: { worker: { from: ['K1'], to: ['C1', 'C2'] } } },
+        { id: 'g', x: 460, y: 310, price: 50, icon: 'cart', label: '鸡蛋搬运工', req: ['a'], repeat: { times: 2, mul: 2.2 }, effect: { worker: { from: ['K1'], to: ['T1'] } } },
         { id: 'h', x: 700, y: 250, price: 70, icon: 'cashier', label: '店员', req: ['a'], effect: { cashier: ['C1', 'C2'] } },
       ],
       deco: { theme: 'farm', paths: [[420, 330, 340, 100]], hedges: [[40, 600, 160, 22]], trees: [[60, 450, 'round'], [720, 40, 'round']], bushes: [[200, 470], [720, 620]], barn: [640, 120] } },

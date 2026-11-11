@@ -234,6 +234,9 @@ export class Renderer {
       pave(p.inZone.x - 8, p.y - 34, p.body.x + p.body.w - p.inZone.x + 18, 68);
       if (p.pile) { const t = p.pile; pave(t.x - 6, t.y - 6, t.w + 12, t.h + 12); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.setLineDash([5, 4]); g.lineWidth = 1.6; g.strokeRect(t.x - 2, t.y - 2, t.w + 4, t.h + 4); g.setLineDash([]); }
     }
+    for (const t of w.trays || []) {   // v4.8.4: raw-goods tray, same dashed outline as a machine tray
+      const pl = t.pile; pave(pl.x - 6, pl.y - 6, pl.w + 12, pl.h + 12); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.setLineDash([5, 4]); g.lineWidth = 1.6; g.strokeRect(pl.x - 2, pl.y - 2, pl.w + 4, pl.h + 4); g.setLineDash([]);
+    }
     // v4.2 鱼塘: the full basin is a damp grassy hollow; the water (and its stone-edged shore) grows with the pond level
     for (const pd of w.ponds) {
       g.fillStyle = 'rgba(70,130,40,0.35)'; g.fillRect(pd.X - 4, pd.Y - 4, pd.MW + 8, pd.MH + 8);

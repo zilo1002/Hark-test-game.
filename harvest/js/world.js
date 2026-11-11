@@ -322,7 +322,7 @@ export class World {
     this.events = [];
     this.stats = { collected: {}, sold: {}, produced: {}, golden: {}, earned: 0, unlocks: 0 };
     this.upg = { cap: 0, speed: 0, radius: 0, wcap: 0, wspeed: 0 };
-    this.objs = {}; this.fields = []; this.ponds = []; this.coops = []; this.counters = []; this.procs = [];
+    this.objs = {}; this.fields = []; this.ponds = []; this.coops = []; this.counters = []; this.procs = []; this.trays = [];
     this.piles = []; this.tiles = []; this.workers = []; this.customers = []; this.solids = [];
     this.fly = []; this.flyFree = [];
     this.gmode = 'collect';
@@ -411,6 +411,12 @@ export class World {
                   exitA: { x: o.x + K.serveDx + 30, y: o.y + 40 },
                   exit: { x: this.W + 70, y: o.y + 40 }, bumpT: 0 };
       this.counters.push(c); this.objs[o.id] = c;
+    } else if (o.type === 'tray') {
+      // v4.8.4: a raw-goods tray (level 3): carriers heap raw items here, the player carries them to the counter.
+      // Same Pile mechanism as a machine's output tray (same cap, same rendering, same pick-up path).
+      const t = { ...base, kind: 'tray', item: o.item, pile: new Pile(o.item, o.x, o.y, o.w, o.h, CFG.proc.trayCap),
+                  zone: rectAt(o.x + o.w / 2, o.y + o.h / 2, o.w, o.h) };
+      t.pile.owner = t; this.piles.push(t.pile); this.trays.push(t); this.objs[o.id] = t;
     } else if (o.type === 'proc') {
       const P = CFG.proc;
       const p = { ...base, kind: 'proc', inItem: o.in, outItem: o.out, buf: 0, inc: 0, timer: 0, work: 0, outInc: 0,
@@ -957,6 +963,7 @@ export class World {
       let sink = null, accepts = null;
       for (const k of this.counters) if (!k.hidden && inRect(c.x, c.y, k.zone) && (!c.toObjs || c.toObjs.includes(k)) && c.stack.some((t) => k.items.includes(t))) { sink = k; accepts = (t) => k.items.includes(t); break; }
       if (!sink) for (const p of this.procs) if (!p.hidden && inRect(c.x, c.y, p.inZone) && (!c.toObjs || c.toObjs.includes(p)) && c.stack.includes(p.inItem) && (c.feedFor === p.id ? this.canDropFeederBatch(c, p) : !this.procFull(p))) { sink = p; accepts = (t) => t === p.inItem; break; }
+      if (!sink) for (const tr of this.trays) if (!tr.hidden && inRect(c.x, c.y, tr.zone) && (!c.toObjs || c.toObjs.includes(tr)) && c.stack.includes(tr.item)) { sink = tr; accepts = (it) => it === tr.item; break; }
       c.dropping = !!sink;
       if (sink) {
         if (sink.kind === 'proc' && c.feedFor === sink.id) {
@@ -973,13 +980,16 @@ export class World {
           c.dropAcc = Math.min(c.dropAcc + c.dropRate * dt, Math.max(1, c.dropRate * 0.1));
           while (c.dropAcc >= 1) {
             let idx = -1; for (let j = c.stack.length - 1; j >= 0; j--) if (accepts(c.stack[j])) { idx = j; break; }
-            if (idx < 0 || (sink.kind === 'proc' && this.procFull(sink))) break;
+            if (idx < 0 || (sink.kind === 'proc' && this.procFull(sink)) || (sink.kind === 'tray' && sink.pile.full())) break;
             if (this.smart && !isPlayer && !this.sinkOpen(c, sink)) break;   // v4.6: staff never overfill a counter / machine
             const item = c.stack[idx];
             c.stack.splice(idx, 1); c.dropAcc--;
             if (!isPlayer) { c.done = (c.done || 0) + 1; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + 1; }   // 雇工 XP (+ v4.3 where it went)
             const z = 44 + idx * CFG.items[item].step;
-            if (sink.kind === 'counter') { sink.incoming++; if ((this._made || (this._made = new Set(this.procs.map((q) => q.outItem)))).has(item)) sink.incMade = (sink.incMade || 0) + 1; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop); }
+            if (sink.kind === 'tray') {   // v4.8.4: heap it onto the raw tray (same 'pile' flight as machine output)
+              const pl = sink.pile; pl.pending++;
+              this.launch(item, 'pile', c.x, c.y, z, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop);
+            } else if (sink.kind === 'counter') { sink.incoming++; if ((this._made || (this._made = new Set(this.procs.map((q) => q.outItem)))).has(item)) sink.incMade = (sink.incMade || 0) + 1; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop); }
             else { sink.inc++; this.launch(item, 'procIn', c.x, c.y, z, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop); }
             if (isPlayer) this.emit('drop', { item });
           }
@@ -1034,7 +1044,9 @@ export class World {
     // keep buyers waiting for that final flight as well.
     if (c.incoming > 0) return true;
     for (const w of this.workers) {
-      if (!w.to || !w.to.includes(c.id)) continue;
+      // v4.8.4: a worker carrying goods to a raw tray that feeds this counter is supply in transit too
+      const viaTray = (w.to || []).some((id) => { const o = this.objs[id]; return o && o.kind === 'tray' && c.items.includes(o.item); });
+      if (!w.to || (!w.to.includes(c.id) && !viaTray)) continue;
       const cargo = w.stack.slice();
       for (const f of this.fly) if (f.active && f.kind === 'stack' && f.ref === w) cargo.push(f.type);
       if (cargo.some((item) => c.items.includes(item))) return true;
@@ -1084,7 +1096,10 @@ export class World {
   counterHasPlannedSupply(c) {
     return this.tiles.some((t) => {
       const w = t.effect && t.effect.worker;
-      if (!w || !w.to || !w.to.includes(c.id)) return false;
+      if (!w || !w.to) return false;
+      // v4.8.4: a hire whose destination is a raw tray feeding this counter is a planned supply route for it
+      const viaTray = w.to.some((id) => { const o = this.objs[id]; return o && o.kind === 'tray' && c.items.includes(o.item); });
+      if (!w.to.includes(c.id) && !viaTray) return false;
       if (w.porter) {
         const p = this.objs[w.tray];
         return !!p && c.items.includes(p.outItem);
@@ -1191,6 +1206,7 @@ export class World {
   // a raw counter wants staff deliveries: in a machine level only to top it up (below rawLow → until rawFull)
   rawNeedsTopUp() { return this.counters.some((c) => !c.hidden && !c.sale2 && this.rawStock(c) < CFG.v46.rawLow); }
   sinkOpen(w, s) {
+    if (s.kind === 'tray') return s.pile.total + s.pile.pending < s.pile.cap;   // v4.8.4: a raw tray takes goods while it has room
     if (s.kind === 'proc') return w.feedFor === s.id ? this.procBatchRoom(s, w.stack.length || w.cap) : !this.procFull(s) && s.buf + s.inc < CFG.proc.inMax;
     if (s.sale2 || w.porter) return s.stock.length + s.incoming < CFG.counter.stockMax;
     const n = this.rawStock(s);
@@ -1329,12 +1345,13 @@ export class World {
       let bs = null, bd = 1e18, bo = null;
       let anyTakes = false;
       for (const s of sinks) {
-        const ok = s.kind === 'counter' ? w.stack.some((t) => s.items.includes(t)) : w.stack.includes(s.inItem);
+        const ok = s.kind === 'counter' ? w.stack.some((t) => s.items.includes(t)) : s.kind === 'tray' ? w.stack.includes(s.item) : w.stack.includes(s.inItem);
         if (!ok) continue;
         anyTakes = true;
+        if (s.kind === 'tray' && s.pile.total + s.pile.pending >= s.pile.cap) { w.blocked = s; continue; }   // v4.8.4: a full raw tray waits for the player to carry it off
         if (s.kind === 'proc' && (w.feedFor === s.id ? !this.procBatchRoom(s, w.batchCap || w.cap) : this.procFull(s))) { w.blocked = s; continue; }   // feeders wait until the whole frozen load fits
         if (this.smart && !this.sinkOpen(w, s)) { if (s.kind === 'proc') w.blocked = s; continue; }
-        const z = s.kind === 'counter' ? s.zone : s.inZone; let dd = d2(z.cx, z.cy, w.x, w.y);
+        const z = s.kind === 'proc' ? s.inZone : s.zone; let dd = d2(z.cx, z.cy, w.x, w.y);
         // v4.6: a raw counter that is being topped up (it ran low) comes first, then a machine that needs crops
         // order: a raw counter that ran low → a starving machine → a counter being topped up / a machine with input
         if (this.smart) dd *= s.kind === 'counter' && !s.sale2 && !w.porter && this.rawStock(s) < CFG.v46.rawLow ? 0.004   // (weights on squared distance)
@@ -1349,7 +1366,7 @@ export class World {
         const o = this.slot(this.objs[w.feedFor].inZone, w); tx = o.x; ty = o.y; w.holding = true; w.blocked = null;   // its machine is full: wait in its input zone, topping it up
       }
       else if (this.smart && anyTakes) { const o = this.post(w, srcs); tx = o.x; ty = o.y; w.holding = true; w.blocked = null; }
-      else if (w.blocked && !w.blocked.hidden) { const z = w.blocked.inZone, k = w.seed | 0; tx = z.cx - 30 + (k % 3) * 8; ty = z.cy + 34 + (k % 2) * 8; w.blocked = null; }
+      else if (w.blocked && !w.blocked.hidden) { const z = w.blocked.inZone || w.blocked.zone, k = w.seed | 0; tx = z.cx - 30 + (k % 3) * 8; ty = z.cy + 34 + (k % 2) * 8; w.blocked = null; }   // v4.8.4: a blocked raw tray waits by its zone (a proc waits by its inZone)
       else if (w.stack.length) { const o = this.post(w, srcs); tx = o.x; ty = o.y; w.holding = true; w.blocked = null; } // preserve cargo until a compatible sink is available
     }
     const goal = Math.hypot(tx - w.x, ty - w.y), body = w.loader ? CFG.loader.body : 9;
