@@ -1384,6 +1384,17 @@ export class World {
     w.waitReason = null;
     // v4.7 fixed roles: everyone only ever works its own sources → its own sinks (no farm help, no assisting machines)
     let srcs = w.from.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
+    // v5.0.2: a farmhand (standCarrier) works exactly one field/coop; if that source
+    // is still hidden (e.g. L25's A2, opened by tile b), it has no visible source
+    // and idles at its post forever — L25 x_rf_apple_2 hired before b idled 100%
+    // / 0 trips. Fall back to a visible field/coop of the same item: the worker
+    // heaps that item onto the same board, and switches to its own source the
+    // moment it is shown. Farmhands only — a feeder must take from the board,
+    // never straight from a field, so feeders/porters never fall back.
+    if (w.standCarrier && srcs.length === 0) {
+      const items = new Set(w.from.map((id) => this.objs[id]).filter(Boolean).map((o) => o.item));
+      srcs = [...this.fields, ...this.coops].filter((o) => o && !o.hidden && items.has(o.item));
+    }
     // a porter works its own tray; when that one is empty and another tray of the same counter is heaping up, it fetches
     // from there (still tray → goods counter, sticky until that load is delivered)
     if (w.porter && w.trayOf && this.smart) {
