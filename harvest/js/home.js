@@ -558,6 +558,7 @@ function dog2d(g, t, col) {
 export const DECO_SPOTS = {
   rainbow: [180, 80], statue: [22, 72], balloon: [352, 64], lanterns: [18, 196], scarecrow: [350, 178], arch: [130, 214],
   fountain: [116, 262], bench: [250, 266], windmill: [-2, 292], flowerbed: [350, 300], pond: [22, 408], swing: [334, 410],
+  starLamp: [290, 130], moonGate: [70, 330],
 };
 const DECO2D = {
   jackLamp(g, t) { jack(g, 1.1, t); g.save(); g.translate(13, 3); jack(g, 0.8, t + 1); g.restore(); },
@@ -615,6 +616,17 @@ const DECO2D = {
     rc.forEach((c, i) => { g.strokeStyle = c; g.beginPath(); g.arc(0, 0, 56 - i * 4, Math.PI, 0); g.stroke(); });
     for (const x of [-52, 52]) { g.fillStyle = '#FFFFFF'; g.beginPath(); g.ellipse(x, -2, 14, 7, 0, 0, TAU); g.ellipse(x + (x > 0 ? -8 : 8), -6, 9, 7, 0, 0, TAU); g.fill(); }
   },
+  starLamp(g, t) {   // v5.0.7 星星灯: a pole topped with a glowing gold star
+    shadow(g, 0, 0, 10, 3); g.fillStyle = '#5A3414'; g.fillRect(-1.5, -34, 3, 34); g.fillStyle = '#3A2210'; g.fillRect(-4, -1, 8, 2);
+    const k = 0.5 + 0.5 * Math.sin(t * 3); g.fillStyle = `rgba(255,210,63,${0.25 + k * 0.35})`; g.beginPath(); g.arc(0, -40, 9, 0, TAU); g.fill();
+    g.fillStyle = '#FFD23F'; g.beginPath();
+    for (let j = 0; j < 10; j++) { const a = -Math.PI / 2 + j * Math.PI / 5, r = j % 2 ? 3 : 7, x = Math.cos(a) * r, y = -40 + Math.sin(a) * r; if (j === 0) g.moveTo(x, y); else g.lineTo(x, y); }
+    g.closePath(); g.fill();
+  },
+  moonGate(g) {   // v5.0.7 月亮门: a round arch with a gold crescent on top
+    g.lineWidth = 4; g.strokeStyle = '#E8E0CC'; g.beginPath(); g.arc(0, -14, 15, Math.PI, 0); g.lineTo(15, 0); g.moveTo(-15, 0); g.lineTo(-15, -14); g.stroke();
+    g.fillStyle = '#FFD23F'; g.beginPath(); g.arc(0, -36, 6, Math.PI * 0.5, Math.PI * 1.5); g.arc(2.5, -36, 5, Math.PI * 1.5, Math.PI * 0.5, true); g.closePath(); g.fill();
+  },
 };
 function decoHat(g, o) {   // the farmer's 商店 hat in the 2D estate view
   const h = o.hat;
@@ -628,6 +640,8 @@ function decoHat(g, o) {   // the farmer's 商店 hat in the 2D estate view
   else if (h === 'santa') { g.fillStyle = '#E8283C'; g.beginPath(); g.moveTo(-7, -35); g.quadraticCurveTo(0, -50, 9, -44); g.lineTo(7, -35); g.closePath(); g.fill(); rr(g, -8, -37, 16, 3.6, 1.8, '#FFFFFF', null); g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(9.5, -44, 2.4, 0, TAU); g.fill(); }
   else if (h === 'lion') { g.fillStyle = '#E8283C'; g.strokeStyle = OL; g.lineWidth = 0.8; g.beginPath(); g.ellipse(0, -36, 10, 7, 0, Math.PI, 0); g.fill(); g.stroke(); for (let k = 0; k < 7; k++) { g.fillStyle = k % 2 ? '#FFFFFF' : '#FFE16B'; g.beginPath(); g.arc(-9 + k * 3, -35.5, 1.8, 0, TAU); g.fill(); } g.fillStyle = '#FFFFFF'; for (const s of [-1, 1]) { g.beginPath(); g.arc(s * 3.4, -39.5, 2, 0, TAU); g.fill(); } g.fillStyle = '#1A1A22'; for (const s of [-1, 1]) { g.beginPath(); g.arc(s * 3.4, -39.2, 1, 0, TAU); g.fill(); } g.fillStyle = '#FFC21A'; g.beginPath(); g.moveTo(-1.4, -42); g.lineTo(0, -47); g.lineTo(1.4, -42); g.closePath(); g.fill(); }
   else if (h === 'scholar') { rr(g, -6, -38, 12, 4, 1, '#2A2A3A', null); g.fillStyle = '#2A2A3A'; g.beginPath(); g.moveTo(-11, -38); g.lineTo(0, -42); g.lineTo(11, -38); g.lineTo(0, -35); g.closePath(); g.fill(); g.strokeStyle = '#FFC21A'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, -39); g.lineTo(8, -37); g.lineTo(8, -32); g.stroke(); }
+  else if (h === 'star') { g.fillStyle = '#2A2A5A'; g.beginPath(); g.arc(0, -33, 7.6, Math.PI, 0); g.fill(); g.fillRect(-7.6, -34, 15.2, 2.4); g.fillStyle = '#FFD23F'; g.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? 1.2 : 2.8, x = Math.cos(a) * r, y = -37 + Math.sin(a) * r; if (k === 0) g.moveTo(x, y); else g.lineTo(x, y); } g.closePath(); g.fill(); }
+  else if (h === 'moon') { g.fillStyle = '#1A1A3A'; g.beginPath(); g.arc(0, -33, 7.6, Math.PI, 0); g.fill(); g.fillRect(-7.6, -34, 15.2, 2.4); g.fillStyle = '#FFD23F'; g.beginPath(); g.arc(0, -37, 3.4, Math.PI * 0.5, Math.PI * 1.5); g.arc(1.4, -37, 2.8, Math.PI * 1.5, Math.PI * 0.5, true); g.closePath(); g.fill(); }
   if (o.scarf) { g.fillStyle = o.scarf === 'rainbow' ? '#FFD23F' : o.scarf; rr(g, -5.6, -23.4, 11.2, 3, 1.4, g.fillStyle, null); g.fillRect(1, -21, 2.6, 6); }
 }
 

@@ -45,6 +45,20 @@ export const OUTFITS = [
 ];
 export const SLOTS = [['hat', '帽子'], ['top', '衣服'], ['neck', '围巾'], ['feet', '鞋子']];
 
+// ---- 星星服装 (v5.0.7): bought with stars, not coins. starPrice instead of price;
+// a 'top' replaces vest/bow tie (same rule as the coin tops above)
+// 星星帽/月亮帽 are the shop's flagships (10★, new hat models in models.js)
+export const STAR_OUTFITS = [
+  { id: 'starHat',       slot: 'hat',  name: '星星帽',     starPrice: 10, style: { hat: 'star' },                                                                      sw: ['#2A2A5A', '#FFD23F'] },
+  { id: 'moonHat',       slot: 'hat',  name: '月亮帽',     starPrice: 10, style: { hat: 'moon' },                                                                      sw: ['#1A1A3A', '#FFD23F'] },
+  { id: 'starRain',      slot: 'hat',  name: '雨夜渔夫帽', starPrice: 6,  style: { hat: 'rain', capColor: '#2E6BFF' },                                                 sw: ['#2E6BFF'] },
+  { id: 'starCap',       slot: 'hat',  name: '星空棒球帽', starPrice: 6,  style: { hat: 'cap', capColor: '#2A2A3A' },                                                  sw: ['#2A2A3A'] },
+  { id: 'starScarf',     slot: 'neck', name: '星光围巾',   starPrice: 5,  style: { scarf: '#FFD23F' },                                                                  sw: ['#FFD23F'] },
+  { id: 'starApron',     slot: 'top',  name: '丰收围裙',   starPrice: 6,  style: { vest: null, bowtie: false, shirt: '#FFF6E0', sleeve: '#FFF6E0', apron: '#FF8A3D', apronDot: '#FFD23F' }, sw: ['#FF8A3D', '#FFD23F'] },
+  { id: 'starOveralls',  slot: 'top',  name: '星夜背带裤', starPrice: 7,  style: { vest: null, bowtie: false, shirt: '#FFF6E0', sleeve: '#FFF6E0', overalls: '#2A4A8A', pants: '#2A4A8A' },           sw: ['#2A4A8A', '#FFF6E0'] },
+  { id: 'starBoots',     slot: 'feet', name: '夜市金靴',   starPrice: 8,  style: { boots: '#E8283C', bootGold: true },                                                   sw: ['#E8283C', '#FFD23F'] },
+];
+
 // ---- 装饰: shown on the home estate (both pages) and outside the fence in every level ------------
 export const DECOS = [
   { id: 'bench',     name: '木长椅',   price: 60 },
@@ -65,6 +79,13 @@ export const DECOS = [
   { id: 'redLamps',  name: '红灯笼串', price: 300, fest: 'cny' },
 ];
 
+// ---- 星星装饰 (v5.0.7): bought with stars; drawn by DECO2D (home.js) on the estate and
+// by DECO_PARTS (models.js) in levels / the shop preview; spotted by DECO_SPOTS (home.js)
+export const STAR_DECOS = [
+  { id: 'starLamp', name: '星星灯', starPrice: 6 },
+  { id: 'moonGate', name: '月亮门', starPrice: 8 },
+];
+
 // ---- 宠物 (v4.0 B): a dog that follows the farmer in levels (and now and then fetches a ripe plant
 // into the stack) and a cat that lounges on the estate. One of each at a time; colour variants.
 export const PETS = [
@@ -73,7 +94,13 @@ export const PETS = [
   { id: 'catOrange', pet: 'cat', name: '橘猫',  price: 300, col: { body: '#F2A040', belly: '#FFF3DC', ear: '#E8823A', nose: '#FF8FA0', stripe: '#D9762A' }, sw: ['#F2A040', '#FFF3DC'] },
   { id: 'catTux',    pet: 'cat', name: '奶牛猫', price: 420, col: { body: '#2E2E36', belly: '#FFFFFF', ear: '#2E2E36', nose: '#FF8FA0' }, sw: ['#2E2E36', '#FFFFFF'] },
 ];
-export const petById = (id) => PETS.find((p) => p.id === id) || null;
+
+// ---- 星星宠物 (v5.0.7): colour variants only, no new models; one dog / one cat at a time
+export const STAR_PETS = [
+  { id: 'dogStar', pet: 'dog', name: '星空柴犬', starPrice: 10, col: { body: '#2A2A5A', belly: '#FFFFFF', ear: '#1A1A3A', nose: '#2A1A10', spot: '#FFD23F' }, sw: ['#2A2A5A', '#FFD23F'] },
+  { id: 'catStar', pet: 'cat', name: '玄猫',     starPrice: 8,  col: { body: '#1A1A22', belly: '#2E2E36', ear: '#1A1A22', nose: '#FF8FA0', stripe: '#FFD23F' },            sw: ['#1A1A22', '#FFD23F'] },
+];
+export const petById = (id) => PETS.find((p) => p.id === id) || STAR_PETS.find((p) => p.id === id) || null;
 
 // ---- 制服 (v3.6): one set at a time, worn by every hired worker in levels -----------------------
 // style overrides the worker's own look (gardener / carter / lumberjack / milker); beards stay.
@@ -86,11 +113,22 @@ export const UNIFORMS = [
   { id: 'u_navy',   uni: true, name: '海军条纹', price: 450, style: { ...U0, shirt: '#FFFFFF', sleeve: '#FFFFFF', vest: '#2A4C9A', pants: '#2A4C9A', scarf: '#E8283C', hat: 'cap', capColor: '#2A4C9A' }, sw: ['#2A4C9A', '#E8283C'] },
   { id: 'u_gold',   uni: true, name: '金牌大师', price: 800, style: { ...U0, shirt: '#FFF6E0', sleeve: '#FFF6E0', vest: '#E8B21E', bowtie: true, bowColor: '#C8352A', pants: '#5A3414', hat: 'cowboy' }, sw: ['#E8B21E', '#C8352A'] },
 ];
+
+// ---- 星星工装 (v5.0.7): U0 base + style override, no new models; all hired hands wear one set
+export const STAR_UNIFORMS = [
+  { id: 'u_lantern', uni: true, name: '夜市灯笼工装', starPrice: 8,  style: { ...U0, shirt: '#E8283C', sleeve: '#E8283C', pants: '#2D3A5A', hat: 'cap', capColor: '#FFC21A' }, sw: ['#E8283C', '#FFC21A'] },
+  { id: 'u_star',    uni: true, name: '星空工装',     starPrice: 10, style: { ...U0, shirt: '#2A2A5A', sleeve: '#2A2A5A', vest: '#FFD23F', pants: '#2A2A5A', hat: 'beanie', capColor: '#FFD23F' }, sw: ['#2A2A5A', '#FFD23F'] },
+];
+
+// all star-shop goods, in shop order (clothes first — Jin asked for clothes — then pets, uniforms, decos)
+export const STAR_ITEMS = [...STAR_OUTFITS, ...STAR_PETS, ...STAR_UNIFORMS, ...STAR_DECOS];
+// a star-shop item is one with a starPrice (and no coin price); everything else is a coin item
+export const isStar = (it) => !!it && typeof it.starPrice === 'number';
 // the default hired-hand look (the gardener) used for the 制服 preview
 export const WORKER_BASE = { shirt: '#F7F5EE', overalls: '#3567C8', pants: '#3567C8', hair: '#5A3414', hat: 'straw', sleeve: '#F7F5EE' };
-export const uniformStyle = (id) => { const u = UNIFORMS.find((x) => x.id === id); return u ? u.style : null; };
+export const uniformStyle = (id) => { const u = UNIFORMS.find((x) => x.id === id) || STAR_UNIFORMS.find((x) => x.id === id); return u ? u.style : null; };
 
-export const itemById = (id) => OUTFITS.find((o) => o.id === id) || DECOS.find((d) => d.id === id) || UNIFORMS.find((u) => u.id === id) || PETS.find((p) => p.id === id);
+export const itemById = (id) => OUTFITS.find((o) => o.id === id) || STAR_OUTFITS.find((o) => o.id === id) || DECOS.find((d) => d.id === id) || STAR_DECOS.find((d) => d.id === id) || UNIFORMS.find((u) => u.id === id) || STAR_UNIFORMS.find((u) => u.id === id) || PETS.find((p) => p.id === id) || STAR_PETS.find((p) => p.id === id);
 // a limited item can be bought only while its festival is on; a 图鉴 reward is never sold
 export const onSale = (it) => !!it && !it.book && (!it.fest || currentFestival() === it.fest);
 export const festName = (it) => (it && it.fest && FESTIVALS[it.fest] ? FESTIVALS[it.fest].name : '');
@@ -102,9 +140,9 @@ export function normShop(s) {
   const d = shopDefaults();
   if (!s || typeof s !== 'object') return d;
   d.owned = Array.isArray(s.owned) ? s.owned.filter((id) => itemById(id)) : [];
-  for (const [k] of SLOTS) { const id = s.eq && s.eq[k]; const it = OUTFITS.find((o) => o.id === id); d.eq[k] = it && it.slot === k && d.owned.includes(id) ? id : null; }
-  d.deco = Array.isArray(s.deco) ? s.deco.filter((id) => DECOS.some((x) => x.id === id) && d.owned.includes(id)) : [];
-  d.uni = UNIFORMS.some((u) => u.id === s.uni) && d.owned.includes(s.uni) ? s.uni : null;
+  for (const [k] of SLOTS) { const id = s.eq && s.eq[k]; const it = itemById(id); d.eq[k] = it && it.slot === k && d.owned.includes(id) ? id : null; }
+  d.deco = Array.isArray(s.deco) ? s.deco.filter((id) => { const it = itemById(id); return it && !it.slot && !it.uni && !it.pet && d.owned.includes(id); }) : [];
+  d.uni = (() => { const u = itemById(s.uni); return u && u.uni && d.owned.includes(s.uni) ? s.uni : null; })();
   for (const k of ['dog', 'cat']) { const id = s.pet && s.pet[k], p = petById(id); d.pet[k] = p && p.pet === k && d.owned.includes(id) ? id : null; }
   return d;
 }
@@ -113,9 +151,13 @@ export function normShop(s) {
 export const HERO_BASE = { shirt: '#FFFFFF', vest: '#C8352A', bowtie: true, pants: '#2D3A5A', hair: '#7A3E1D', sleeve: '#FFFFFF' };
 export function heroStyle(eq) {
   const st = { ...HERO_BASE };
-  for (const [k] of SLOTS) { const it = eq && OUTFITS.find((o) => o.id === eq[k]); if (it) Object.assign(st, it.style); }
+  for (const [k] of SLOTS) { const it = eq && itemById(eq[k]); if (it && it.slot === k) Object.assign(st, it.style); }
   return st;
 }
+
+// star balance (same formula as save.js starsLeft, computed here so shop.js stays
+// cycle-free: save.js imports shop.js, so shop.js must not import save.js)
+export const starBalance = (data) => Object.values(data.stars || {}).reduce((a, b) => a + (b || 0), 0) - (data.spent || 0);
 
 // buy / equip (pure: mutate the save object, return a result code)
 export function buy(data, id) {
@@ -123,8 +165,17 @@ export function buy(data, id) {
   if (data.shop.owned.includes(id)) return 'owned';
   if (it.book) return 'reward';
   if (!onSale(it)) return 'closed';
-  if ((data.coins || 0) < it.price) return 'poor';
-  data.coins -= it.price; data.shop.owned.push(id);
+  // validate first, mutate once: a failed buy never touches either wallet (atomic in
+  // this synchronous flow; the caller Save.saves immediately after 'ok', so a
+  // re-entered game can never see a half-bought item or a refunded star balance)
+  if (isStar(it)) {
+    if (starBalance(data) < it.starPrice) return 'poor';
+    data.spent = (data.spent || 0) + it.starPrice;
+  } else {
+    if ((data.coins || 0) < it.price) return 'poor';
+    data.coins -= it.price;
+  }
+  data.shop.owned.push(id);
   if (it.pet) data.shop.pet[it.pet] = id;
   else if (it.uni) data.shop.uni = id; else if (it.slot) data.shop.eq[it.slot] = id; else if (!data.shop.deco.includes(id)) data.shop.deco.push(id);   // new things go straight on
   return 'ok';

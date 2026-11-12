@@ -583,6 +583,17 @@ export function makePerson(o = {}) {
     head.add(mesh(cyl(7.9, 8.0, 3.4, 14), '#2A2A3A', 0, 5.8, -0.4));
     head.add(mesh(box(15, 1.2, 15), '#2A2A3A', 0, 8.0, -0.4, 1, 1, 1));
     head.add(mesh(sph(1, 6, 4), '#FFC21A', 0, 8.8, 0)); head.add(mesh(box(0.8, 0.6, 7), '#FFC21A', 0, 8.6, 3.6)); head.add(mesh(cyl(0.9, 1.4, 4.4, 6), '#FFC21A', 0, 6.2, 7.2));
+  } else if (o.hat === 'star') {   // v5.0.7 星星帽: dark blue cap with a gold star on the front
+    head.add(mesh(dome(8.35, 12, 6), '#2A2A5A', 0, 2.4, -0.4, 1, 0.82, 1));
+    head.add(mesh(box(8, 0.9, 6), '#2A2A5A', 0, 2.6, 8.4));
+    const st = new THREE.Group();
+    st.add(new THREE.Mesh(sph(1.5, 6, 5), M('#FFD23F')));
+    for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + k / 5 * Math.PI * 2; const c = new THREE.Mesh(cone(0.95, 2.8, 4), M('#FFD23F')); c.position.set(Math.cos(a) * 2.4, Math.sin(a) * 2.4, 0); c.rotation.z = a - Math.PI / 2; c.castShadow = true; st.add(c); }
+    st.position.set(0, 6.4, 7.6); st.scale.set(1, 1, 0.55); head.add(st);
+  } else if (o.hat === 'moon') {   // v5.0.7 月亮帽: dark blue cap with a gold crescent
+    head.add(mesh(dome(8.35, 12, 6), '#1A1A3A', 0, 2.4, -0.4, 1, 0.82, 1));
+    head.add(mesh(box(8, 0.9, 6), '#1A1A3A', 0, 2.6, 8.4));
+    const cr = new THREE.Mesh(tor(4.2, 1.1, 4, 12, Math.PI * 1.25), M('#FFD23F')); cr.position.set(0, 6.2, 7.4); cr.rotation.z = 0.6; cr.castShadow = true; head.add(cr);
   }
   if (o.pigtails) for (const s of [-1, 1]) head.add(mesh(sph(2.6, 7, 5), hair, s * 7.6, -0.8, -2.2));
   if (o.crown) {   // VIP: chunky gold crown with a red gem
@@ -1179,6 +1190,17 @@ const DECO_PARTS = {
     rc.forEach((c, i) => { for (let k = 0; k <= 14; k++) { const a = Math.PI * k / 14, R = 30 - i * 2.6; out.push(P(box(3.4, 2.6, 6), c, [Math.cos(a) * R, Math.sin(a) * R * 0.9, 0], [0, 0, a - H])); } });
     for (const x of [-30, 30]) out.push(P(sph(6, 8, 6), '#FFFFFF', [x, 2, 0], [0, 0, 0], [1.4, 0.8, 1]), P(sph(4.4, 8, 6), '#FFFFFF', [x + (x > 0 ? -5 : 5), 4, 2]));
     return out;
+  },
+  starLamp: () => {   // v5.0.7 星星灯: a pole topped with a gold 3D starburst
+    const out = [P(cyl(1, 1.3, 26, 6), '#5A3414', [0, 13, 0]), P(cyl(2.4, 2.4, 1.2, 8), '#3A2210', [0, 0.6, 0]), P(sph(1.8, 6, 5), '#FFC21A', [0, 26.8, 0])];
+    out.push(P(ico(2.4, 0), '#FFD23F', [0, 30, 0]));
+    for (const [p, r] of [[[3.2, 30, 0], [0, 0, -H]], [[-3.2, 30, 0], [0, 0, H]], [[0, 33.2, 0], [0, 0, 0]], [[0, 26.8, 0], [0, 0, Math.PI]], [[0, 30, 3.2], [H, 0, 0]], [[0, 30, -3.2], [-H, 0, 0]]]) out.push(P(cone(1, 3, 4), '#FFD23F', p, r));
+    return out;
+  },
+  moonGate: () => {   // v5.0.7 月亮门: a round arch with a gold crescent on top
+    return [P(box(3, 26, 3), '#E8E0CC', [-14, 13, 0]), P(box(3, 26, 3), '#E8E0CC', [14, 13, 0]),
+      P(tor(14, 1.6, 4, 16, Math.PI), '#E8E0CC', [0, 26, 0]),
+      P(tor(5, 1.2, 4, 12, Math.PI * 1.25), '#FFD23F', [0, 44, 0], [0, 0, Math.PI * 0.38])];
   },
 };
 const DECO_GEO = {};
