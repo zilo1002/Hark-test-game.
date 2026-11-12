@@ -19,11 +19,11 @@ const expected = new Map([
   [58, ['咸香茶歇屋', ['chips', 'popcorn']]], [59, ['山谷早餐工坊', ['pie', 'jam']]],
   [60, ['晨茶丰收宴', ['pie', 'xiaolongbao']]],
 ]);
-const buyAll = (w) => {
+const buyAll = (w, skip = () => false) => {
   let changed = true, loops = 0;
   while (changed && loops++ < 200) {
     changed = false;
-    for (const t of w.tiles) if (t.visible && !t.done) { w.completeTile(t, true); changed = true; }
+    for (const t of w.tiles) if (t.visible && !t.done && !skip(t)) { w.completeTile(t, true); changed = true; }
   }
   assert.ok(loops < 200, 'all visible upgrades settle without an unlock cycle');
 };
@@ -42,8 +42,20 @@ for (const [lv, [name, outputs]] of expected) {
     const processedStands = L.objects.filter(o => o.type === 'stand' && o.role === 'processed');
     assert.deepEqual(rawStands.map(o => o.item).sort(), cropKinds.sort(), `level ${lv}: one raw stand per crop kind`);
     assert.deepEqual(processedStands.map(o => o.item).sort(), [...new Set(procs.map(p => p.out))].sort(), `level ${lv}: one output stand per product type`);
-    assert.equal(L.objects.filter(o => o.type === 'counter').length, 1, 'customer checkout stays separate and singular');
-    assert.ok(objs.C1 && objs.C1.items.includes(procs[0].out), `level ${lv} keeps the customer checkout`);
+    // v4.9.9: two counters — C1 sells raw goods only, a dedicated PS sells processed goods only
+    assert.equal(L.objects.filter(o => o.type === 'counter').length, 2, 'raw + dedicated processed counters');
+    assert.ok(objs.C1 && !procs.some((p) => objs.C1.items.includes(p.out)), `level ${lv} ordinary counter sells raw only`);
+    assert.ok(cropKinds.every((k) => objs.C1.items.includes(k)), `level ${lv} ordinary counter keeps every raw kind`);
+    assert.ok(objs.PS && objs.PS.sale2 && objs.PS.hidden, `level ${lv} dedicated processed counter exists, hidden until unlock`);
+    assert.deepEqual([...objs.PS.items].sort(), [...outputs].sort(), `level ${lv} processed counter sells only the level products`);
+    assert.ok(L.tiles.some((t) => t.effect?.show?.includes(procs[0].id) && t.effect.show.includes('PS')), `level ${lv} first machine unlock reveals the processed counter`);
+    assert.ok(L.tiles.some((t) => (t.effect?.cashier || []).includes('PS')), `level ${lv} a cashier serves the processed counter`);
+    const tallyTile = L.tiles.find((t) => t.effect?.worker?.tally);
+    assert.ok(tallyTile, `level ${lv} dedicated processed-goods tally clerk hire exists`);
+    const firstMachineUnlock = L.tiles.find((t) => t.effect?.show?.includes(procs[0].id));
+    assert.ok(firstMachineUnlock && (tallyTile.req || []).includes(firstMachineUnlock.id), `level ${lv} tally clerk requires the first machine unlock`);
+    assert.deepEqual([...tallyTile.effect.worker.from].sort(), processedStands.map((o) => o.id).sort(), `level ${lv} tally clerk takes from all processed boards`);
+    assert.deepEqual(tallyTile.effect.worker.to, ['PS'], `level ${lv} tally clerk delivers only to the processed counter`);
     for (const p of procs) {
       assert.equal(objs[p.outTo]?.type, 'stand', `${p.id} must deposit into its own wooden stand`);
       assert.ok(L.tiles.some(t => t.effect?.show?.includes(p.id)), `${p.id} has an unlock tile`);
@@ -59,11 +71,13 @@ for (const [lv, [name, outputs]] of expected) {
     assert.equal(w.L.name, name);
     const runtimeStands = Object.values(w.objs).filter(o => o.kind === 'stand');
     assert.equal(runtimeStands.length, rawStands.length + processedStands.length);
-    assert.equal(w.counters.length, 1);
+    assert.equal(w.counters.length, 2);
+    assert.ok(w.counters.some((c) => c.sale2 && c.hidden), 'processed counter starts hidden');
+    assert.ok(w.counters.some((c) => !c.sale2 && !c.hidden), 'ordinary counter starts visible');
     for (const p of w.procs) assert.equal(p.pile, p.outObj.pile, `${p.id} output uses its collection table as stock pile`);
     buyAll(w);
     assert.equal(w.workers.length, L.tiles.filter(t => t.effect?.worker).length, `level ${lv} all one-per-field and one-per-machine hires can be bought`);
-    const workerRoutes = w.workers.map(x => ({ from: x.from[0], to: x.to[0], feed: x.feedFor }));
+    const workerRoutes = w.workers.map(x => ({ from: x.from[0], to: x.to[0], feed: x.feedFor, tally: x.tally }));
     for (const x of w.workers) if (x.feedFor) assert.equal(x.loader, false, `level ${lv}: machine specialist keeps normal-batch capacity after loader upgrade`);
     if (w.loaders) for (const x of w.workers) if (!x.feedFor && !x.cart && !x.porter) assert.equal(x.loader, true, `level ${lv}: field/stand worker retains loader upgrade`);
     const hadLoaderUpgrade = w.loaders; w.loaders = true;
@@ -72,6 +86,7 @@ for (const [lv, [name, outputs]] of expected) {
     w.workers.splice(w.workers.indexOf(lateFeeder), 1); w.loaders = hadLoaderUpgrade; w.refreshStats();
     for (const route of workerRoutes) {
       if (route.feed) assert.ok(w.procs.some(p => p.id === route.feed && route.to === p.id), 'machine specialist only serves its assigned machine');
+      else if (route.tally) assert.equal(route.to, 'PS', 'tally clerk delivers only to the processed counter');
       else assert.ok(rawStands.some(s => s.id === route.to), 'field worker deposits at the matching raw-goods stand');
     }
     const deliveries = [];
@@ -87,6 +102,7 @@ for (const [lv, [name, outputs]] of expected) {
     for (const s of runtimeStands) assert.ok(s.pile.total + s.pile.pending <= s.pile.cap, `${s.id} never exceeds table capacity`);
     for (const p of w.procs) assert.ok(p.pile.total + p.pile.pending <= p.pile.cap, `${p.id} output stand never overflows`);
     for (const p of w.procs) assert.ok((p.drops || 0) >= 0);
+    assert.ok(w.workers.some((x) => x.tally && (x.drops || {}).PS > 0), `level ${lv}, season ${season} tally clerk stocked the processed counter`);
   }
 }
 // Exercise the intended player loop: collect packaged raw goods from its table, take them
@@ -98,7 +114,7 @@ for (const [lv, [name, outputs]] of expected) {
   const p = w.player; p.x = raw.x; p.y = raw.y; p.vx = p.vy = 0;
   for (let i = 0; i < 24; i++) w.update(1 / 30, 0, 0);
   assert.ok(p.stack.includes('wheat') || p.incoming > 0, 'player can pick up raw goods from the stand');
-  const c = w.counters[0], soldBefore = w.stats.sold.wheat || 0;
+  const c = w.counters.find((x) => !x.sale2), soldBefore = w.stats.sold.wheat || 0;
   // Leave the collection stand promptly so the player's automatic drop cannot return the goods
   // to the same stand; the counter then sells the delivered wheat in the normal simulation.
   p.x = c.zone.cx; p.y = c.zone.cy; p.vx = p.vy = 0;
@@ -106,18 +122,21 @@ for (const [lv, [name, outputs]] of expected) {
   assert.ok((w.stats.sold.wheat || 0) > soldBefore, 'player can deliver stand goods to the separate customer checkout');
 }
 // Verify processed goods follow the same player-pickup loop from their own stand, not the cashier.
+// The tally clerk is left unbought here so it cannot drain the processed stand before the player
+// gets there; the loop itself (stand -> dedicated processed counter) is what is exercised.
 {
-  const w = new World(53, { quiet: true, season: 0, seed: 555 }); buyAll(w);
+  const w = new World(53, { quiet: true, season: 0, seed: 555 });
+  buyAll(w, (t) => t.effect?.worker?.tally);
   for (let i = 0; i < 120 * 30; i++) w.update(1 / 30, 0, 0);
   const output = w.objs.P_bread;
   assert.ok(output.pile.total > 0, 'processed stand has worker-delivered goods');
   const p = w.player; p.x = output.x; p.y = output.y; p.vx = p.vy = 0;
   for (let i = 0; i < 24; i++) w.update(1 / 30, 0, 0);
   assert.ok(p.stack.includes('bread') || p.incoming > 0, 'player can pick up processed goods from their own stand');
-  const c = w.counters[0], soldBefore = w.stats.sold.bread || 0;
+  const c = w.counters.find((x) => x.sale2), soldBefore = w.stats.sold.bread || 0;
   p.x = c.zone.cx; p.y = c.zone.cy; p.vx = p.vy = 0;
   for (let i = 0; i < 12 * 30; i++) w.update(1 / 30, 0, 0);
-  assert.ok((w.stats.sold.bread || 0) > soldBefore, 'player can carry processed stand goods to the separate checkout');
+  assert.ok((w.stats.sold.bread || 0) > soldBefore, 'player can carry processed stand goods to the dedicated processed checkout');
 }
 for (const [lv, expectedOut] of [[54, 'bread'], [57, 'juice'], [60, 'pie']]) {
   const k = lv - CFG.valley.from - 1, L = splitSales(valleyLevel(k, 0));

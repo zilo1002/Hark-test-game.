@@ -664,6 +664,7 @@ export class World {
       if (e.worker.tray) w.trayOf = e.worker.tray;        // v4.7 the porter's own machine tray
       if (e.worker.standCarrier) w.standCarrier = true;
       if (e.worker.fullBatch) w.fullBatch = true;
+      if (e.worker.tally) w.tally = true;   // v4.9.9 理货员 (processed boards → goods counter, no batch gate)
     }
     if (e.upgradeWorkers === 'loader') {
       this.loaders = true;

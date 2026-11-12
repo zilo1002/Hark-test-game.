@@ -170,7 +170,7 @@ export const CFG = {
   // ({ season: [ids] }) where one set does not fit all four (the extra goods must not heap the trays past v47.trayMax)
   // v4.9: with the line kept full (customers walk up all the time) goods sell faster, so 7, 13, 15, 26, 40, 42, 溪畔双坊 秋 and 四季山谷大庄园 秋 M1 joined
   v48: { feeder3: 1.2, feed3: { 蛋箱工坊: ['M1'], 麦田番茄: ['M1'], 青青大庄园: ['M2'], 木椅工坊: ['M1', 'M2'], 葡萄酒庄: ['M1'], 夜钓: ['M1', 'M2'],
-                                 羊毛牧场: ['M1'], 湖畔渔村: ['M1'], 秋收集市: ['M2'], 半亩大庄园: ['M1', 'M4'], 夜间农场: ['M1'], 早市面包摊: ['M1'],
+                                 羊毛牧场: ['M1'], 湖畔渔村: ['M1'], 半亩大庄园: ['M1', 'M4'], 夜间农场: ['M1'], 早市面包摊: ['M1'],
                                  湖畔集市: ['M3'], 湖畔酒庄大庄园: ['M1', 'M3'], 山谷小作坊: ['M1'], 溪畔双坊: { 0: ['M1'], 1: ['M1'], 2: ['M1', 'M2'], 3: ['M1'] }, 山谷集市: ['M1'],
                                  四季山谷大庄园: { 0: ['M1'], 1: ['M1'], 2: ['M1', 'M2', 'M3'], 3: ['M1'] },
                                  晨光面包房: ['M1'], 果香早餐铺: ['M1'], 山谷茶点坊: ['M1'], 早市烘焙铺: ['M1', 'M3', 'M4'],
@@ -322,7 +322,7 @@ export const CFG = {
       goal: { type: 'produce', item: 'crate', n: 310 },
       objects: [
         { id: 'K1', type: 'coop', item: 'egg', producer: 'hen', x: 70, y: 70, w: 330, h: 270, n: 6, max: 20, prefill: 1200 },
-        { id: 'M1', type: 'proc', in: 'egg', out: 'crate', ratio: 6, time: 0.45, x: 620, y: 200, outTo: 'C1' },
+        { id: 'M1', type: 'proc', in: 'egg', out: 'crate', ratio: 4, time: 0.45, x: 620, y: 200, outTo: 'C1' }, // v4.9.9: ratio 6->4, 一田一人后蛋板上料 ~14/s, 150 只一批烧 3.3s, PS 柜前等 4.7s
         { id: 'C1', type: 'counter', items: ['crate'], x: 630, y: 420 },
       ],
       tiles: [
@@ -442,7 +442,7 @@ export const CFG = {
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 300, h: 300, gap: 9 },
         { id: 'T1', type: 'coop', item: 'tomato', producer: 'bush', x: 70, y: 430, w: 280, h: 300, n: 8, max: 18, prefill: 900 },
-        { id: 'M1', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 3, time: 0.3, x: 740, y: 260, outTo: 'C1', hidden: true }, // v4.9.6: time 0.4->0.3, B PS svc was 3.2s (porter batches ~20/10s, desk drains in ~4s, dry-window customers wait ~8s); buf never starves so ratio untouched
+        { id: 'M1', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 1, time: 0.3, x: 740, y: 260, outTo: 'C1', hidden: true }, // v4.9.6: time 0.4->0.3, B PS svc was 3.2s (porter batches ~20/10s, desk drains in ~4s, dry-window customers wait ~8s); buf never starves so ratio untouched; v4.9.9: ratio 3->1 (ratio 2 时一批 150 只烧 6.6s, 3 个专员分板各 ~4.5/s 供不上, 缺料 25%; 1 只一批烧 13.3s, 盖过供货间隔 ~11s), 一田一人后番茄板上料 ~14/s
         { id: 'C1', type: 'counter', items: ['wheat', 'tomato', 'ketchup'], x: 750, y: 480 },
       ],
       tiles: [
@@ -575,7 +575,7 @@ export const CFG = {
       goal: { type: 'produce', item: 'cheese', n: 280 },
       objects: [
         { id: 'K1', type: 'coop', item: 'milk', producer: 'cow', x: 80, y: 80, w: 330, h: 270, n: 4, max: 12, prefill: 800 },
-        { id: 'M1', type: 'proc', in: 'milk', out: 'cheese', ratio: 2, time: 0.45, x: 640, y: 200, outTo: 'C1' }, // v4.8.7: ratio 6->2, feeder supply ~14/s, starve was 26%
+        { id: 'M1', type: 'proc', in: 'milk', out: 'cheese', ratio: 1, time: 0.45, x: 640, y: 200, outTo: 'C1' }, // v4.8.7: ratio 6->2, feeder supply ~14/s, starve was 26%; v4.9.9: ratio 2->1, 一田一人后奶板上料 ~11/s, M1 缺料 18%
         { id: 'C1', type: 'counter', items: ['cheese'], x: 650, y: 420 },
       ],
       tiles: [
@@ -738,8 +738,8 @@ export const CFG = {
       objects: [
         { id: 'K1', type: 'coop', item: 'milk', producer: 'cow', x: 80, y: 80, w: 300, h: 250, n: 5, max: 11, prefill: 800 },
         { id: 'B1', type: 'field', crop: 'berry', x: 40, y: 420, w: 320, h: 310, gap: 9 },
-        { id: 'M1', type: 'proc', in: 'milk', out: 'icecream', ratio: 3, time: 0.9, x: 760, y: 200, outTo: 'C1' }, // v4.8.8: ratio 6->3 + time 0.45->0.9, starve was 20%, tray 64
-        { id: 'M2', type: 'proc', in: 'berry', out: 'jam', ratio: 5, time: 0.8, x: 560, y: 680, outTo: 'C1', hidden: true }, // v4.8.8: time 0.5->0.8, tray was 64
+        { id: 'M1', type: 'proc', in: 'milk', out: 'icecream', ratio: 2, time: 0.9, x: 760, y: 200, outTo: 'C1' }, // v4.8.8: ratio 6->3 + time 0.45->0.9, starve was 20%, tray 64; v4.9.9: ratio 3->2, 一田一人后 PS 柜前等 3.1s
+        { id: 'M2', type: 'proc', in: 'berry', out: 'jam', ratio: 4, time: 0.8, x: 560, y: 680, outTo: 'C1', hidden: true }, // v4.8.8: time 0.5->0.8, tray was 64; v4.9.9: ratio 5->4, 一田一人后 PS 柜前等 3.0s
         { id: 'C1', type: 'counter', items: ['berry', 'icecream', 'jam'], x: 770, y: 470 },
       ],
       tiles: [
@@ -784,8 +784,8 @@ export const CFG = {
         { id: 'F1', type: 'field', crop: 'corn', x: 40, y: 40, w: 300, h: 260, gap: 10 },
         { id: 'P1', type: 'field', crop: 'pumpkin', x: 40, y: 350, w: 300, h: 220, gap: 22 },
         { id: 'A1', type: 'coop', item: 'apple', producer: 'appletree', x: 80, y: 640, w: 260, h: 150, n: 4, max: 7, prefill: 500 },
-        { id: 'M1', type: 'proc', in: 'corn', out: 'popcorn', ratio: 6, time: 0.9, x: 700, y: 140, outTo: 'C1' }, // v4.8.8: time 0.45->0.9, tray was 71
-        { id: 'M2', type: 'proc', in: 'pumpkin', out: 'pie', ratio: 1, time: 1.2, x: 700, y: 330, outTo: 'C1', hidden: true }, // v4.8.8: ratio 4->2 + time 0.5->0.9, starve was 23%, tray 71; v4.9.7: ratio 2->1 (time 0.9->1.2 did not move the 26% starve — the sparse pumpkin field feeds the board too slowly, so the oven takes fewer pumpkins per pie instead)
+        { id: 'M1', type: 'proc', in: 'corn', out: 'popcorn', ratio: 5, time: 0.9, x: 700, y: 140, outTo: 'C1' }, // v4.8.8: time 0.45->0.9, tray was 71; v4.9.9: ratio 6->5, 一田一人后 PS 柜前等 3.3s (玉米板上料 ~13/s, M1 吃 22.6/s, 爆米花供不上)
+        { id: 'M2', type: 'proc', in: 'pumpkin', out: 'pie', ratio: 1, time: 1.2, x: 700, y: 330, outTo: 'C1', hidden: true }, // v4.8.8: ratio 4->2 + time 0.5->0.9, starve was 23%, tray 71; v4.9.7: ratio 2->1 (time 0.9->1.2 did not move the 26% starve — the sparse pumpkin field feeds the board too slowly, so the oven takes fewer pumpkins per pie instead); v4.9.9: M2 从 feed3 拿掉 — 一田一人后南瓜板上料 ~11/s, 3 个专员分一板各 ~3.7/s, 第一批 150 要 40s 才到, 机器开局缺料 16%; 2 个专员各 ~5.5/s, 第一批 ~27s 到
         { id: 'M3', type: 'proc', in: 'apple', out: 'juice', ratio: 2, time: 1.1, x: 700, y: 720, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->2 + time 0.5->1.1, starve was 70%, tray 71
         { id: 'C1', type: 'counter', items: ['corn', 'pumpkin', 'popcorn', 'pie', 'juice'], x: 840, y: 480 },
       ],
@@ -1410,7 +1410,7 @@ const VL = {
         { id: 'F2', type: 'field', crop: 'B', x: 40, y: 340, w: 300, h: 250, hidden: true },
         { id: 'F3', type: 'field', crop: 'C', x: 40, y: 640, w: 300, h: 220, hidden: true },
         { id: 'M1', type: 'proc', in: 'A', time: 1.6, x: 700, y: 140, outTo: 'C1' }, // v4.8.8: time 0.45->1.6, tray was 120
-        { id: 'M2', type: 'proc', in: 'B', time: 1.3, x: 560, y: 420, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->1.3, tray was 120
+        { id: 'M2', type: 'proc', in: 'B', time: 1.1, x: 560, y: 420, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->1.3, tray was 120; v4.9.9: time 1.3->1.1, 一田一人后 PS 柜前等 3.0s
         { id: 'M3', type: 'proc', in: 'C', time: 1.2, x: 640, y: 780, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->1.2, tray was 120
         { id: 'C1', type: 'counter', items: ['A', 'B', 'C', 'A+', 'B+', 'C+'], x: 900, y: 520 },
       ],
@@ -1460,7 +1460,7 @@ const VL = {
     // 54–60 — breakfast and tea-time food workshops. Their recipes stay the same in every chosen season;
     // the season still changes the valley look and the season-specific growth bonus where applicable.
     // 54 — breakfast bakery and berry preserves: two direct, independently collectable products
-    { name: '晨光面包房', W: 960, H: 780, start: [490, 420], par: 500, bill: 30, customer: { processed: { buyMin: 1, buyMax: 2 } },
+    { name: '晨光面包房', W: 960, H: 780, start: [490, 420], par: 500, bill: 30, customer: { processed: { buyMin: 2, buyMax: 6 } }, // v4.9.9: 1-2 -> 2-4 -> 2-6 — 之前食品关没有 PS, 这份 processed 配置是死的; PS 一建它就生效。共用收银台时顾客一次买 4-12 件(原料+加工品混着), PS 顾客只买 2-4 件加工品卖得太慢, L54 机器人局 8:45/8:39 掉到 2★(基线 3★); 2-6 让人均 4 件, 回到共用台的加工品量
       foodLines: { A: { crop: 'wheat', gap: 9, out: 'bread', ratio: 4 }, B: { crop: 'berry', gap: 9, out: 'jam', ratio: 5 } },
       goal: { type: 'earn', n: [36000, 36000, 36000, 36000] },
       objects: [
@@ -1534,14 +1534,14 @@ const VL = {
       deco: { theme: 'garden', paths: [[350, 280, 600, 80], [780, 220, 90, 430]], hedges: [[930, 850, 100, 20]], trees: [[1050, 860, 'round'], [1050, 40, 'cone']], bushes: [[550, 50], [840, 60]], barn: [490, 50] } },
 
     // 57 — a morning bakery with bread and apple juice as its two products
-    { name: '早市烘焙铺', foodMarketMultiplier: 2.0, W: 1120, H: 900, start: [560, 460], par: 530, bill: 40, customer: { processed: { buyMin: 2, buyMax: 4 } },
+    { name: '早市烘焙铺', foodMarketMultiplier: 2.0, W: 1120, H: 900, start: [560, 460], par: 530, bill: 40, customer: { processed: { buyMin: 2, buyMax: 8 } }, // v4.9.9: 2-4 -> 2-6 -> 2-8 (PS 顾客人均 5 件; 2-6 时休闲局 8:52, 只差 par 2 秒)
       foodLines: { A: { crop: 'wheat', gap: 9, out: 'bread', ratio: 4 }, B: { crop: 'apple', gap: 11, out: 'juice', ratio: 5 } },
       goal: { type: 'earn', n: [55500, 55500, 55500, 55500] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 280, h: 230 },
         { id: 'A1', type: 'coop', item: 'B', producer: 'appletree', x: 60, y: 330, w: 280, h: 230, n: 4, max: 10, prefill: 600, hidden: true },
-        { id: 'M1', type: 'proc', in: 'A', out: 'bread', ratio: 4, time: 0.65, x: 700, y: 130, outTo: 'C1' },
-        { id: 'M3', type: 'proc', in: 'B', out: 'juice', time: 0.55, x: 700, y: 650, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', out: 'bread', ratio: 4, time: 0.5, x: 700, y: 130, outTo: 'C1' }, // v4.9.9: time 0.65 -> 0.5 — PS 建起来后加工品销量只走 PS 一条线, 机器产量成了瓶颈; 休闲局 8:51 只差 par 1 秒
+        { id: 'M3', type: 'proc', in: 'B', out: 'juice', time: 0.5, x: 700, y: 650, outTo: 'C1', hidden: true }, // v4.9.9: time 0.55 -> 0.5 (同上)
         { id: 'C1', type: 'counter', items: ['A', 'B'], x: 900, y: 450 },
       ],
       tiles: [
@@ -1614,14 +1614,14 @@ const VL = {
       deco: { theme: 'farm', paths: [[350, 300, 620, 80], [770, 190, 80, 180], [770, 500, 80, 200]], hedges: [[960, 890, 120, 20]], trees: [[1120, 900, 'round'], [1120, 40, 'cone']], bushes: [[560, 50], [900, 60]], barn: [500, 70] } },
 
     // 60 — the valley breakfast-and-tea feast: steamed xiaolongbao and pumpkin pie
-    { name: '晨茶丰收宴', foodMarketMultiplier: 2.05, W: 1200, H: 1000, start: [610, 500], par: 590, bill: 60, extraPorters: 3, customer: { processed: { buyMin: 2, buyMax: 4 } },
+    { name: '晨茶丰收宴', foodMarketMultiplier: 2.05, W: 1200, H: 1000, start: [610, 500], par: 590, bill: 60, extraPorters: 3, customer: { processed: { buyMin: 2, buyMax: 8 } }, // v4.9.9: 2-4 -> 2-6 -> 2-8 (PS 顾客人均 5 件; 2-6 时休闲局 10:14, 还差 par 24 秒)
       foodLines: { A: { crop: 'wheat', gap: 9, out: 'xiaolongbao', ratio: 4 }, B: { crop: 'pumpkin', gap: 22, out: 'pie', ratio: 4 } },
       goal: { type: 'earn', n: [75000, 75000, 75000, 75000] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 30, y: 35, w: 260, h: 210 },
         { id: 'F2', type: 'field', crop: 'B', x: 30, y: 285, w: 260, h: 210, hidden: true },
-        { id: 'M1', type: 'proc', in: 'A', out: 'xiaolongbao', ratio: 4, time: 0.65, x: 730, y: 105, outTo: 'C1' },
-        { id: 'M3', type: 'proc', in: 'B', out: 'pie', time: 0.6, x: 730, y: 500, outTo: 'C1', hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', out: 'xiaolongbao', ratio: 4, time: 0.5, x: 730, y: 105, outTo: 'C1' }, // v4.9.9: time 0.65 -> 0.5 — PS 建起来后加工品销量只走 PS 一条线, 机器产量成了瓶颈; 休闲局 10:09 还差 par 19 秒
+        { id: 'M3', type: 'proc', in: 'B', out: 'pie', time: 0.5, x: 730, y: 500, outTo: 'C1', hidden: true }, // v4.9.9: time 0.6 -> 0.5 (同上)
         { id: 'C1', type: 'counter', items: ['A', 'B'], x: 930, y: 430 },
       ],
       tiles: [

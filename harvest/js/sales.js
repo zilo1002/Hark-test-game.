@@ -141,7 +141,7 @@ function splitFoodLevel(L0) {
   // Replaced processing trays become output collection stands; do not reserve their former footprint.
   for (const p of procs) delete p.tray;
   const main = L.objects.find((o) => o.type === 'counter' && o.id === 'C1') || L.objects.find((o) => o.type === 'counter');
-  if (main) { main.items = [...new Set([...sources.map(sourceObj), ...outItems])]; main.hidden = false; main.foodManualSupply = true; }
+  if (main) { main.items = [...new Set(sources.map(sourceObj))]; main.hidden = false; main.foodManualSupply = true; }   // v4.9.9: raw only — processed goods get their own dedicated counter (PS) below
   const removedObjects = new Set(L.objects.filter((o) => !keepObjectIds.has(o.id) && o !== main).map((o) => o.id));
   L.objects = L.objects.filter((o) => !removedObjects.has(o.id));
   // Keep common upgrades/cashier, and only machine/plot unlocks still attached to retained objects.
@@ -202,6 +202,36 @@ function splitFoodLevel(L0) {
     const unlock = tileForObject(p.id);
     if (unlock) unlock.effect.show = [...new Set([...(unlock.effect.show || []), id])];
   }
+  // v4.9.9: a dedicated processed-goods counter (PS, only processed goods). The food
+  // workshops used to sell raw + processed on one shared counter (C1) and the player
+  // had to carry every finished good there by hand. PS sits near C1 — same free-space
+  // search as splitSales0 (near the raw counter, close to the machines), with a
+  // whole-map fallback — and is revealed with the first machine unlock. A dedicated
+  // tally clerk (below) stocks it; the raw counter keeps selling raw goods only.
+  let sale = null, firstMachineTile = null;
+  if (main) {
+    const bl = blockers(L, null), K = CFG.counter;
+    let best = null, bs = 1e18;
+    const score = (x, y) => Math.abs(y - main.y) + Math.abs(x - main.x) * 2 + Math.min(...procs.map((p) => Math.hypot(p.x - x, p.y - y))) * 0.5;
+    const tryAt = (x, y, gap) => {
+      if (x + K.serveDx > L.W - 40 || x + K.cashDx - 20 < 20) return;
+      const rs = counterRects(x, y, L.W);
+      if (!rs.slice(0, 3).every((r) => inside(L, r, 20))) return;
+      if (rs.some((r, k) => bl.some((b) => ov(r, b, k === 0 ? gap : 8)))) return;
+      const sc = score(x, y); if (sc < bs) { bs = sc; best = [x, y]; }
+    };
+    for (const gap of [34, 22, 12]) { if (best) break;
+      for (let dx = -80; dx <= 80; dx += 10) for (let y = 60; y <= L.H - 100; y += 10) tryAt(main.x + dx, y, gap); }
+    if (!best) for (let x = 45; x <= L.W - 45; x += 16) for (let y = 45; y <= L.H - 45; y += 16) tryAt(x, y, 3);
+    const psPos = best || [Math.min(L.W - 50, Math.max(50, main.x)), Math.min(L.H - 50, Math.max(50, main.y + 120))];
+    if (!best) console.warn(`[sales] ${L.name}: no clear spot for the processed counter, using ${psPos}`);
+    sale = { id: 'PS', type: 'counter', items: [...outItems], x: psPos[0], y: psPos[1], hidden: true, sale2: true };
+    L.objects.push(sale);
+    firstMachineTile = tileForObject(procs[0].id);
+    if (firstMachineTile) firstMachineTile.effect.show = [...new Set([...(firstMachineTile.effect.show || []), sale.id])];
+    // One clerk serves both desks (same as splitSales0: reuse the level's cashier).
+    for (const t of tiles) if (t.effect.cashier && t.effect.cashier.length) t.effect = { ...t.effect, cashier: [...new Set([...t.effect.cashier, sale.id])] };
+  }
   L.tiles = tiles; // keep procedural hire tiles in the placement blockers as they are added.
   const first = tiles[0];
   const gen = [];
@@ -228,11 +258,24 @@ function splitFoodLevel(L0) {
       req: [...new Set([machineTile.id, ...(upstreamTile ? [upstreamTile.id] : [])])],
       effect: { worker: { from: [source.id], to: [proc.id], feeder: proc.id, fullBatch: true } } });
   }
+  // v4.9.9: one dedicated processed-goods tally clerk per food level — takes finished
+  // goods from the processed boards to the dedicated processed counter (PS), never to
+  // the shared raw counter. One clerk covers all the level's processed boards and
+  // leaves with whatever is on them (no batch gate), so the boards stay clear while
+  // the player is busy elsewhere. Requires the first machine unlock (same as PS).
+  if (sale) {
+    const boards = [...new Set(procs.map((p) => p.outTo))];
+    const pos = spot(L, procs[0].x - 90, procs[0].y + 100);
+    add({ id: 'food_tally', x: pos[0], y: pos[1], price: hirePrice, icon: 'porter', label: '加工品理货员',
+      req: firstMachineTile ? [firstMachineTile.id] : [first.id],
+      effect: { worker: { from: boards, to: [sale.id], tally: true } } });
+  }
   // Keep every tile's prerequisite references valid and place the new hires early after the starter tile.
   const ids = new Set(tiles.map((t) => t.id));
   tiles = tiles.filter((t) => (t.req || []).every((id) => ids.has(id)));
   L.tiles = tiles.length ? [tiles[0], ...gen, ...tiles.filter((t) => t !== tiles[0] && !gen.includes(t))] : gen;
   L.foodCollectionTables = true;
+  if (sale) L.sale2 = 'PS';
   L.objects = L.objects.map((o) => o.type === 'proc' ? { ...o, tray: undefined } : o);
   return L;
 }
@@ -364,30 +407,25 @@ function splitSales0(L0) {
   // 2c) v4.9.7 farmhands: they heap the field/coop output onto the raw board so the 机器专员
   // always find a full load there. (Same role as the food workshops' 田间采收工, but without
   // `raw: true`, so they never count as raw carriers to a counter — staff-check /
-  // labour-check recognise `standCarrier` as its own role.) One farmhand per feeder-slot
-  // the kind's machines use (2 normally, 3 on a feed3 machine): a single harvester cannot
-  // keep up with a fast machine — the old flow had 2-3 feeders harvesting in parallel.
+  // labour-check recognise `standCarrier` as its own role.)
+  // v4.9.9: one farmhand per field/co-op (Jin: 4 fields → 4 people). Each farmhand works
+  // its own field and heaps that field's kind onto the raw board. Replaces the v4.9.7
+  // rule (one per feeder-slot of the kind + 1 spare = 3-4 per kind).
   const farmTiles = [];
   for (const item of neededRaw) {
     const stand = rStand[item]; if (!stand) continue;
     const src = srcOf(item);
-    const machines = farmFed.filter((p) => p.in === item);
-    // v4.9.7: one farmhand per feeder-slot the kind's machines use, plus one spare — the
-    // two-stage board pipeline (field -> board -> machine) is slower than the old direct
-    // field -> machine carry, so the old headcount leaves fast machines starved (L22 25%
-    // with two hands). The spare is what keeps L22 and L51 fed.
-    const nFarm = Math.max(...machines.map((p) => (feed3Of(L0).includes(p.id) ? 3 : 2))) + 1;
     const coop = src.every((id) => obj[id].type === 'coop');
-    for (let k = 0; k < nFarm; k++) {
+    src.forEach((srcId, k) => {
       const sp = spot(L, stand.x - 10, stand.y + 55 + k * 40);
-      farmTiles.push(add({ id: `x_rf_${item}_${k + 1}`, x: sp[0], y: sp[1], price: r10(s * V.raw[0] * 0.4), icon: coop ? 'cart' : 'worker', label: '田间采收工',   // v4.9.7: 0.4x price — a farmhand only hauls field -> board (one short leg), and there are 2-4 of them per kind; at full worker price the bot spends the whole opening saving up for them and the machines start late (L15 casual 3:35 -> 5:44, machines 0% starved)
+      farmTiles.push(add({ id: `x_rf_${item}_${k + 1}`, x: sp[0], y: sp[1], price: r10(s * V.raw[0] * 0.4), icon: coop ? 'cart' : 'worker', label: '田间采收工',   // v4.9.7: 0.4x price — a farmhand only hauls field -> board (one short leg); at full worker price the bot spends the whole opening saving up for them and the machines start late (L15 casual 3:35 -> 5:44, machines 0% starved)
         req: k === 0 ? [first.id] : [`x_rf_${item}_${k}`],
         // v4.9.7: NO fullBatch — a farmhand that waits for a full 150-item load while the
         // field regrows leaves the board empty and the machine starved (L22 24%); it
         // delivers a partial load whenever the field is temporarily bare, so the board
         // stays stocked in a steady trickle instead of rare big bursts.
-        effect: { worker: { from: src, to: [stand.id], standCarrier: true } } }));
-    }
+        effect: { worker: { from: [srcId], to: [stand.id], standCarrier: true } } }));
+    });
   }
   // 3) machines: every machine is hidden until bought; a machine without a tile gets one on its own spot
   const mTile = {};
@@ -499,6 +537,21 @@ function splitSales0(L0) {
     por.push(add({ id: 'x_p' + (k + 1), x: sp[0], y: sp[1], price: r10(s * V.porter[k < T.length ? 0 : 1]), icon: 'porter', label: '加工品搬运工',
                    req, effect: { worker: { from: [p.id, ...T.filter((q) => q !== p).map((q) => q.id)], to: [sale.id], porter: true, tray: p.id } } }));
   }
+  // v4.9.9 理货员: in levels with two or more terminal machines, one dedicated clerk
+  // stands by the machine specialists and shuttles finished goods from the processed
+  // boards to the goods counter. Why not just another porter: a porter is tied to one
+  // machine's board and waits there until a fair batch (60) heaps up — so with two
+  // machines the boards pile up while Jin is busy elsewhere. The tally clerk covers
+  // ALL the level's boards and leaves with whatever is on them (no batch gate), so
+  // the boards stay clear. One per level, only where T.length >= 2.
+  let tally = null;
+  if (T.length >= 2) {
+    const boards = [...new Set(T.map((p) => pStand[p.id]))];
+    const sp = spot(L, T[0].x - 90, T[0].y + 100);
+    tally = add({ id: 'x_tally', x: sp[0], y: sp[1], price: r10(s * V.porter[0]), icon: 'porter', label: '理货员',
+                  req: [mTile[T[0].id].id],
+                  effect: { worker: { from: boards.map((b) => b.id), to: [sale.id], tally: true } } });
+  }
   // 6) 店员 + 收银升级 (the upgrade waits on the clerk, on the same spot)
   const cup = (id, at, ids, clerk) => add({ id, x: at.x, y: at.y, price: r10(s * V.cup.base), icon: 'register', label: '收银升级', req: [clerk],
                                             repeat: { times: V.cup.times, mul: V.cup.mul }, effect: { counterUp: ids } });
@@ -532,7 +585,7 @@ function splitSales0(L0) {
   let order = [orig[0], ...farmTiles, ...mGen, ...orig.slice(1)];
   const firstTerm = order.findIndex((t) => termTiles.includes(t.id));
   // Hire the first porter promptly after the machine; both stands already appear at machine unlock.
-  order.splice(firstTerm + 1, 0, por[0], ...(pc ? [pc] : []), ...(rawT[0] ? [rawT[0]] : []));
+  order.splice(firstTerm + 1, 0, por[0], ...(tally ? [tally] : []), ...(pc ? [pc] : []), ...(rawT[0] ? [rawT[0]] : []));
   T.forEach((p, k) => { if (!k) return; const i = order.indexOf(mTile[p.id]); if (i >= 0) order.splice(i + 1, 0, por[k]); else order.push(por[k]); });
   order.push(...gen.filter((t) => t.id.startsWith('x_f')), ...rawT.slice(1), ...por.slice(T.length), ...feed2, ...feed3, ...(pu ? [pu] : []), ...ups, ...gen.filter((t) => t.id.startsWith('u_')));
   const seen = new Set(); L.tiles = order.filter((t) => t && !seen.has(t) && seen.add(t));

@@ -31,6 +31,8 @@ CFG.levels.forEach((L, li) => {
       // raw-carrier branch, which would otherwise flag a board drop as "going to a machine".
       if (x.standCarrier) { const st = (x.toObjs || [])[0]; if (x.stack.some((t) => !st || t !== st.item)) bump('采收工拿了别的'); if (x.toObjs && x.toObjs.some((s) => s.kind !== 'stand')) bump('采收工去别处'); }
       else if (x.porter) { if (x.stack.some((t) => !made.has(t))) bump('搬运工拿了原料'); if (x.sources && x.sources.some((s) => s.kind !== 'proc')) bump('搬运工去田里'); }
+      // v4.9.9 理货员: only holds machine goods, only ever works the processed boards → goods counter.
+      else if (x.tally) { if (x.stack.some((t) => !made.has(t))) bump('理货员拿了原料'); if (x.sources && x.sources.some((s) => s.kind !== 'stand' || s.role !== 'processed')) bump('理货员去别处'); if (x.toObjs && x.toObjs.some((s) => s.kind !== 'counter' || !s.sale2)) bump('理货员去别处'); }
       else if (x.feedFor) { const m = w.objs[x.feedFor]; if (x.stack.some((t) => t !== m.inItem)) bump('专员拿了别的'); if (x.toObjs && x.toObjs.some((s) => s !== m)) bump('专员去别处'); }
       else if (x.rawCarrier) { if (x.stack.some((t) => !rawItems.has(t))) bump('原料工拿了别的'); if (x.toObjs && x.toObjs.some((s) => s.kind !== 'counter' || s.sale2)) bump('原料工去机器'); }
     }

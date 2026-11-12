@@ -116,15 +116,15 @@ CFG.levels.forEach((L0, li) => {
   }
   if (w.workers.some((x) => !x.feedFor && x.to.some((id) => w.objs[id] && w.objs[id].kind === 'proc'))) errs.push('a non-feeder hire feeds a machine');
   const raw = w.workers.filter((x) => x.rawCarrier), por = w.workers.filter((x) => x.porter);
-  if (w.workers.some((x) => !x.rawCarrier && !x.porter && !x.feedFor && !x.standCarrier)) errs.push('a hire without a role');
-  // v4.9.7 田间采收工: one per machine-feeding raw kind; it only ever holds its board's
-  // kind and only drops on that raw board (never a counter, never a machine).
+  if (w.workers.some((x) => !x.rawCarrier && !x.porter && !x.feedFor && !x.standCarrier && !x.tally)) errs.push('a hire without a role');
+  // v4.9.9 田间采收工: one per field/co-op of each machine-feeding raw kind; it only
+  // ever holds its board's kind and only drops on that raw board (never a counter, never a machine).
   const farm = w.workers.filter((x) => x.standCarrier);
   const stands = new Map(Object.values(w.objs).filter((o) => o.kind === 'stand').map((o) => [o.id, o]));
-  // v4.9.7: one farmhand per feeder-slot the kind's machines use, plus one spare (see sales.js)
-  const wantFarm = [...new Set(farmFed.map((p) => p.inItem))].reduce((n, item) =>
-    n + Math.max(...farmFed.filter((p) => p.inItem === item).map((p) => (feed3Of(L).includes(p.id) ? 3 : 2))) + 1, 0);
-  if (farm.length !== wantFarm) errs.push(`${farm.length} farmhands (want ${wantFarm}: one per feeder-slot of each machine-feeding kind)`);
+  // v4.9.9: one farmhand per field/co-op of the kind (see sales.js)
+  const srcOf = (item) => L.objects.filter((o) => (o.type === 'field' && o.crop === item) || (o.type === 'coop' && o.item === item));
+  const wantFarm = [...new Set(farmFed.map((p) => p.inItem))].reduce((n, item) => n + srcOf(item).length, 0);
+  if (farm.length !== wantFarm) errs.push(`${farm.length} farmhands (want ${wantFarm}: one per field/co-op of each machine-feeding kind)`);
   for (const x of farm) {
     if (drops(x).some((id) => !stands.has(id))) errs.push(`farmhand dropped at ${drops(x).join(',')}`);
     const h = [...st.get(x).held].filter((it) => !x.to.some((id) => stands.get(id)?.item === it));
@@ -143,6 +143,19 @@ CFG.levels.forEach((L0, li) => {
     const h = [...st.get(x).held].filter((it) => !made.has(it)); if (h.length) errs.push(`porter held (harvested?) ${h.join(',')}`);
   }
   if (!por.some((x) => (x.drops || {})[sale.id] > 0)) errs.push('porters did not deliver goods');
+  // v4.9.9 理货员: one per level with two or more terminal machines; it only ever
+  // holds machine goods and only drops at the goods counter.
+  const tally = w.workers.filter((x) => x.tally);
+  const wantTally = term.length >= 2 ? 1 : 0;
+  const tallyTile = w.tiles.find((t) => t.effect?.worker?.tally);
+  if (tally.length !== wantTally) errs.push(`${tally.length} tally clerks for ${term.length} terminal machines (want ${wantTally})`);
+  if (term.length >= 2 && (!tallyTile || !machineUnlock || !(tallyTile.req || []).includes(machineUnlock.id))) errs.push('tally clerk tile missing or does not require a processing-machine unlock');
+  if (term.length < 2 && tallyTile) errs.push('unexpected tally clerk tile');
+  for (const x of tally) {
+    if (drops(x).some((id) => id !== sale.id)) errs.push(`tally clerk dropped at ${drops(x).join(',')}`);
+    const h = [...st.get(x).held].filter((it) => !made.has(it)); if (h.length) errs.push(`tally clerk held ${h.join(',')}`);
+  }
+  if (tally.length && !tally.some((x) => (x.drops || {})[sale.id] > 0)) errs.push('tally clerk never delivered goods');
   if (trayOverflow) errs.push(`tray exceeded its actual capacity (${trayOverflow})`);
   if (!(w.stats.sold[FIN] > 0)) errs.push(`no ${FIN} sold`);
   // B) processor unlocked but its first porter not hired: both desks are visible; feeders wait at the machine.

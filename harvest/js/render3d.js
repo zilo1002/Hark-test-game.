@@ -996,8 +996,12 @@ export class Renderer {
       o.grp.visible = o.zone.visible = o.cash.visible = a > 0; if (a <= 0) continue;
       const sq = 1 + c.bumpT * 0.05; o.grp.scale.set(a, a * sq, a); o.zone.scale.setScalar(a); o.cash.scale.setScalar(a);
       const K = CFG.counter, dsk = c.desk;
-      const boxed = c.stock.filter((type) => isPackableCargo(type)).slice(0, 24);
-      const loose = c.stock.filter((type) => !isPackableCargo(type)).concat(c.stock.filter((type) => isPackableCargo(type)).slice(24));
+      // v4.9.9: counter goods sit grouped by kind, side by side — two vegetables read as
+      // a left pile and a right pile, not one stack layered on top of the other. This
+      // changes no stock/count, only where each item is drawn.
+      const groupByKind = (arr) => { const kinds = [], by = new Map(); for (const t of arr) { if (!by.has(t)) { by.set(t, []); kinds.push(t); } by.get(t).push(t); } return kinds.flatMap((k) => by.get(k)); };
+      const boxed = groupByKind(c.stock.filter((type) => isPackableCargo(type))).slice(0, 24);
+      const loose = groupByKind(c.stock.filter((type) => !isPackableCargo(type)).concat(c.stock.filter((type) => isPackableCargo(type)).slice(24)));
       for (let i = 0; i < o.crateSlots.length; i++) o.crateSlots[i].visible = i < Math.ceil(boxed.length / 4);
       // Four actual goods per open crate, in small layers so apples, tomatoes and fish remain
       // individually recognizable above the warm slatted sides. This changes no stock/count.
@@ -1007,9 +1011,19 @@ export class Renderer {
         const type = boxed[k], ix = cell % 2, iz = (cell / 2) | 0;
         this.item(type, c.x + cx + (ix ? 2.1 : -2.1), c.y + cz + (iz ? 1.8 : -1.8), K.deskH + 2.2 + (M.ITEM_HALF[type] || 2), (k % 3) * 0.2 + 0.785, 0.55);
       }
-      for (let k = 0; k < Math.min(loose.length, 120); k++) {
-        const col = k % 6, lay = (k / 6) | 0, type = loose[k], ix = col % 2, iy = (col / 2) | 0;
-        this.item(type, dsk.x + 8 + ix * 14, dsk.y + 26 + iy * 12, K.deskH + 1 + lay * CFG.items[type].step * 0.8 + (M.ITEM_HALF[type] || 2), (k % 3) * 0.2 + 0.785, 0.85);
+      // Loose goods: each kind gets its own footprint cell (left/right pairs down the
+      // desk) and stacks in layers there — four per layer in a small 2x2 cluster so a
+      // big pile stays a pile instead of a needle.
+      const looseCells = [[8, 26], [22, 26], [8, 38], [22, 38], [8, 50], [22, 50]];
+      let drawn = 0;
+      for (const [ki, type] of [...new Set(loose)].entries()) {
+        if (drawn >= 120) break;
+        const [cx, cy] = looseCells[ki % looseCells.length];
+        const items = loose.filter((t) => t === type);
+        for (let j = 0; j < items.length && drawn < 120; j++, drawn++) {
+          const cell = j % 4, lay = (j / 4) | 0, ix = cell % 2, iz = (cell / 2) | 0;
+          this.item(type, dsk.x + cx + (ix ? 2.1 : -2.1), dsk.y + cy + (iz ? 1.8 : -1.8), K.deskH + 1 + lay * CFG.items[type].step * 0.8 + (M.ITEM_HALF[type] || 2), (j % 3) * 0.2 + 0.785, 0.85);
+        }
       }
       if (c.cash > 0.01) {
         const bv = world.L.bill || 5, m = Math.min(72, Math.ceil(c.cash / bv)), p = c.cashPos;
