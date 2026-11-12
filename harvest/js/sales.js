@@ -116,7 +116,7 @@ export function splitSales(L) {
 // matching raw/intermediate table; machine outputs go to a distinct finished-goods table.
 const FOOD_OUTPUTS = {
   8: ['bread', 'jam'], 9: ['juice', 'jam'], 10: ['pie', 'teasnack'],
-  11: ['bread', 'juice'], 12: ['chips', 'popcorn'], 13: ['pie', 'jam'], 14: ['xiaolongbao', 'pie'],
+  11: ['bread', 'juice'], 12: ['chips', 'popcorn'], 13: ['pie', 'jam', 'bread'], 14: ['xiaolongbao', 'pie'], // v5.0.5: 13 keeps 'bread' — the wheat line is L59's only visible starting field; without it the level is empty
 };
 function splitFoodLevel(L0) {
   const L = { ...L0, objects: L0.objects.map((o) => ({ ...o, items: o.items?.slice() })),

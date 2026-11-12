@@ -16,7 +16,7 @@ for (const item of ['xiaolongbao', 'teasnack']) { assert.equal(packageKind(item)
 const expected = new Map([
   [54, ['晨光面包房', ['bread', 'jam']]], [55, ['果香早餐铺', ['juice', 'jam']]],
   [56, ['山谷茶点坊', ['pie', 'teasnack']]], [57, ['早市烘焙铺', ['bread', 'juice']]],
-  [58, ['咸香茶歇屋', ['chips', 'popcorn']]], [59, ['山谷早餐工坊', ['pie', 'jam']]],
+  [58, ['咸香茶歇屋', ['chips', 'popcorn']]], [59, ['山谷早餐工坊', ['flour', 'bread', 'pie', 'jam']]],
   [60, ['晨茶丰收宴', ['pie', 'xiaolongbao']]],
 ]);
 const buyAll = (w, skip = () => false) => {
@@ -37,7 +37,7 @@ for (const [lv, [name, outputs]] of expected) {
     const procs = L.objects.filter((o) => o.type === 'proc');
     const cropKinds = [...new Set(L.objects.filter((o) => ['field', 'coop'].includes(o.type)).map(o => o.type === 'field' ? o.crop : o.item))];
     assert.deepEqual([...new Set(procs.map(p => p.out))].sort(), [...outputs].sort(), `level ${lv} recipe set`);
-    assert.ok(procs.length <= 2, `level ${lv} stays within two intermediate/finished product types`);
+    assert.ok(procs.length <= 4, `level ${lv} stays within three food lines (L59's wheat line is two-stage: flour then bread, so it needs two machines)`);
     const rawStands = L.objects.filter(o => o.type === 'stand' && o.role === 'raw');
     const processedStands = L.objects.filter(o => o.type === 'stand' && o.role === 'processed');
     assert.deepEqual(rawStands.map(o => o.item).sort(), cropKinds.sort(), `level ${lv}: one raw stand per crop kind`);
@@ -143,4 +143,4 @@ for (const [lv, expectedOut] of [[54, 'bread'], [57, 'juice'], [60, 'pie']]) {
   const proc = L.objects.find(p => p.type === 'proc' && p.out === expectedOut);
   assert.ok(proc && proc.outTo.startsWith('P_'), `level ${lv} retains the designed ${expectedOut} process and its own stand`);
 }
-console.log('food level checks: PASS · levels 54–60 · four seasons · two-item cap · separate wooden stands · full-batch staff routes · raw+processed player-to-cashier loops');
+console.log('food level checks: PASS · levels 54–60 · four seasons · at most three food lines · separate wooden stands · full-batch staff routes · raw+processed player-to-cashier loops');

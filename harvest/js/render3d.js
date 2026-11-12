@@ -1027,12 +1027,14 @@ export class Renderer {
       // desk) and stacks in layers there — four per layer in a small 2x2 cluster so a
       // big pile stays a pile instead of a needle.
       const looseCells = [[8, 26], [22, 26], [8, 38], [22, 38], [8, 50], [22, 50]];
-      let drawn = 0;
+      // v5.0.5: the 120-item budget is per kind, not shared across kinds — the old
+      // shared budget let one abundant kind (120+ corn) spend every slot, so the
+      // other kind on the desk drew 0 items and vanished even while stocked and
+      // selling (L58's potatoes). Each kind now draws up to 120 of its own pile.
       for (const [ki, type] of [...new Set(loose)].entries()) {
-        if (drawn >= 120) break;
         const [cx, cy] = looseCells[ki % looseCells.length];
         const items = loose.filter((t) => t === type);
-        for (let j = 0; j < items.length && drawn < 120; j++, drawn++) {
+        for (let j = 0; j < items.length && j < 120; j++) {
           const cell = j % 4, lay = (j / 4) | 0, ix = cell % 2, iz = (cell / 2) | 0;
           this.item(type, dsk.x + cx + (ix ? 2.1 : -2.1), dsk.y + cy + (iz ? 1.8 : -1.8), K.deskH + 1 + lay * CFG.items[type].step * 0.8 + (M.ITEM_HALF[type] || 2), (j % 3) * 0.2 + 0.785, 0.85);
         }
