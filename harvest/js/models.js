@@ -402,9 +402,22 @@ Object.assign(CROP_PARTS, {
     P(sph(1.7, 7, 5), '#FFFFFF', [0.6, 7.6, -2.6], [0, 0, 0], [1, 1.2, 1]),
     P(cyl(0.3, 0.3, 1.4, 4), '#2F7A1E', [2.8, 6.6, 2.2]), P(cyl(0.3, 0.3, 1.4, 4), '#2F7A1E', [-2.8, 7.5, 2.0]),
   ],
+  // v5.0.0: orchard tree for dense apple fields (a small tree with red apples — the
+  // big round appleTreeGeo stays the coop/deco tree). Red apples are '#FFFFFF' so the tint paints them.
+  apple: () => [
+    P(cyl(0.5, 0.7, 4, 5), '#8E5627', [0, 2, 0]),
+    P(ico(3.4, 0), '#3FA236', [0, 6.5, 0]),
+    P(ico(2.6, 0), '#5DBB3A', [1.6, 8.2, 0.6]),
+    P(ico(2.2, 0), '#2F8A2A', [-1.8, 7.6, -0.8]),
+    P(sph(0.9, 5, 4), '#FFFFFF', [2.6, 6.2, 1.4]),
+    P(sph(0.9, 5, 4), '#FFFFFF', [-2.4, 7.0, 1.0]),
+    P(sph(0.8, 5, 4), '#FFFFFF', [0.8, 8.8, 1.8]),
+    P(sph(0.8, 5, 4), '#FFFFFF', [-1.0, 5.2, -2.0]),
+    P(sph(0.8, 5, 4), '#FFFFFF', [2.2, 8.0, -1.6]),
+  ],
 });
 // tint colours for the white parts of each crop (applied with instance colour = whole plant tint is avoided)
-const CROP_TINT = { fish: ['#FF8A3D', '#4FA8F0', '#FFC21A', '#C8D4E0'], grape: ['#7A3EA8', '#8E4EC0', '#6A2E98'], tomato: ['#EE4630', '#E8302C', '#FF6A3A'], pepper: ['#E8302C', '#FFC21A', '#5DBB3A', '#FF8A1E'], log: ['#3FA236', '#4FB233', '#2F9A2E'], corn: ['#FFD23F', '#FFC21A'], pumpkin: ['#F2871E', '#FF9F38', '#E8771A'], berry: ['#E8243C', '#F03A50'], tulip: ['#F2486E', '#FF6F92', '#E8365E', '#FF4F7A'], gold: ['#FFC21A', '#FFB10A', '#FFD23F', '#FFC21A'], rose: ['#E0283C', '#C8102E', '#F03A50', '#D81E36'], potato: ['#FFFFFF'], wheat: ['#FFFFFF'] };
+const CROP_TINT = { fish: ['#FF8A3D', '#4FA8F0', '#FFC21A', '#C8D4E0'], grape: ['#7A3EA8', '#8E4EC0', '#6A2E98'], tomato: ['#EE4630', '#E8302C', '#FF6A3A'], pepper: ['#E8302C', '#FFC21A', '#5DBB3A', '#FF8A1E'], log: ['#3FA236', '#4FB233', '#2F9A2E'], corn: ['#FFD23F', '#FFC21A'], pumpkin: ['#F2871E', '#FF9F38', '#E8771A'], berry: ['#E8243C', '#F03A50'], tulip: ['#F2486E', '#FF6F92', '#E8365E', '#FF4F7A'], gold: ['#FFC21A', '#FFB10A', '#FFD23F', '#FFC21A'], rose: ['#E0283C', '#C8102E', '#F03A50', '#D81E36'], potato: ['#FFFFFF'], wheat: ['#FFFFFF'], apple: ['#E8243C', '#D81E36', '#F03A50'] };
 const CROP_GEO = {};
 export function cropGeo(crop, variant = 0) {
   const k = crop + variant;

@@ -142,6 +142,9 @@ export const CFG = {
     grape:   { grow: 8.0 },
     tomato:  { grow: 8.0 },
     pepper:  { grow: 8.0 },
+    // v5.0.0: apples grow in dense field plots like any vegetable (was a 4-tree coop —
+    // too sparse to harvest); trees regrow a little slower than berry/grape
+    apple:   { grow: 9.0 },
   },
   // gap: spacing of the stalls along the fences (cows / sheep / hives / apple trees are bigger than hens)
   producers: { hen: { period: 1.25, burst: 3 }, bush: { period: 1.5, burst: 2 },
@@ -692,23 +695,25 @@ export const CFG = {
       ],
       deco: { theme: 'garden', paths: [[400, 250, 420, 100], [500, 350, 90, 270]], hedges: [[740, 640, 70, 22]], trees: [[780, 40, 'cone'], [380, 660, 'round']], bushes: [[600, 40], [780, 440]] } },
 
-    // 25 — apple orchard: apples fall into the grass, a juice press
+    // 25 — apple orchard: apples grow in dense field plots like any vegetable (v5.0.0:
+    // the old 4-tree coop was too sparse to harvest); a second plot opens with tile 'b'
     { name: '苹果园', W: 820, H: 700, start: [460, 430], par: 260, bill: 20,
       goal: { type: 'produce', item: 'juice', n: 340 },
       objects: [
-        { id: 'A1', type: 'coop', item: 'apple', producer: 'appletree', x: 80, y: 80, w: 340, h: 280, n: 4, max: 11, prefill: 800 },
+        { id: 'A1', type: 'field', crop: 'apple', x: 80, y: 80, w: 340, h: 280, gap: 11 },
+        { id: 'A2', type: 'field', crop: 'apple', x: 40, y: 380, w: 240, h: 250, gap: 11, hidden: true },
         { id: 'M1', type: 'proc', in: 'apple', out: 'juice', ratio: 2, time: 0.5, x: 650, y: 210, outTo: 'C1' }, // v4.8.7: ratio 5->2, feeder supply ~12/s, starve was 49%
         { id: 'C1', type: 'counter', items: ['apple', 'juice'], x: 660, y: 440 },
       ],
       tiles: [
         { id: 'a', x: 460, y: 560, price: 40, icon: 'cap', label: '大果篮', effect: { up: { key: 'cap', v: 40 } } },
-        { id: 'b', x: 490, y: 90, price: 100, icon: 'appletree', label: '种苹果树', buy: 2, req: ['a'], repeat: { times: 3, mul: 1.6 }, effect: { hens: { coop: 'A1', n: 2 } } },
+        { id: 'b', x: 490, y: 90, price: 100, icon: 'appletree', label: '开新果园', req: ['a'], effect: { show: ['A2'] } }, // v5.0.0: was '种苹果树' (+2 coop trees ×3) — now opens the second orchard plot
         { id: 'c', x: 310, y: 470, price: 150, icon: 'cart', label: '雇小车', req: ['a'], effect: { worker: { from: ['A1'], to: ['M1'] } } },
         { id: 'd', x: 310, y: 580, price: 250, icon: 'cart', label: '雇小车', req: ['c'], effect: { worker: { from: ['A1'], to: ['M1'] } } },
         { id: 'e', x: 750, y: 100, price: 230, icon: 'gear', label: '快榨汁机', req: ['c'], effect: { proc: [{ id: 'M1', mul: 0.6 }] } },
         { id: 'f', x: 500, y: 250, price: 210, icon: 'cashier', label: '店员', req: ['b'], effect: { cashier: ['C1'] } },
       ],
-      deco: { theme: 'farm', paths: [[440, 380, 380, 100], [530, 190, 80, 190]], hedges: [[40, 640, 180, 22]], trees: [[60, 490, 'round'], [780, 650, 'round']], bushes: [[200, 500], [780, 320]] } },
+      deco: { theme: 'farm', paths: [[440, 380, 380, 100], [530, 190, 80, 190]], hedges: [[40, 640, 180, 22]], trees: [[780, 40, 'round'], [780, 650, 'round']], bushes: [[200, 500], [780, 320]] } },
 
     // 26 — logs → planks → chairs: one machine feeds the next
     { name: '木椅工坊', W: 880, H: 740, start: [500, 420], par: 280, bill: 20,
@@ -783,10 +788,10 @@ export const CFG = {
       objects: [
         { id: 'F1', type: 'field', crop: 'corn', x: 40, y: 40, w: 300, h: 260, gap: 10 },
         { id: 'P1', type: 'field', crop: 'pumpkin', x: 40, y: 350, w: 300, h: 220, gap: 22 },
-        { id: 'A1', type: 'coop', item: 'apple', producer: 'appletree', x: 80, y: 640, w: 260, h: 150, n: 4, max: 7, prefill: 500 },
-        { id: 'M1', type: 'proc', in: 'corn', out: 'popcorn', ratio: 5, time: 0.9, x: 700, y: 140, outTo: 'C1' }, // v4.8.8: time 0.45->0.9, tray was 71; v4.9.9: ratio 6->5, 一田一人后 PS 柜前等 3.3s (玉米板上料 ~13/s, M1 吃 22.6/s, 爆米花供不上)
+        { id: 'A1', type: 'field', crop: 'apple', x: 80, y: 640, w: 260, h: 150, gap: 11 }, // v5.0.0: was a 4-tree coop — too sparse; now a dense field plot like corn/pumpkin
+        { id: 'M1', type: 'proc', in: 'corn', out: 'popcorn', ratio: 5, time: 0.8, x: 700, y: 140, outTo: 'C1' }, // v4.8.8: time 0.45->0.9, tray was 71; v4.9.9: ratio 6->5, 一田一人后 PS 柜前等 3.3s (玉米板上料 ~13/s, M1 吃 22.6/s, 爆米花供不上); v5.0.0: time 0.9->0.8 — 苹果园改田后开局慢 19s, PS 柜前等 3.2s, 爆米花提速补供货
         { id: 'M2', type: 'proc', in: 'pumpkin', out: 'pie', ratio: 1, time: 1.2, x: 700, y: 330, outTo: 'C1', hidden: true }, // v4.8.8: ratio 4->2 + time 0.5->0.9, starve was 23%, tray 71; v4.9.7: ratio 2->1 (time 0.9->1.2 did not move the 26% starve — the sparse pumpkin field feeds the board too slowly, so the oven takes fewer pumpkins per pie instead); v4.9.9: M2 从 feed3 拿掉 — 一田一人后南瓜板上料 ~11/s, 3 个专员分一板各 ~3.7/s, 第一批 150 要 40s 才到, 机器开局缺料 16%; 2 个专员各 ~5.5/s, 第一批 ~27s 到
-        { id: 'M3', type: 'proc', in: 'apple', out: 'juice', ratio: 2, time: 1.1, x: 700, y: 720, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->2 + time 0.5->1.1, starve was 70%, tray 71
+        { id: 'M3', type: 'proc', in: 'apple', out: 'juice', ratio: 2, time: 0.95, x: 700, y: 720, outTo: 'C1', hidden: true }, // v4.8.8: ratio 5->2 + time 0.5->1.1, starve was 70%, tray 71; v5.0.0: time 1.1->0.95 — 苹果改田后 PS 柜前等 3.2s, 果汁提速补供货 (M3 不缺料, 只缺速度)
         { id: 'C1', type: 'counter', items: ['corn', 'pumpkin', 'popcorn', 'pie', 'juice'], x: 840, y: 480 },
       ],
       tiles: [
@@ -1486,7 +1491,7 @@ const VL = {
       foodLines: { A: { crop: 'apple', gap: 11, out: 'juice', ratio: 5 }, B: { crop: 'berry', gap: 9, out: 'jam', ratio: 5 } },
       goal: { type: 'earn', n: [52250, 52000, 52000, 52000] },
       objects: [
-        { id: 'A1', type: 'coop', item: 'A', producer: 'appletree', x: 60, y: 60, w: 280, h: 270, n: 4, max: 10, prefill: 650 },
+        { id: 'A1', type: 'field', crop: 'A', x: 60, y: 60, w: 280, h: 270 }, // v5.0.0: was an appletree coop — now a dense field plot (gap 11 from foodLines)
         { id: 'F2', type: 'field', crop: 'B', x: 40, y: 460, w: 280, h: 270, hidden: true },
         { id: 'M1', type: 'proc', in: 'A', time: 0.55, x: 680, y: 150, outTo: 'C1' },
         { id: 'M2', type: 'proc', in: 'B', time: 0.55, x: 680, y: 560, outTo: 'C1', hidden: true },
@@ -1539,7 +1544,7 @@ const VL = {
       goal: { type: 'earn', n: [55500, 55500, 55500, 55500] },
       objects: [
         { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 280, h: 230 },
-        { id: 'A1', type: 'coop', item: 'B', producer: 'appletree', x: 60, y: 330, w: 280, h: 230, n: 4, max: 10, prefill: 600, hidden: true },
+        { id: 'A1', type: 'field', crop: 'B', x: 60, y: 330, w: 280, h: 230, hidden: true }, // v5.0.0: was an appletree coop — now a dense field plot (gap 11 from foodLines)
         { id: 'M1', type: 'proc', in: 'A', out: 'bread', ratio: 4, time: 0.5, x: 700, y: 130, outTo: 'C1' }, // v4.9.9: time 0.65 -> 0.5 — PS 建起来后加工品销量只走 PS 一条线, 机器产量成了瓶颈; 休闲局 8:51 只差 par 1 秒
         { id: 'M3', type: 'proc', in: 'B', out: 'juice', time: 0.5, x: 700, y: 650, outTo: 'C1', hidden: true }, // v4.9.9: time 0.55 -> 0.5 (同上)
         { id: 'C1', type: 'counter', items: ['A', 'B'], x: 900, y: 450 },
