@@ -582,7 +582,11 @@ export class World {
   }
 
   // ---- flying items ------------------------------------------------------
-  launch(type, kind, x0, y0, z0, ref, tx, ty, tz, dur, spray) {
+  // v5.0.4: `arc` caps the flight's lift. The old default (34, or 50-110 with spray) lofted
+  // sold/dropped goods high above the counter, so they read as floating in mid-air. Counter
+  // flights pass a small arc; callers start drops at the carried stack's top — the stack is a
+  // 4x3 grid (12/layer), so item k sits at layer floor(k/12), not k*step up a single column.
+  launch(type, kind, x0, y0, z0, ref, tx, ty, tz, dur, spray, arc) {
     const f = this.flyFree.pop() || {};
     f.type = type; f.kind = kind; f.x0 = x0; f.y0 = y0; f.z0 = z0; f.ref = ref; f.tx = tx; f.ty = ty; f.tz = tz;
     f.t = 0; f.dur = dur * (0.85 + this.rnd() * 0.3); f.active = true;
@@ -596,7 +600,12 @@ export class World {
     const spread = crateLoad ? Math.min(spray || 0, 18) : spray || 0;
     f.sx = spread ? (this.rnd() - 0.5) * spread : 0;
     f.sy = spread ? (this.rnd() - 0.5) * spread : 0;
+    // Compute the arc the old way first — same this.rnd() calls in the same order — so the RNG
+    // stream (and therefore the sim's random outcomes) is bit-identical; an explicit arc only
+    // overrides the value. Skipping the rnd() call here shifted every later random draw and
+    // flipped a borderline fit-check gate (L32 PS served 5 customers instead of 4).
     f.arc = crateLoad ? 18 + this.rnd() * 10 : spray ? 50 + this.rnd() * 60 : 34;
+    if (arc !== undefined) f.arc = arc;
     if (kind === 'stack' && ref && ref.incomingItems) ref.incomingItems[type] = (ref.incomingItems[type] || 0) + 1;
     this.fly.push(f);
     return f;
@@ -756,7 +765,7 @@ export class World {
             else { tx = c.x + Math.pow(this.rnd(), 1.5) * c.w; ty = h.y + (this.rnd() - 0.5) * 120; }
             tx = Math.min(c.x + c.w - 2, Math.max(c.x + 2, tx)); ty = Math.min(c.y + c.h - 2, Math.max(c.y + 2, ty));
             c.pile.pending++;
-            this.launch(c.item, 'pile', h.x, h.y, 18, c.pile, tx, ty, 0, CFG.fly.lay);
+            this.launch(c.item, 'pile', h.x, h.y, 18, c.pile, tx, ty, 0, CFG.fly.lay, 0, 10);
           }
           this.emit('lay', { x: h.x, y: h.y, item: c.item });
         }
@@ -789,9 +798,9 @@ export class World {
           this.stats.produced[p.outItem] = (this.stats.produced[p.outItem] || 0) + 1;
           if (tray) {   // v4.2: onto the output tray (a little heap the 搬运工 carry off)
             const tx = tray.x + 4 + this.rnd() * (tray.w - 8), ty = tray.y + 4 + this.rnd() * (tray.h - 8);
-            tray.pending++; this.launch(p.outItem, 'pile', p.x, p.y, 36, tray, tx, ty, 0, CFG.fly.produce);
-          } else if (chain) { out.inc++; this.launch(p.outItem, 'procIn', p.x, p.y, 36, out, out.x - 14, out.y, CFG.proc.bodyH + 10, CFG.fly.produce * 1.6, 40); }
-          else if (out) { out.incoming++; this.launch(p.outItem, 'counter', p.x, p.y, 36, out, out.x, out.y, CFG.counter.deskH + 4, CFG.fly.produce); }
+            tray.pending++; this.launch(p.outItem, 'pile', p.x, p.y, 36, tray, tx, ty, 0, CFG.fly.produce, 0, 12);
+          } else if (chain) { out.inc++; this.launch(p.outItem, 'procIn', p.x, p.y, 36, out, out.x - 14, out.y, CFG.proc.bodyH + 10, CFG.fly.produce * 1.6, 40, 16); }
+          else if (out) { out.incoming++; this.launch(p.outItem, 'counter', p.x, p.y, 36, out, out.x, out.y, CFG.counter.deskH + 4, CFG.fly.produce, 0, 12); }
           this.emit('produce', { x: p.x, y: p.y, item: p.outItem });
         }
       } else p.timer = Math.min(p.timer, p.time);
@@ -893,7 +902,7 @@ export class World {
       c.stack.length = 0; c.dropAcc = 0;
       sink.inc += n;
       if (!isPlayer) { c.done = (c.done || 0) + n; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + n; }
-      const f = this.launch(item, 'procBatch', c.x, c.y, 44 + Math.max(0, n - 1) * CFG.items[item].step, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop);
+      const f = this.launch(item, 'procBatch', c.x, c.y, 44 + Math.floor(Math.max(0, n - 1) / 12) * CFG.items[item].step, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop, 0, 10);
       f.count = n; f.batchCap = c.batchCap || c.cap; f.by = isPlayer ? 'player' : 'worker';
     } else if (sink.kind === 'counter') {
       if (sink.stock.length + sink.incoming + n > CFG.counter.stockMax) return false;
@@ -904,7 +913,7 @@ export class World {
       const made = this._made || (this._made = new Set(this.procs.map((q) => q.outItem)));
       items.forEach((it, k) => {
         sink.incoming++; if (made.has(it)) sink.incMade = (sink.incMade || 0) + 1;
-        this.launch(it, 'counter', c.x, c.y, 44 + k * CFG.items[it].step, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop);
+        this.launch(it, 'counter', c.x, c.y, 44 + Math.floor(k / 12) * CFG.items[it].step, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop, 0, 10);
       });
     } else if (sink.kind === 'tray') {
       const pl = sink.pile;
@@ -914,7 +923,7 @@ export class World {
       if (!isPlayer) { c.done = (c.done || 0) + n; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + n; }
       items.forEach((it, k) => {
         pl.pending++;
-        this.launch(it, 'pile', c.x, c.y, 44 + k * CFG.items[it].step, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop);
+        this.launch(it, 'pile', c.x, c.y, 44 + Math.floor(k / 12) * CFG.items[it].step, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop, 0, 10);
       });
     } else if (sink.kind === 'stand') {
       // v4.9.4: a wooden stand takes a whole stack exactly like a raw tray; without this,
@@ -927,7 +936,7 @@ export class World {
       if (!isPlayer) { c.done = (c.done || 0) + n; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + n; }
       items.forEach((it, k) => {
         pl.pending++;
-        this.launch(it, 'pile', c.x, c.y, 44 + k * CFG.items[it].step, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop);
+        this.launch(it, 'pile', c.x, c.y, 44 + Math.floor(k / 12) * CFG.items[it].step, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop, 0, 10);
       });
     } else return false;
     if (isPlayer) this.emit('drop', { item: items[0] });
@@ -983,7 +992,7 @@ export class World {
             for (let k = 0; k < f.spill; k++) {
               const tx = px + (this.rnd() - 0.5) * 34, ty = py + (this.rnd() - 0.5) * 34;
               f.pile.pending++;
-              this.launch(f.item, 'pile', px, py, 4, f.pile, Math.min(f.x + f.w - 2, Math.max(f.x + 2, tx)), Math.min(f.y + f.h - 2, Math.max(f.y + 2, ty)), 0, CFG.fly.harvest);
+              this.launch(f.item, 'pile', px, py, 4, f.pile, Math.min(f.x + f.w - 2, Math.max(f.x + 2, tx)), Math.min(f.y + f.h - 2, Math.max(f.y + 2, ty)), 0, CFG.fly.harvest, 0, 10);
             }
           } else {
             // a chopped tree drops several logs (yield), every other plant one item
@@ -1072,7 +1081,7 @@ export class World {
           const count = c.stack.length, item = sink.item; c.stack.length = 0; c.dropAcc = 0;
           sink.pile.pending += count; c.done = (c.done || 0) + count;
           const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + count;
-          const f = this.launch(item, 'pileBatch', c.x, c.y, 44 + Math.max(0, count - 1) * CFG.items[item].step, sink.pile, sink.pile.x + sink.pile.w / 2, sink.pile.y + sink.pile.h / 2, 4, CFG.fly.drop);
+          const f = this.launch(item, 'pileBatch', c.x, c.y, 44 + Math.floor(Math.max(0, count - 1) / 12) * CFG.items[item].step, sink.pile, sink.pile.x + sink.pile.w / 2, sink.pile.y + sink.pile.h / 2, 4, CFG.fly.drop, 0, 10);
           f.count = count; f.batchCap = c.cap; f.workerSeed = c.seed;
         } else if (sink.kind === 'proc' && c.feedFor === sink.id) {
           if (this.canDropFeederBatch(c, sink) && (!this.smart || this.sinkOpen(c, sink))) {
@@ -1081,7 +1090,7 @@ export class World {
             sink.inc += count;
             c.done = (c.done || 0) + count;
             const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + count;
-            const f = this.launch(item, 'procBatch', c.x, c.y, 44 + Math.max(0, count - 1) * CFG.items[item].step, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop);
+            const f = this.launch(item, 'procBatch', c.x, c.y, 44 + Math.floor(Math.max(0, count - 1) / 12) * CFG.items[item].step, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop, 0, 10);
             f.count = count; f.batchCap = c.batchCap || c.cap; f.by = 'feeder'; f.workerSeed = c.seed;
           }
         } else if (this.tryBatchDrop(c, sink, accepts, isPlayer)) {
@@ -1095,15 +1104,15 @@ export class World {
             const item = c.stack[idx];
             c.stack.splice(idx, 1); c.dropAcc--;
             if (!isPlayer) { c.done = (c.done || 0) + 1; const dd = c.drops || (c.drops = {}); dd[sink.id] = (dd[sink.id] || 0) + 1; }   // 雇工 XP (+ v4.3 where it went)
-            const z = 44 + idx * CFG.items[item].step;
+            const z = 44 + Math.floor(idx / 12) * CFG.items[item].step;
             if (sink.kind === 'tray') {   // v4.8.4: heap it onto the raw tray (same 'pile' flight as machine output)
               const pl = sink.pile; pl.pending++;
-              this.launch(item, 'pile', c.x, c.y, z, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop);
+              this.launch(item, 'pile', c.x, c.y, z, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop, 0, 10);
             } else if (sink.kind === 'stand') {   // v4.9.4: heap it onto the wooden stand (same 'pile' flight as a raw tray)
               const pl = sink.pile; pl.pending++;
-              this.launch(item, 'pile', c.x, c.y, z, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop);
-            } else if (sink.kind === 'counter') { sink.incoming++; if ((this._made || (this._made = new Set(this.procs.map((q) => q.outItem)))).has(item)) sink.incMade = (sink.incMade || 0) + 1; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop); }
-            else { sink.inc++; this.launch(item, 'procIn', c.x, c.y, z, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop); }
+              this.launch(item, 'pile', c.x, c.y, z, pl, pl.x + 4 + this.rnd() * (pl.w - 8), pl.y + 4 + this.rnd() * (pl.h - 8), 0, CFG.fly.drop, 0, 10);
+            } else if (sink.kind === 'counter') { sink.incoming++; if ((this._made || (this._made = new Set(this.procs.map((q) => q.outItem)))).has(item)) sink.incMade = (sink.incMade || 0) + 1; this.launch(item, 'counter', c.x, c.y, z, sink, sink.x, sink.y, CFG.counter.deskH + 4, CFG.fly.drop, 0, 10); }
+            else { sink.inc++; this.launch(item, 'procIn', c.x, c.y, z, sink, sink.x - 14, sink.y, CFG.proc.bodyH + 10, CFG.fly.drop, 0, 10); }
             if (isPlayer) this.emit('drop', { item });
           }
         }
@@ -1254,7 +1263,7 @@ export class World {
       while (c.buyAcc >= 1 && c.stock.length > 0 && front.bag.length + front.incoming < front.want) {
         c.buyAcc--;
         const it = c.stock.pop(); front.incoming++;
-        this.launch(it, 'cust', c.x, c.y, CFG.counter.deskH + 4, front, 0, 0, 0, CFG.fly.serve);
+        this.launch(it, 'cust', c.x, c.y, CFG.counter.deskH + 4, front, 0, 0, 0, CFG.fly.serve, 0, 6);
       }
       if (c.stock.length <= 0) c.buyAcc = 0;
       const got = front.bag.length;

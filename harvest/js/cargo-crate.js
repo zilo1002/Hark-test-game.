@@ -52,13 +52,12 @@ export function cargoItemSlot(item, ordinal, counts = {}) {
   return { x: cx + x, y: base + y, z: cz + z, box, kind };
 }
 
-// Packages fill a basket two boxes wide: each pair sits side by side, then the next tier,
-// instead of one tall needle. Column spacing fits the widest box of the kind (fish crates are wider).
+// v5.0.4: back to one row — Jin wants the back basket in a single column again (the v4.9.6
+// two-boxes-wide pair sat left and right and got in the way when moving). Every box/steamer
+// sits directly above the previous one. `kind` is kept for callers; a single column needs no
+// per-kind sideways spacing.
 export function cargoCratePosition(boxIndex, kind = 'wood-crate') {
-  const tier = Math.max(0, Math.floor(boxIndex / 2));
-  const col = boxIndex % 2 === 0 ? -1 : 1;
-  const half = kind === 'fish-crate' ? 25 : 17;
-  return { x: col * half, z: 0, base: tier * 24 };
+  return { x: 0, z: 0, base: Math.max(0, Math.floor(boxIndex)) * 24 };
 }
 
 const cube = new THREE.BoxGeometry(1, 1, 1);

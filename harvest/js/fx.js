@@ -47,7 +47,7 @@ export class FX {
   }
   bill(sx, sy, tx, ty, delay = 0) {
     let o = null; for (const b of this.bills) if (!b.on) { o = b; break; } if (!o) return;
-    o.on = true; o.x0 = sx; o.y0 = sy; o.tx = tx; o.ty = ty; o.t = -delay; o.dur = 0.45 + Math.random() * 0.15; o.rot = Math.random() * 6; o.cx = (Math.random() - 0.5) * 120;
+    o.on = true; o.x0 = sx; o.y0 = sy; o.tx = tx; o.ty = ty; o.t = -delay; o.dur = 0.45 + Math.random() * 0.15; o.rot = Math.random() * 6; o.cx = (Math.random() - 0.5) * 60; // v5.0.4: half the sideways wander (was 120) so bills track to the HUD, not across the farm
   }
   wbill(x0, y0, x1, y1, delay = 0) {
     let o = null; for (const b of this.wbills) if (!b.on) { o = b; break; } if (!o) return;

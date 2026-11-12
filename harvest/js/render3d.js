@@ -911,7 +911,7 @@ export class Renderer {
       if (packed && isPackableCargo(type)) {
         const ordinal = packedOrdinals[type] || 0; packedOrdinals[type] = ordinal + 1;
         const pos = this.crateCargoPoint(o, type, ordinal, packedCounts);
-        if (pos) this.item(type, pos.x, pos.y, pos.z + (M.ITEM_HALF[type] || 2), o.ang + Math.PI / 2, type === 'apple' || type === 'berry' || type === 'grape' ? 0.58 : 0.46);
+        if (pos) this.item(type, pos.x, pos.y, pos.z + (M.ITEM_HALF[type] || 2), o.ang + Math.PI / 2, type === 'apple' || type === 'berry' || type === 'grape' ? 1.05 : 0.85); // v5.0.4: back-basket fruit full-size (was 0.58/0.46 — small with gaps, "like leftovers"); at ~1.0 the apples touch across the crate's 7-wide grid and brim to the rim, like Jin's reference
         continue;
       }
       const cell = i % per, col = cell % b.cols, row = (cell / b.cols) | 0;
@@ -1125,8 +1125,10 @@ export class Renderer {
     }
     for (const h in pool) for (let k = used[h] || 0; k < pool[h].length; k++) { pool[h][k].pp.root.visible = false; pool[h][k].cu = null; }
     for (const f of world.fly) this.flyItem(f);
+    // v5.0.4: money hops low to the cash pile (peak 28, just over the 20-high desk) instead of
+    // soaring to 50 — the old arc read as bills floating in mid-air over the counter.
     if (fx) for (const o of fx.wbills) if (o.on && o.t >= 0) {
-      const p = o.t / o.dur, x = o.x0 + (o.x1 - o.x0) * p, y = o.y0 + (o.y1 - o.y0) * p, h = 20 + 30 * 4 * p * (1 - p);
+      const p = o.t / o.dur, x = o.x0 + (o.x1 - o.x0) * p, y = o.y0 + (o.y1 - o.y0) * p, h = 18 + 10 * 4 * p * (1 - p);
       this.itemTumble('bill', x, y, h, Math.sin(o.rot + p * 6) * 0.5, o.rot + p * 4, 1.1);
     }
     this.endItems();
@@ -1367,9 +1369,11 @@ export class Renderer {
   }
   fxScreen(fx) {
     const g = this.g;
+    // v5.0.4: bills zip almost straight to the coin HUD (12px lift, not 40) so a sale reads as
+    // money going to the counter, not bills drifting in mid-air over the farm.
     for (const o of fx.bills) if (o.on && o.t >= 0) {
       const p = o.t / o.dur, e = p * p;
-      const x = o.x0 + (o.tx - o.x0) * e + o.cx * Math.sin(p * Math.PI) * 0.5, y = o.y0 + (o.ty - o.y0) * e - Math.sin(p * Math.PI) * 40;
+      const x = o.x0 + (o.tx - o.x0) * e + o.cx * Math.sin(p * Math.PI) * 0.5, y = o.y0 + (o.ty - o.y0) * e - Math.sin(p * Math.PI) * 12;
       const s = 1.3 - p * 0.5; this.billIcon(x, y, 22 * s, 13 * s, o.rot + p * 6);
     }
     for (const o of fx.conf) if (o.on) {

@@ -766,8 +766,8 @@ export const CFG = {
       objects: [
         { id: 'T1', type: 'field', crop: 'log', x: 40, y: 40, w: 300, h: 280, gap: 30 },
         { id: 'K1', type: 'coop', item: 'milk', producer: 'cow', x: 80, y: 440, w: 280, h: 300, n: 4, max: 11, prefill: 700 },
-        { id: 'M1', type: 'proc', in: 'log', out: 'plank', ratio: 2, time: 1.0, x: 640, y: 160, outTo: 'C1' }, // v4.8.8: ratio 5->2 + time 0.45->1.0, starve was 35%, tray 65
-        { id: 'M2', type: 'proc', in: 'milk', out: 'cheese', ratio: 3, time: 1.1, x: 640, y: 700, outTo: 'C1', hidden: true }, // v4.8.8: ratio 6->3 + time 0.45->1.1, starve was 17%, tray 65
+        { id: 'M1', type: 'proc', in: 'log', out: 'plank', ratio: 2, time: 0.85, x: 640, y: 160, outTo: 'C1' }, // v4.8.8: ratio 5->2 + time 0.45->1.0, starve was 35%, tray 65; v5.0.4: 1.0->0.85, PS front wait was 3.8s (v5.0.3 easing slowed pile pickup)
+        { id: 'M2', type: 'proc', in: 'milk', out: 'cheese', ratio: 3, time: 0.95, x: 640, y: 700, outTo: 'C1', hidden: true }, // v4.8.8: ratio 6->3 + time 0.45->1.1, starve was 17%, tray 65; v5.0.4: 1.1->0.95, PS front wait was 3.8s (v5.0.3 easing slowed pile pickup)
         { id: 'C1', type: 'counter', items: ['log', 'plank', 'cheese'], x: 790, y: 440 },
       ],
       tiles: [
@@ -995,8 +995,8 @@ export const CFG = {
       objects: [
         { id: 'F1', type: 'field', crop: 'wheat', x: 40, y: 40, w: 300, h: 300, gap: 9 },
         { id: 'T1', type: 'field', crop: 'tomato', x: 50, y: 430, w: 290, h: 300, gap: 11 },
-        { id: 'M1', type: 'proc', in: 'wheat', out: 'flour', ratio: 4, time: 0.45, x: 700, y: 140, outTo: 'M2' },
-        { id: 'M2', type: 'proc', in: 'flour', out: 'bread', ratio: 3, time: 0.55, x: 860, y: 280, outTo: 'C1' },
+        { id: 'M1', type: 'proc', in: 'wheat', out: 'flour', ratio: 4, time: 0.4, x: 700, y: 140, outTo: 'M2' }, // v5.0.4: 0.45->0.4, PS front wait was 3.0s (v5.0.3 easing slowed pile pickup)
+        { id: 'M2', type: 'proc', in: 'flour', out: 'bread', ratio: 3, time: 0.5, x: 860, y: 280, outTo: 'C1' }, // v5.0.4: 0.55->0.5, PS front wait was 3.0s (v5.0.3 easing slowed pile pickup)
         { id: 'M3', type: 'proc', in: 'tomato', out: 'ketchup', ratio: 5, time: 0.8, x: 640, y: 760, outTo: 'C1', hidden: true }, // v4.8.8: time 0.45->0.8, tray was 78
         { id: 'C1', type: 'counter', items: ['wheat', 'tomato', 'bread', 'ketchup'], x: 850, y: 520 },
       ],
