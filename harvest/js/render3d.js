@@ -1000,8 +1000,20 @@ export class Renderer {
       // a left pile and a right pile, not one stack layered on top of the other. This
       // changes no stock/count, only where each item is drawn.
       const groupByKind = (arr) => { const kinds = [], by = new Map(); for (const t of arr) { if (!by.has(t)) { by.set(t, []); kinds.push(t); } by.get(t).push(t); } return kinds.flatMap((k) => by.get(k)); };
-      const boxed = groupByKind(c.stock.filter((type) => isPackableCargo(type))).slice(0, 24);
-      const loose = groupByKind(c.stock.filter((type) => !isPackableCargo(type)).concat(c.stock.filter((type) => isPackableCargo(type)).slice(24)));
+      // v5.0.1: one kind on the counter → one 3x4 grid (4 across, 3 deep, 12 per layer),
+      // like the tall milk-bottle stack in the reference: when full it reads as a tall
+      // neat pile. Applies to the processed counter and any counter holding a single
+      // kind; multi-kind keeps the v4.9.9 left-right piles below. Render-only.
+      const singleKind = [...new Set(c.stock)];
+      const boxed = singleKind.length === 1 ? [] : groupByKind(c.stock.filter((type) => isPackableCargo(type))).slice(0, 24);
+      const loose = singleKind.length === 1 ? [] : groupByKind(c.stock.filter((type) => !isPackableCargo(type)).concat(c.stock.filter((type) => isPackableCargo(type)).slice(24)));
+      if (singleKind.length === 1) {
+        const type = singleKind[0], n = Math.min(c.stock.length, 120);
+        for (let j = 0; j < n; j++) {
+          const cell = j % 12, lay = (j / 12) | 0, ix = cell % 4, iz = (cell / 4) | 0;
+          this.item(type, c.x + (ix - 1.5) * 4.2, c.y + (iz - 1) * 3.6, K.deskH + 1 + lay * CFG.items[type].step * 0.8 + (M.ITEM_HALF[type] || 2), (j % 3) * 0.2 + 0.785, 0.85);
+        }
+      }
       for (let i = 0; i < o.crateSlots.length; i++) o.crateSlots[i].visible = i < Math.ceil(boxed.length / 4);
       // Four actual goods per open crate, in small layers so apples, tomatoes and fish remain
       // individually recognizable above the warm slatted sides. This changes no stock/count.
