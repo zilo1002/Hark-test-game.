@@ -2,11 +2,11 @@
 
 > 种菜，卖菜，雇人替你干活。
 
-> 🆕 另一个小游戏：**[半亩·丰收](./harvest/)** —— 走进田地收获、加工、装箱并出售，解锁新关卡、雇工和庄园。现有 60 关；当前 Android 版本为 5.0.4（versionCode 44）。果园改成田里种；60 关都有平木台，工人开车送货，收银台单品类 3×4 摆货，背筐一排、筐里果饱满。**[在线试玩](https://zilo1002.github.io/Hark-test-game./harvest/)**；安卓 APK 可在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 查看。版本、测试状态和关卡说明见 [harvest/README.md](./harvest/README.md)。
+水墨风的放置种田小游戏。纯静态网页：没有构建步骤、没有外部依赖、不联网，打开即玩。手机竖屏优先，电脑用鼠标也行。
 
-一个月下水墨风的放置种田小游戏。纯静态网页：没有构建步骤、没有外部依赖、不联网，打开即玩。手机竖屏优先，电脑用鼠标也行。
+🆕 另一个小游戏：**[半亩·丰收](./harvest/)** —— 走进田地收获、加工、装箱并出售，解锁新关卡、雇工和庄园。现有 60 关；当前 Android 版本为 5.0.4（versionCode 44）。果园改成田里种；60 关都有平木台，工人开车送货，收银台单品类 3×4 摆货，背筐一排、筐里果饱满。**[在线试玩](https://zilo1002.github.io/Hark-test-game./harvest/)**；安卓 APK 可在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 查看。版本、测试状态和关卡说明见 [harvest/README.md](./harvest/README.md)。
 
-## 玩法
+## 功能亮点
 
 1. **种**：点一块空地，选种子播下。作物分三个生长阶段，成熟时会泛起微光、轻轻晃动。
 2. **收**：点成熟的作物收进仓库（顶部显示 仓库 已用/容量）。仓库满了就收不进去。
@@ -26,26 +26,34 @@
 7. **庄园等级**：按累计赚到的金币升级，解锁雇工、工具上限，田边陆续出现篱笆、谷仓、风车、灯笼、垂柳、远塔……
 8. 开局 2×2 块地、50 金币，地可以一路开垦到 3×4。
 
-**存档**：自动存在本机浏览器（localStorage），每 10 秒一次，切到后台/关闭页面时也会存。离开后再回来，会按离开时长（最多 2 小时）结算雇工替你干的活：「你不在时，雇工替你挣了 X 金币」。设置（右上角齿轮）里可以切换动效强度、清空存档。
+## 运行环境一览
 
-## 如何本地运行
+| 项目 | 说明 |
+| --- | --- |
+| 运行方式 | 纯静态网页，本地起静态服务器即可运行 |
+| 平台 | 手机（竖屏优先）、桌面浏览器（鼠标操作） |
+| 网络要求 | 完全离线，不联网、无外部依赖 |
+| 存档 | 自动存本机浏览器 localStorage，每 10 秒一次，切后台/关页面也会存 |
+| 离线收益 | 离开后回来按离开时长（最多 2 小时）结算雇工产出：「你不在时，雇工替你挣了 X 金币」 |
+| 起始状态 | 2×2 块地、50 金币，可开垦到 3×4 |
+| 在线试玩 | https://zilo1002.github.io/Hark-test-game./harvest/ |
 
-浏览器直接双击 `index.html` 打不开 ES 模块，需要起一个本地静态服务器：
+## 隐私与安全
 
-```bash
-cd 本仓库目录
-python3 -m http.server
-```
+- 不收集任何数据：没有后端、没有统计脚本、没有外部请求，整个游戏加载后完全离线运行。
+- 所有存档只保存在本机浏览器的 localStorage 里，清除浏览器数据会同时清掉存档；设置（右上角齿轮）里可一键清空存档。
+- 本地运行源码可完整审查，无任何混淆。
 
-然后打开 <http://localhost:8000>。手机和电脑在同一个 Wi-Fi 下，也可以用电脑的局域网 IP 访问。
+## 操作说明
 
-## 如何开 GitHub Pages
+| 操作 | 说明 |
+| --- | --- |
+| 点空地 | 选种子播下 |
+| 点成熟作物 | 收割进仓库 |
+| 集市 | 逐种卖出 / 全部卖出 / 交付订单 / 换一单 |
+| 设置（右上角齿轮） | 切换动效强度、清空存档 |
 
-**GitHub Pages 已启用。**「半亩·丰收」在线试玩页：[打开游戏](https://zilo1002.github.io/Hark-test-game./harvest/)（当前部署已验证可访问）。
-
-本仓库的 Pages 通过 GitHub Actions 构建并部署；部署状态可在仓库的 **Actions → pages build and deployment** 查看。所有路径使用相对路径，游戏放在 `/harvest/` 子目录下运行。
-
-## 文件结构
+## 项目结构
 
 ```
 index.html        页面骨架
@@ -64,14 +72,30 @@ js/fx.js          动效：粒子、飞行图标、数字滚动、升级光效
 js/ui.js          HUD、标签页、面板、弹层
 js/main.js        启动与主循环
 sim/balance.mjs   无界面平衡模拟：node sim/balance.mjs
+harvest/          「半亩·丰收」子游戏（60 关，版本说明见其 README.md）
 ```
 
-## 平衡模拟
+## 技术栈
 
-```bash
-node sim/balance.mjs
-```
+- 纯静态 HTML / CSS / 原生 JavaScript（ES Modules），无构建步骤、无框架、无依赖
+- 美术：全部线描 SVG 字符串内嵌，零图片资源
+- 动效：CSS 动画 + Canvas/粒子效果
+- 持久化：localStorage + 离线收益快进结算
+- 部署：GitHub Actions 构建并部署 GitHub Pages，全相对路径，游戏放在 `/harvest/` 子目录运行
 
-用一个“普通玩家”机器人跑 20 个随机种子，输出第一个收割工、种地工、挑夫等的中位解锁时间，以及第 10 分钟起完全不操作时雇工的产出。
+## 使用提示（踩坑经验）
 
-素材致谢：半亩·丰收 的奶牛 / 绵羊 3D 模型来自 Quaternius 的 Farm Animal Pack（CC0，https://quaternius.com/packs/farmanimal.html ）。
+- **双击 `index.html` 打不开**：浏览器不允许 file:// 加载 ES 模块，必须起本地静态服务器：
+
+  ```bash
+  cd 本仓库目录
+  python3 -m http.server
+  ```
+
+  然后打开 <http://localhost:8000>。手机和电脑在同一 Wi-Fi 下，也可用电脑的局域网 IP 访问。
+- **调平衡只改 `js/config.js`**，改完跑一遍 `node sim/balance.mjs`：用一个“普通玩家”机器人跑 20 个随机种子，输出第一个收割工、种地工、挑夫等的中位解锁时间，以及第 10 分钟起完全不操作时雇工的产出。
+- **Pages 部署状态**在仓库的 **Actions → pages build and deployment** 查看；「半亩·丰收」在线页已验证可访问。
+
+## License
+
+- 半亩·丰收 的奶牛 / 绵羊 3D 模型来自 Quaternius 的 Farm Animal Pack（CC0，https://quaternius.com/packs/farmanimal.html ）。
