@@ -6,8 +6,8 @@ import { splitSales } from '../js/sales.js';
 import { World } from '../js/world.js';
 import { isPackableCargo, packageCapacity, packageKind } from '../js/cargo-crate.js';
 
-assert.equal(CFG.levels.length, 60);
-assert.equal(CFG.valley.n, 15);
+assert.equal(CFG.levels.length, 67);
+assert.equal(CFG.valley.n, 22);
 for (const item of ['apple', 'berry', 'grape']) assert.ok(isPackableCargo(item), `${item} fruit must be packed`);
 for (const item of ['potato', 'tomato', 'corn', 'pumpkin', 'pepper']) assert.ok(!isPackableCargo(item), `${item} vegetables stay unboxed`);
 assert.equal(packageKind('fish'), 'fish-crate');
@@ -18,6 +18,10 @@ const expected = new Map([
   [56, ['山谷茶点坊', ['pie', 'teasnack']]], [57, ['早市烘焙铺', ['bread', 'juice']]],
   [58, ['咸香茶歇屋', ['chips', 'popcorn']]], [59, ['山谷早餐工坊', ['flour', 'bread', 'pie', 'jam']]],
   [60, ['晨茶丰收宴', ['pie', 'xiaolongbao']]],
+  [61, ['夜市小摊', ['chips']]], [62, ['灯火小吃街', ['popcorn', 'ketchup']]],
+  [63, ['烤鱼夜市', ['smoked', 'bread']]], [64, ['果汁冰饮摊', ['juice', 'jam', 'icecream']]],
+  [65, ['葡萄酒夜市', ['gjuice', 'wine']]], [66, ['丰收夜市大排档', ['xiaolongbao', 'chips', 'teasnack']]],
+  [67, ['丰收夜市盛宴', ['xiaolongbao', 'pie', 'gjuice']]],
 ]);
 const buyAll = (w, skip = () => false) => {
   let changed = true, loops = 0;
@@ -138,9 +142,9 @@ for (const [lv, [name, outputs]] of expected) {
   for (let i = 0; i < 12 * 30; i++) w.update(1 / 30, 0, 0);
   assert.ok((w.stats.sold.bread || 0) > soldBefore, 'player can carry processed stand goods to the dedicated processed checkout');
 }
-for (const [lv, expectedOut] of [[54, 'bread'], [57, 'juice'], [60, 'pie']]) {
+for (const [lv, expectedOut] of [[54, 'bread'], [57, 'juice'], [60, 'pie'], [64, 'icecream'], [65, 'wine']]) {
   const k = lv - CFG.valley.from - 1, L = splitSales(valleyLevel(k, 0));
   const proc = L.objects.find(p => p.type === 'proc' && p.out === expectedOut);
   assert.ok(proc && proc.outTo.startsWith('P_'), `level ${lv} retains the designed ${expectedOut} process and its own stand`);
 }
-console.log('food level checks: PASS · levels 54–60 · four seasons · at most three food lines · separate wooden stands · full-batch staff routes · raw+processed player-to-cashier loops');
+console.log('food level checks: PASS · levels 54–67 · four seasons · at most three food lines · separate wooden stands · full-batch staff routes · raw+processed player-to-cashier loops');

@@ -45,7 +45,7 @@ check(`apple top layer reaches rim (top ${topApple.toFixed(1)} >= ${RIM - 1})`, 
 const layout = cargoPackageLayout({ apple: 150 });
 const g = layout.groups.apple;
 const origins = Array.from({ length: g.boxes }, (_, b) => cargoCratePosition(g.startBox + b, g.kind));
-check(`single column: ${g.boxes} boxes all x=0, height ${Math.max(...origins.map((o) => o.base)) + 24}`, origins.every((o) => o.x === 0));
+check(`single column: ${g.boxes} boxes all x=0, height ${Math.max(...origins.map((o) => o.base)) + RIM}`, origins.every((o) => o.x === 0)); // v5.0.6: stack height is top base + crate height (17), not the old step 24
 // each crate still full (12/layer x 2 layers)
 let full = true;
 for (let b = 0; b < g.boxes - 1; b++) {

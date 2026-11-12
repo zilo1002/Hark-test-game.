@@ -86,7 +86,7 @@ export class UI {
     const seaBtns = (el, restart) => { el.innerHTML = CFG.seasons.map((S, i) => `<button data-s="${i}" class="s${i}">${S.name}</button>`).join('');
       for (const b of el.children) b.onclick = () => { const v = +b.dataset.s; h.valleySeason(v, restart); this.renderSeasonRow(); if (!restart) this.renderLevels(); }; };
     seaBtns($('lvSeaBtns'), false); seaBtns($('pSeaBtns'), true);
-    $('btnValley').onclick = () => { h.tap(); this.openLevels(CFG.areas.length - 1); };
+    $('btnValley').onclick = () => { h.tap(); this.openLevels(CFG.areas.findIndex((A) => A.id === 'valley')); }; // v5.0.6: was CFG.areas.length - 1 — the night-market tab is last now, the valley button must still open the valley
     $('lvGo').onclick = () => { const li = +$('lvGo').dataset.li; this.closeAll(); h.start(li); };
     swipe($('levelGrid').parentNode, (d) => { const n = Math.max(0, Math.min(CFG.areas.length - 1, this.lvPage + d)); if (n !== this.lvPage) { this.lvPage = n; h.tap(); this.renderLevels(); } });
     // 商店
@@ -202,7 +202,7 @@ export class UI {
   banner(world) {
     const b = this.el.banner;
     $('bannerLv').textContent = world.daily ? `每日挑战 · ${world.L.name}` : `等级 ${world.li + 1} · ${world.L.name}`;
-    $('bannerGoal').textContent = world.daily ? `${world.daily.name}：${world.daily.desc} · 3 分钟` : `目标：${goalText(world.L.goal)}${world.valley ? ` · 四季山谷·${CFG.seasons[world.season].full}` : ''}${world.rain ? ' · 今天下雨，生长 +25%' : ''}`;
+    $('bannerGoal').textContent = world.daily ? `${world.daily.name}：${world.daily.desc} · 3 分钟` : `目标：${goalText(world.L.goal)}${world.valley ? ` · ${(CFG.areas.find((A) => world.li >= A.from && world.li < A.from + A.size) || {}).name || '四季山谷'}·${CFG.seasons[world.season].full}` : ''}${world.rain ? ' · 今天下雨，生长 +25%' : ''}`; // v5.0.6: area name, not hardcoded 四季山谷 — night-market levels (61–67) are valley specs too
     b.classList.add('hidden'); void b.offsetWidth; b.classList.remove('hidden');
     clearTimeout(this._bn); this._bn = setTimeout(() => b.classList.add('hidden'), 2500);
   }

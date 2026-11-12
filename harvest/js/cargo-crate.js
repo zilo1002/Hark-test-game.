@@ -32,7 +32,8 @@ export function cargoPackageLayout(counts = {}) {
   return { groups, boxes: nextBox };
 }
 export function cargoItemSlot(item, ordinal, counts = {}) {
-  const group = cargoPackageLayout(counts).groups[item];
+  const layout = cargoPackageLayout(counts);
+  const group = layout.groups[item];
   if (!group) return null;
   const n = Math.max(0, Math.floor(ordinal));
   const box = group.startBox + Math.floor(n / group.capacity);
@@ -48,7 +49,7 @@ export function cargoItemSlot(item, ordinal, counts = {}) {
     const layer = Math.floor(within / 12), cell = within % 12;
     x = [-11, -3.5, 3.5, 11][cell % 4]; z = [-8, -2.7, 2.7][Math.floor(cell / 4)]; y = 4.5 + layer * 5;
   }
-  const { x: cx, z: cz, base } = cargoCratePosition(box, kind);
+  const { x: cx, z: cz, base } = cargoCratePosition(box, kind, layout.groups);
   return { x: cx + x, y: base + y, z: cz + z, box, kind };
 }
 
@@ -56,8 +57,23 @@ export function cargoItemSlot(item, ordinal, counts = {}) {
 // two-boxes-wide pair sat left and right and got in the way when moving). Every box/steamer
 // sits directly above the previous one. `kind` is kept for callers; a single column needs no
 // per-kind sideways spacing.
-export function cargoCratePosition(boxIndex, kind = 'wood-crate') {
-  return { x: 0, z: 0, base: Math.max(0, Math.floor(boxIndex)) * 24 };
+// v5.0.6: crates sit snug, not floating — the step was 24 but a wood crate is only ~17 tall
+// (posts base+0..17), leaving a 7 gap that read as floating in mid-air. The step is now the
+// crate's own height + a 1–2 slit (wood/fish 19, steamer 13: a steamer is only ~6.5 tall but
+// its buns poke up to ~12.9, so 13 leaves the buns just under the next floor). A mixed stack
+// stacks by cumulative height, not boxIndex * one step, or a steamer would land inside a
+// wood crate below it — pass the layout groups so the base sums the steps beneath.
+const CRATE_STEP = Object.freeze({ 'wood-crate': 19, 'fish-crate': 19, steamer: 13 });
+export function crateStep(kind) { return CRATE_STEP[kind] || 19; }
+export function cargoCrateBase(boxIndex, kind, groups) {
+  const i = Math.max(0, Math.floor(boxIndex));
+  if (!groups) return i * crateStep(kind);
+  let base = 0;
+  for (const g of Object.values(groups)) base += Math.max(0, Math.min(g.startBox + g.boxes, i) - g.startBox) * crateStep(g.kind);
+  return base;
+}
+export function cargoCratePosition(boxIndex, kind = 'wood-crate', groups) {
+  return { x: 0, z: 0, base: cargoCrateBase(boxIndex, kind, groups) };
 }
 
 const cube = new THREE.BoxGeometry(1, 1, 1);
@@ -108,7 +124,7 @@ export function updateCargoCrateStack(frame, counts = {}) {
   data.signature = sig;
   let r=0,p=0,f=0, fr=0,fp=0,ff=0,sf=0,sr=0,sb=0;
   for (const [item, group] of Object.entries(layout.groups)) for (let i=0;i<group.boxes;i++) {
-    const box = group.startBox + i, { x: cx, z: cz, base } = cargoCratePosition(box, group.kind);
+    const box = group.startBox + i, { x: cx, z: cz, base } = cargoCratePosition(box, group.kind, layout.groups);
     if (group.kind === 'steamer') {
       write(data.steamFloors,sf++,cx,base+2,cz,1,1,1);
       write(data.steamRims,sr++,cx,base+5,cz,1,1,1,Math.PI/2);

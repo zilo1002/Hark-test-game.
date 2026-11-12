@@ -1640,6 +1640,176 @@ const VL = {
         { id: 'o', x: 600, y: 880, price: 520, icon: 'loader', label: '园丁换铲车', req: ['k'], effect: { upgradeWorkers: 'loader' } },
       ],
       deco: { theme: 'farm', paths: [[330, 260, 640, 80], [790, 170, 80, 180], [790, 430, 80, 370]], hedges: [[1000, 950, 130, 22]], trees: [[1160, 960, 'round'], [1160, 35, 'cone']], bushes: [[560, 40], [980, 60]], barn: [520, 70] } },
+
+    // 61–67 — v5.0.6 夜市 (night market): the same food-workshop system as 54–60, at night.
+    // Recipes are fixed in every season (like 54–60); the season only changes the look and
+    // the growth bonus. 64 is the first food level with a cow shed (milk -> ice cream, the
+    // coop stays visible so the new line is in front of the player from the start); 65 is
+    // the first two-stage food chain (grape -> juice -> wine, one line only, so the chain
+    // itself is the lesson). 66–67 combine the earlier lines. Difficulty rises by adding
+    // lines and machines, not just by raising the earn target.
+    // 61 — night-market tutorial: one line, fries
+    { name: '夜市小摊', foodMarketMultiplier: 2.0, W: 960, H: 780, start: [490, 420], par: 500, bill: 30, customer: { processed: { buyMin: 2, buyMax: 4 } }, // v5.0.6: par 480->500 — tutorial casual was 7:46, only 14s margin
+      foodLines: { A: { crop: 'potato', gap: 30, out: 'chips', ratio: 5 } },
+      goal: { type: 'earn', n: [30000, 30000, 30000, 30000] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 50, w: 270, h: 260 },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.55, x: 610, y: 150, outTo: 'C1' },
+        { id: 'C1', type: 'counter', items: ['A'], x: 850, y: 590 },
+      ],
+      tiles: [
+        { id: 'a', x: 430, y: 580, price: 120, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 50 } } },
+        { id: 'b', x: 420, y: 190, price: 270, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'e', x: 900, y: 470, price: 340, icon: 'cashier', label: '夜市店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'f', x: 570, y: 650, price: 400, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'g', x: 520, y: 280, price: 350, icon: 'gear', label: '快机器', req: ['b'], effect: { proc: [{ id: 'M1', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'farm', night: true, lanterns: [[380, 60], [380, 360], [380, 700], [560, 380], [740, 380], [900, 100], [900, 700], [560, 740]], paths: [[350, 350, 480, 80], [600, 210, 70, 180]], hedges: [[790, 730, 70, 18]], trees: [[920, 730, 'round'], [900, 50, 'cone']], bushes: [[360, 50], [780, 70]] } },
+
+    // 62 — two snack lines: popcorn and ketchup
+    { name: '灯火小吃街', foodMarketMultiplier: 2.6, W: 1100, H: 880, start: [520, 430], par: 520, bill: 40, customer: { processed: { buyMin: 2, buyMax: 4 } }, // v5.0.6: multiplier 2.2->2.6 — low-value snacks (popcorn/ketchup) earned too slowly, casual was 9:25 vs par 8:40
+      foodLines: { A: { crop: 'corn', gap: 10, out: 'popcorn', ratio: 6 }, B: { crop: 'tomato', gap: 11, out: 'ketchup', ratio: 5 } },
+      goal: { type: 'earn', n: [52000, 52000, 52000, 52000] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 280, h: 230 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 330, w: 280, h: 230, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.5, x: 700, y: 140, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'B', time: 0.55, x: 700, y: 440, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B'], x: 950, y: 430 },
+      ],
+      tiles: [
+        { id: 'a', x: 480, y: 470, price: 130, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 60 } } },
+        { id: 'b', x: 420, y: 140, price: 280, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 410, y: 350, price: 230, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'e', x: 550, y: 350, price: 280, icon: '$mach', ln: 'B', req: ['c'], effect: { show: ['M2'] } },
+        { id: 'g', x: 1020, y: 330, price: 380, icon: 'cashier', label: '小吃店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'h', x: 590, y: 500, price: 420, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'i', x: 560, y: 700, price: 370, icon: 'gear', label: '快机器', req: ['e'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'farm', night: true, lanterns: [[380, 60], [380, 360], [380, 760], [560, 380], [740, 380], [1020, 100], [1020, 780], [560, 820]], paths: [[350, 280, 600, 80], [780, 220, 90, 430]], hedges: [[930, 830, 100, 20]], trees: [[1050, 840, 'round'], [1050, 40, 'cone']], bushes: [[550, 50], [840, 60]] } },
+
+    // 63 — grilled fish night market: smoked fish and bread
+    { name: '烤鱼夜市', foodMarketMultiplier: 2.0, W: 1120, H: 900, start: [560, 460], par: 540, bill: 40, extraPorters: 2, customer: { processed: { buyMin: 2, buyMax: 6 } },
+      foodLines: { A: { crop: 'fish', gap: 16, out: 'smoked', ratio: 5 }, B: { crop: 'wheat', gap: 9, out: 'bread', ratio: 4 } },
+      goal: { type: 'earn', n: [75000, 75000, 75000, 75000] }, // v5.0.6: 60000->75000 — smoked fish earns fast, the level finished in 6:02 vs par 9:00
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 280, h: 230 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 330, w: 280, h: 230, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.55, x: 700, y: 140, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'B', time: 0.5, x: 700, y: 440, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B'], x: 950, y: 430 },
+      ],
+      tiles: [
+        { id: 'a', x: 480, y: 470, price: 140, icon: 'cap', label: '大鱼篓', effect: { up: { key: 'cap', v: 60 } } },
+        { id: 'b', x: 420, y: 140, price: 290, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 410, y: 350, price: 240, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'e', x: 550, y: 350, price: 290, icon: '$mach', ln: 'B', req: ['c'], effect: { show: ['M2'] } },
+        { id: 'g', x: 1020, y: 330, price: 400, icon: 'cashier', label: '烤鱼店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'h', x: 590, y: 500, price: 440, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'i', x: 560, y: 700, price: 380, icon: 'gear', label: '快机器', req: ['e'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'farm', night: true, lanterns: [[380, 60], [380, 360], [380, 780], [560, 380], [740, 380], [1040, 100], [1040, 800], [560, 840]], paths: [[350, 280, 600, 80], [780, 220, 90, 430]], hedges: [[930, 850, 100, 20]], trees: [[1060, 860, 'round'], [1060, 40, 'cone']], bushes: [[550, 50], [840, 60]] } },
+
+    // 64 — first food level with a cow shed: juice, jam, and milk ice cream. The shed stays
+    // visible from the start (the new line is in front of the player); the other two lines
+    // are familiar (juice/jam from 54–55), so the milk line gets its own familiarisation time.
+    { name: '果汁冰饮摊', foodMarketMultiplier: 2.2, W: 1160, H: 920, start: [590, 480], par: 560, bill: 50, extraPorters: 2, customer: { processed: { buyMin: 2, buyMax: 6 } },
+      foodLines: { A: { crop: 'apple', gap: 11, out: 'juice', ratio: 5 }, B: { crop: 'berry', gap: 9, out: 'jam', ratio: 5 }, C: { crop: 'milk', gap: 9, out: 'icecream', ratio: 2 } },
+      goal: { type: 'earn', n: [68000, 68000, 68000, 68000] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 270, h: 230 },
+        { id: 'F2', type: 'field', crop: 'B', x: 40, y: 340, w: 270, h: 230, hidden: true },
+        { id: 'K1', type: 'coop', item: 'C', producer: 'cow', x: 70, y: 640, w: 270, h: 230, n: 5, max: 11, prefill: 800 }, // v5.0.6: x 40->70 — layout-check: the coop's check rect extends 30px left, x=40 put it 10px from the wall (needs >=16); 70 matches the other coops
+        { id: 'M1', type: 'proc', in: 'A', time: 0.55, x: 700, y: 130, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'B', time: 0.55, x: 700, y: 440, outTo: 'C1', hidden: true },
+        { id: 'M3', type: 'proc', in: 'C', out: 'icecream', ratio: 2, time: 0.6, x: 700, y: 740, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B', 'C'], x: 1030, y: 480 },
+      ],
+      tiles: [
+        { id: 'a', x: 500, y: 480, price: 150, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 70 } } },
+        { id: 'b', x: 430, y: 130, price: 300, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 430, y: 360, price: 250, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'd', x: 570, y: 390, price: 290, icon: '$mach', ln: 'B', req: ['c'], effect: { show: ['M2'] } },
+        { id: 'e', x: 430, y: 650, price: 260, icon: 'cow', label: '买奶牛', buy: 3, req: ['a'], repeat: { times: 2, mul: 1.6 }, effect: { hens: { coop: 'K1', n: 3 } } },
+        { id: 'f', x: 580, y: 760, price: 300, icon: 'icecream', label: '冰淇淋机', req: ['a'], effect: { show: ['M3'] } },
+        { id: 'g', x: 1090, y: 380, price: 440, icon: 'cashier', label: '冰饮店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'h', x: 590, y: 520, price: 460, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'i', x: 560, y: 850, price: 400, icon: 'gear', label: '快机器', req: ['d'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }, { id: 'M3', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'farm', night: true, lanterns: [[380, 60], [380, 360], [380, 640], [560, 380], [740, 380], [1080, 100], [1080, 820], [560, 860]], paths: [[350, 280, 620, 80], [780, 220, 90, 430]], hedges: [[960, 870, 120, 20]], trees: [[1100, 880, 'round'], [1100, 40, 'cone']], bushes: [[560, 50], [880, 60]] } },
+
+    // 65 — first two-stage food chain: grape -> juice -> wine. One line only, so the chain
+    // itself is the lesson; the par leaves room to learn it before the three-line levels.
+    { name: '葡萄酒夜市', foodMarketMultiplier: 2.2, W: 1180, H: 960, start: [590, 480], par: 570, bill: 50, customer: { processed: { buyMin: 2, buyMax: 4 } }, // v5.0.6: multiplier 2.0->2.2 + faster chain — the two-stage chain was too slow, casual was 10:16 vs par 9:30
+      foodLines: { A: { crop: 'grape', gap: 9, gapY: 24, out: 'gjuice', ratio: 5 } },
+      goal: { type: 'earn', n: [72000, 72000, 72000, 72000] },
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 300, gap: 9, gapY: 24 },
+        { id: 'M1', type: 'proc', in: 'A', out: 'gjuice', ratio: 5, time: 0.3, x: 640, y: 160, outTo: 'M2' },
+        { id: 'M2', type: 'proc', in: 'A+', out: 'wine', ratio: 2, time: 0.4, x: 760, y: 330, outTo: 'C1' },
+        { id: 'C1', type: 'counter', items: ['A'], x: 720, y: 520 },
+      ],
+      tiles: [
+        { id: 'a', x: 500, y: 480, price: 160, icon: 'cap', label: '大果篮', effect: { up: { key: 'cap', v: 70 } } },
+        { id: 'b', x: 430, y: 130, price: 300, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 640, y: 260, price: 320, icon: 'wine', label: '橡木酒桶', req: ['b'], effect: { show: ['M2'] } },
+        { id: 'g', x: 1090, y: 380, price: 460, icon: 'cashier', label: '酒摊店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'h', x: 590, y: 520, price: 480, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'i', x: 560, y: 850, price: 420, icon: 'gear', label: '快酒桶', req: ['c'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'farm', night: true, lanterns: [[380, 60], [380, 360], [380, 700], [560, 380], [740, 380], [1100, 100], [1100, 860], [560, 900]], paths: [[350, 280, 620, 80], [780, 220, 90, 430]], hedges: [[980, 910, 120, 20]], trees: [[1120, 920, 'round'], [1120, 40, 'cone']], bushes: [[560, 50], [900, 60]] } },
+
+    // 66 — three lines: xiaolongbao, fries, berry tea snacks
+    { name: '丰收夜市大排档', foodMarketMultiplier: 2.05, W: 1200, H: 1000, start: [610, 500], par: 590, bill: 60, extraPorters: 2, customer: { processed: { buyMin: 2, buyMax: 8 } },
+      foodLines: { A: { crop: 'wheat', gap: 9, out: 'xiaolongbao', ratio: 4 }, B: { crop: 'potato', gap: 30, out: 'chips', ratio: 5 }, C: { crop: 'berry', gap: 9, out: 'teasnack', ratio: 5 } },
+      goal: { type: 'earn', n: [100000, 100000, 100000, 100000] }, // v5.0.6: 80000->100000 — three lines earn fast, finished in 7:02 vs par 9:50
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 30, y: 35, w: 260, h: 210 },
+        { id: 'F2', type: 'field', crop: 'B', x: 30, y: 285, w: 260, h: 210, hidden: true },
+        { id: 'F3', type: 'field', crop: 'C', x: 30, y: 535, w: 260, h: 210, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.5, x: 730, y: 105, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'B', time: 0.55, x: 730, y: 400, outTo: 'C1', hidden: true },
+        { id: 'M3', type: 'proc', in: 'C', time: 0.55, x: 730, y: 700, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B', 'C'], x: 930, y: 430 },
+      ],
+      tiles: [
+        { id: 'a', x: 500, y: 500, price: 170, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 80 } } },
+        { id: 'b', x: 430, y: 100, price: 310, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 420, y: 300, price: 250, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'd', x: 420, y: 550, price: 250, icon: '$plot', ln: 'C', req: ['c'], effect: { show: ['F3'] } },
+        { id: 'e', x: 560, y: 400, price: 300, icon: '$mach', ln: 'B', req: ['c'], effect: { show: ['M2'] } },
+        { id: 'f', x: 560, y: 700, price: 300, icon: '$mach', ln: 'C', req: ['d'], effect: { show: ['M3'] } },
+        { id: 'g', x: 1110, y: 330, price: 500, icon: 'cashier', label: '大排档店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'h', x: 700, y: 880, price: 520, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'i', x: 450, y: 880, price: 430, icon: 'gear', label: '快机器', req: ['f'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }, { id: 'M3', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'farm', night: true, lanterns: [[380, 60], [380, 360], [380, 700], [560, 380], [740, 380], [1120, 100], [1120, 900], [560, 920]], paths: [[330, 260, 640, 80], [790, 170, 80, 180], [790, 430, 80, 370]], hedges: [[1000, 950, 130, 22]], trees: [[1160, 960, 'round'], [1160, 35, 'cone']], bushes: [[560, 40], [980, 60]] } },
+
+    // 67 — the night-market feast: xiaolongbao, pumpkin pie, grape juice
+    { name: '丰收夜市盛宴', foodMarketMultiplier: 2.05, W: 1280, H: 1040, start: [640, 520], par: 620, bill: 70, extraPorters: 3, customer: { processed: { buyMin: 2, buyMax: 8 } },
+      foodLines: { A: { crop: 'wheat', gap: 9, out: 'xiaolongbao', ratio: 4 }, B: { crop: 'pumpkin', gap: 22, out: 'pie', ratio: 4 }, C: { crop: 'grape', gap: 9, gapY: 24, out: 'gjuice', ratio: 5 } },
+      goal: { type: 'earn', n: [110000, 110000, 110000, 110000] }, // v5.0.6: 90000->110000 — three lines earn fast, finished in 7:38 vs par 10:20
+      objects: [
+        { id: 'F1', type: 'field', crop: 'A', x: 30, y: 35, w: 260, h: 210 },
+        { id: 'F2', type: 'field', crop: 'B', x: 30, y: 285, w: 260, h: 210, hidden: true },
+        { id: 'F3', type: 'field', crop: 'C', x: 30, y: 535, w: 260, h: 210, hidden: true },
+        { id: 'M1', type: 'proc', in: 'A', time: 0.5, x: 730, y: 105, outTo: 'C1' },
+        { id: 'M2', type: 'proc', in: 'B', time: 0.5, x: 730, y: 400, outTo: 'C1', hidden: true },
+        { id: 'M3', type: 'proc', in: 'C', time: 0.5, x: 730, y: 700, outTo: 'C1', hidden: true },
+        { id: 'C1', type: 'counter', items: ['A', 'B', 'C'], x: 930, y: 430 },
+      ],
+      tiles: [
+        { id: 'a', x: 500, y: 500, price: 180, icon: 'cap', label: '大背篓', effect: { up: { key: 'cap', v: 80 } } },
+        { id: 'b', x: 430, y: 100, price: 320, icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } },
+        { id: 'c', x: 420, y: 300, price: 260, icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } },
+        { id: 'd', x: 420, y: 550, price: 260, icon: '$plot', ln: 'C', req: ['c'], effect: { show: ['F3'] } },
+        { id: 'e', x: 560, y: 400, price: 310, icon: '$mach', ln: 'B', req: ['c'], effect: { show: ['M2'] } },
+        { id: 'f', x: 560, y: 700, price: 310, icon: '$mach', ln: 'C', req: ['d'], effect: { show: ['M3'] } },
+        { id: 'g', x: 1110, y: 330, price: 520, icon: 'cashier', label: '宴席店员', req: ['b'], effect: { cashier: ['C1'] } },
+        { id: 'h', x: 700, y: 900, price: 540, icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } },
+        { id: 'i', x: 450, y: 900, price: 450, icon: 'gear', label: '快机器', req: ['f'], effect: { proc: [{ id: 'M1', mul: 0.6 }, { id: 'M2', mul: 0.6 }, { id: 'M3', mul: 0.6 }] } },
+      ],
+      deco: { theme: 'farm', night: true, lanterns: [[380, 60], [380, 360], [380, 700], [560, 380], [740, 380], [1200, 100], [1200, 940], [560, 960]], paths: [[330, 260, 640, 80], [790, 170, 80, 180], [790, 430, 80, 370]], hedges: [[1080, 990, 130, 22]], trees: [[1240, 1000, 'round'], [1240, 35, 'cone']], bushes: [[560, 40], [1060, 60]] } },
   ],
 };
 const HIRE = { log: ['lumber', '雇伐木工'], fish: ['fisher', '拉网捕鱼'] };
@@ -1684,6 +1854,7 @@ CFG.areas = [
   { id: 'farm', name: '林场牧场', from: 15, size: 15 },
   { id: 'lake', name: '湖畔酒庄', from: 30, size: 15 },
   { id: 'valley', name: '四季山谷', from: VL.from, size: 15, seasons: true },
+  { id: 'night', name: '夜市', from: 60, size: 15 }, // v5.0.6: 61–67 夜市；slots past CFG.levels.length show as「即将开放」
 ];
 // the sims / checks can put the whole valley in one season: BANMU_SEASON=0..3 node sim/… (the game always passes its own)
 const ENV_S = typeof process !== 'undefined' && process.env && /^[0-3]$/.test(process.env.BANMU_SEASON || '') ? +process.env.BANMU_SEASON : 0;

@@ -117,6 +117,11 @@ export function splitSales(L) {
 const FOOD_OUTPUTS = {
   8: ['bread', 'jam'], 9: ['juice', 'jam'], 10: ['pie', 'teasnack'],
   11: ['bread', 'juice'], 12: ['chips', 'popcorn'], 13: ['pie', 'jam', 'bread'], 14: ['xiaolongbao', 'pie'], // v5.0.5: 13 keeps 'bread' — the wheat line is L59's only visible starting field; without it the level is empty
+  // v5.0.6 night market 61–67 (valley 15–21): the final outputs each level sells. The
+  // two-stage chain (65) lists only 'wine' — include() walks back to the gjuice machine.
+  // WITHOUT an entry here splitFoodLevel deletes the whole level (the L59 empty-level bug).
+  15: ['chips'], 16: ['popcorn', 'ketchup'], 17: ['smoked', 'bread'], 18: ['juice', 'jam', 'icecream'],
+  19: ['wine'], 20: ['xiaolongbao', 'chips', 'teasnack'], 21: ['xiaolongbao', 'pie', 'gjuice'],
 };
 function splitFoodLevel(L0) {
   const L = { ...L0, objects: L0.objects.map((o) => ({ ...o, items: o.items?.slice() })),
