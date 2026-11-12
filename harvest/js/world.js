@@ -1345,6 +1345,16 @@ export class World {
     const c = k % 6, dx = (c % 3 - 1) * sx, dy = (c < 3 ? -1 : 1) * sy;
     return { x: z.cx + dx, y: z.cy + dy };
   }
+  // v5.0.3: a deliver target that teleports every frame is a bug — slot() advances its
+  // global counter on every call, so a worker re-aimed each tick chased 6 slots round
+  // the zone (a ±14-30 px box) and vibrated in place by the counter / wooden board.
+  // Cache one slot per worker+zone; it is re-drawn only when the worker targets a
+  // different zone. (slot() itself is untouched, so the spread between workers is
+  // the same as before — each worker just keeps the slot it drew.)
+  slotFor(z, w) {
+    if (w._slotZ !== z) { w._slotZ = z; w._slot = this.slot(z, w); }
+    return w._slot;
+  }
   // where a worker waits with its load: a feeder beside its machine, others along the east edge of their field
   post(w, srcs) {
     const i = this.workers.indexOf(w);
@@ -1452,6 +1462,10 @@ export class World {
         const v = s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + (s.ripe || 0);
         if (v > bv) { bv = v; best = s; }
       }
+      // v5.0.3: ease the approach only for pile pickups (board / coop / machine pile).
+      // Field harvesters work plants 11 px apart, so a distance-eased approach would
+      // slow their whole sweep and cost stars (L35 casual 3:14 vs par 3:10 with it on).
+      w._easeCollect = !!best && best.kind !== 'field' && best.kind !== 'pond';
       if (!best) {
         w.wait += dt; w.idleT = (w.idleT || 0) + dt;
         const collectWait = collectWaitLimit(w, srcs, CFG);
@@ -1504,6 +1518,10 @@ export class World {
           }
         }
         if (w.tgt) { tx = w.tgt.x; ty = w.tgt.y; }
+        // v5.0.3 stay-put-when-in-range was tried here and REVERTED: it starved the
+        // machines (fit 22/37 with it, 30/37 pile-only) — a worker that stops at the
+        // first cell in range never sweeps the field / board, so the supply line dries
+        // up. The easing below + slotFor + the holding fix carry the tremble fix.
         // Machine feeders never leave with a partial load just because a field is temporarily bare;
         // they wait for regrowth and only deliver a complete, frozen batch.
         if (bv === 0 && w.stack.length > 0 && !w.feedFor && !w.fullBatch) w.state = 'deliver';
@@ -1532,10 +1550,10 @@ export class World {
         if (dd < bd) { bd = dd; bs = z; bo = s; }
       }
       if (this.smart) w.pick = bo;
-      if (bs && this.smart) { const o = this.slot(bs, w); tx = o.x; ty = o.y; w.blocked = null; }
+      if (bs && this.smart) { const o = this.slotFor(bs, w); tx = o.x; ty = o.y; w.blocked = null; }
       else if (bs) { const k = (w.seed + (w.sinkRot || 0)) | 0; tx = bs.cx + ((k % 3) - 1) * 8; ty = bs.cy + ((k % 2) ? 6 : -6); w.blocked = null; }
       else if (this.smart && anyTakes && w.feedFor && w.stack.includes(this.objs[w.feedFor].inItem) && !this.objs[w.feedFor].hidden) {
-        const o = this.slot(this.objs[w.feedFor].inZone, w); tx = o.x; ty = o.y; w.holding = true; w.waitReason = '等加工台空位'; w.blocked = null;   // its machine is full: wait in its input zone, topping it up
+        const o = this.slotFor(this.objs[w.feedFor].inZone, w); tx = o.x; ty = o.y; w.holding = true; w.waitReason = '等加工台空位'; w.blocked = null;   // its machine is full: wait in its input zone, topping it up
       }
       else if (this.smart && anyTakes) { const o = this.post(w, srcs); tx = o.x; ty = o.y; w.holding = true; if (w.blocked?.kind === 'stand') w.waitReason = '等木台腾出空间'; w.blocked = null; }
       else if (w.blocked && !w.blocked.hidden) { const z = w.blocked.inZone || w.blocked.zone, k = w.seed | 0; tx = z.cx - 30 + (k % 3) * 8; ty = z.cy + 34 + (k % 2) * 8; w.blocked = null; }   // a blocked sink waits nearby
@@ -1544,7 +1562,12 @@ export class World {
     const goal = Math.hypot(tx - w.x, ty - w.y), body = w.loader ? this.loaderCfg(w).body : 9;
     // stuck detection: no real progress for a while while trying to move → force a fresh
     // path; still nothing → give up on this target (pick another plant/pile cell / sink spot)
-    const wantMove = goal > 3;
+    // v5.0.3: a worker waiting with its load (blocked sink) stands at its post — the
+    // exact post point can sit against a solid the worker can never quite reach, so
+    // it would push into it at full speed forever (walk animation on, no motion =
+    // visible trembling), and the stuck detector would then fire a random dodge that
+    // only makes it jitter. Treat "close enough" as arrived for a waiting worker.
+    const wantMove = goal > 3 && !(w.holding && goal < 24);
     if (!w.prog) w.prog = { x: w.x, y: w.y, n: w.stack.length + w.incoming, t: T };
     const pg = w.prog, load = w.stack.length + w.incoming;
     if (!wantMove || Math.hypot(w.x - pg.x, w.y - pg.y) > 16 || load !== pg.n) { pg.x = w.x; pg.y = w.y; pg.n = load; pg.t = T; w.unstick = 0; }
@@ -1558,7 +1581,15 @@ export class World {
     if (w.dodge && T < w.dodge.t) { tx = w.dodge.x; ty = w.dodge.y; } else w.dodge = null;
     const wp = this.navigate(w, tx, ty, body, force);
     const dx = wp.x - w.x, dy = wp.y - w.y, dd = Math.hypot(dx, dy);
-    const sp = wantMove || w.dodge ? w.speed : 0;
+    // v5.0.3: ease into the waypoint when collecting, instead of charging it at full
+    // speed. A worker re-aimed every 0.4 s at a nearby pile cell used to sprint
+    // 10-40 px, overshoot and reverse, which reads as on-the-spot trembling. Scaling
+    // speed by distance keeps long trips fast and makes short hops gentle. Deliveries
+    // keep full speed so the supply line (PS front wait) is untouched. Ease on the
+    // distance to the FINAL target (goal), not the next path waypoint (dd) — the
+    // waypoints on an A* path sit a few px apart, so easing on dd crawled the whole
+    // trip at a third of speed and starved the machines (fit 25/37).
+    const sp = wantMove || w.dodge ? w.speed * (w.dodge || w.state !== 'collect' || !w._easeCollect ? 1 : Math.min(1, goal / 30)) : 0;
     const vx = dd > 0 ? dx / dd * sp : 0, vy = dd > 0 ? dy / dd * sp : 0;
     w.lastX = w.x; w.lastY = w.y;
     const k = Math.min(1, dt * 10);
