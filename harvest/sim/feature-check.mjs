@@ -71,7 +71,13 @@ function buyReady(w, skip = () => false) {
   assert.ok(ordinary.workers.some((w) => !w.cart && !w.porter));
   for (const w of ordinary.workers) if (!w.cart && !w.porter) assert.equal(w.cap, CFG.worker.cap, 'standard hire carries the normal full load');
   assert.ok(loader.visible); ordinary.completeTile(loader, true);
-  for (const w of ordinary.workers) if (!w.cart && !w.porter) assert.equal(w.cap, CFG.loader.cap, 'vehicle upgrade raises the full load');
+  // v4.9.8: the upgrade gives each worker the vehicle its job calls for — harvest workers
+  // the big shovel loader, machine feeders the small forklift — each with its own full load.
+  for (const w of ordinary.workers) if (!w.cart && !w.porter) {
+    const want = w.loaderKind === 'big' ? CFG.loaderBig : w.loaderKind === 'small' ? CFG.loaderSmall : CFG.loader;
+    assert.equal(w.cap, want.cap, `vehicle upgrade raises the full load (loaderKind=${w.loaderKind})`);
+    assert.ok(w.loaderKind, 'an upgraded worker has a vehicle kind');
+  }
 }
 
 // Fishers retain the school's restock window; they should not dump one fish as soon as a school moves away.
@@ -119,4 +125,4 @@ function buyReady(w, skip = () => false) {
   assert.ok(w.counters.some((c) => c.sale2 && c.items.includes('smoked')));
 }
 
-console.log('feature checks: PASS · resumable snapshot + persistence status · 50→150 carrying · smoked-fish feeders carry full loads · two-wide crate basket');
+console.log('feature checks: PASS · resumable snapshot + persistence status · 50→180/150 carrying (big loader / forklift) · smoked-fish feeders carry full loads · two-wide crate basket');

@@ -760,10 +760,16 @@ export class Renderer {
       mow.root.add(pp.root); this.levelRoot.add(mow.root);
       o = { c, pp, mow, ang: 0.8, root: mow.root };
     } else if (c.kind === 'worker' && c.loader) {
-      const pp = M.makePerson(this.wLook(c.lumber ? LUMBERJACK : GARDENER)), ld = M.makeLoader(c.lumber ? 'log' : '');
-      pp.root.position.set(0, 13, -1.5); pp.blob.visible = false; ld.root.add(pp.root);
+      // v4.9.8: two vehicles — harvest workers ride the big shovel loader, machine feeders
+      // drive the small forklift. A loader without a kind falls back to the old single loader
+      // (same as the stats fallback in loaderCfg). Seat height and shadow follow the vehicle.
+      const pp = M.makePerson(this.wLook(c.lumber ? LUMBERJACK : GARDENER));
+      const ld = c.loaderKind === 'small' ? M.makeForklift() : c.loaderKind === 'big' ? M.makeBigLoader(c.lumber ? 'log' : '') : M.makeLoader(c.lumber ? 'log' : '');
+      pp.root.position.set(0, c.loaderKind === 'small' ? 9 : c.loaderKind === 'big' ? 15 : 13, -1.5); pp.blob.visible = false; ld.root.add(pp.root);
       const root = new THREE.Group(); root.add(ld.root); this.levelRoot.add(root);
-      const blob = new THREE.Mesh(M.BLOB_GEO, M.BLOB_MAT); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.3; blob.scale.set(17, 21, 1); root.add(blob);
+      const blob = new THREE.Mesh(M.BLOB_GEO, M.BLOB_MAT); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.3;
+      if (c.loaderKind === 'small') blob.scale.set(14, 18, 1); else if (c.loaderKind === 'big') blob.scale.set(22, 26, 1); else blob.scale.set(17, 21, 1);
+      root.add(blob);
       o = { c, pp, ld, loader: true, ang: 0.8, root };
     } else if (c.kind === 'worker') {
       const pp = M.makePerson(this.wLook(c.porter ? PORTER : c.cart ? (c.from && this.world.objs[c.from[0]] && this.world.objs[c.from[0]].producer === 'cow' ? MILKER : CARTER) : c.lumber ? LUMBERJACK : c.fisher ? FISHER : GARDENER));
@@ -774,8 +780,8 @@ export class Renderer {
     }
     if (o && o.root) {
       o.crate = makeCargoCrateStack();
-      const rear = c.kind === 'player' ? -17 : c.loader || c.cart ? -19 : 12;
-      const y = c.kind === 'player' && c.vehicle ? 5 : c.loader ? 7 : c.cart ? 2 : 8;
+      const rear = c.kind === 'player' ? -17 : c.loader ? (c.loaderKind === 'small' ? 20 : c.loaderKind === 'big' ? -24 : -19) : c.cart ? -19 : 12;
+      const y = c.kind === 'player' && c.vehicle ? 5 : c.loader ? (c.loaderKind === 'small' ? 9 : c.loaderKind === 'big' ? 8 : 7) : c.cart ? 2 : 8;
       o.crate.position.set(0, y, rear); o.crate.visible = false;
       o.root.add(o.crate);
     }
@@ -836,7 +842,14 @@ export class Renderer {
     // where the stack sits: in the hands (walking), on the mower's rear deck, or on the cart bed
     const a = o ? o.ang : 0, fx = Math.sin(a), fz = Math.cos(a);
     if (c.kind === 'player' && c.vehicle) return { x: c.x - fx * 17, y: c.y - fz * 17, z: 16, cols: 3, spread: 7.5, fx, fz };
-    if (c.kind === 'worker' && c.loader) return { x: c.x - fx * 17.8 * 1.15, y: c.y - fz * 17.8 * 1.15, z: 21.5, cols: 3, deep: 3, spread: 6.6, fx, fz };
+    if (c.kind === 'worker' && c.loader) {
+      // v4.9.8: the big loader's load rides its wide rear bed; the forklift's load rides its
+      // front forks, piled full (3x3) — a full pallet on the way to the machine. A loader
+      // without a kind keeps the old single-loader offset.
+      if (c.loaderKind === 'small') return { x: c.x + fx * 25, y: c.y + fz * 25, z: 11, cols: 3, deep: 3, spread: 6.6, fx, fz };
+      if (c.loaderKind === 'big') return { x: c.x - fx * 24, y: c.y - fz * 24, z: 24, cols: 3, deep: 3, spread: 7.5, fx, fz };
+      return { x: c.x - fx * 17.8 * 1.15, y: c.y - fz * 17.8 * 1.15, z: 21.5, cols: 3, deep: 3, spread: 6.6, fx, fz };
+    }
     if (c.kind === 'worker' && c.cart) return { x: c.x - fx * 23, y: c.y - fz * 23, z: 15, cols: 2, spread: 7.5, fx, fz };
     // A stacked load has a little weight: vertical bounce follows the gait while its base
     // sways against the carrier's turn, making the layers read as physical objects in 3D.

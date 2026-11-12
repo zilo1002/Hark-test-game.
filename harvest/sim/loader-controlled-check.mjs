@@ -1,14 +1,19 @@
-// Controlled comparison: only machine-feeder loader capacity toggles after identical tile purchases.
+// Controlled comparison: only the machine feeders' vehicle toggles after identical tile purchases.
+// baseline = feeders on foot; legacy-upgraded = feeders on the old single loader table (body 14);
+// patched-upgrade = feeders on the new small forklift (body 12, same cap). Gardeners ride the big
+// shovel loader in all three conditions (a constant, not a variable). Diagnostic output only —
+// there is no PASS/FAIL verdict here.
 import { World } from '../js/world.js';
 import { CFG } from '../js/config.js';
 const DT=1/30,HORIZON=540,LOAD=60;
 const buyAll=w=>{let changed=true,n=0;while(changed&&n++<300){changed=false;for(const t of w.tiles)if(t.visible&&!t.done){w.completeTile(t,true);changed=true;}}};
 function run(li,season,seed,condition){
  const w=new World(li,{quiet:true,season,seed});buyAll(w);
- const feederBefore=w.workers.filter(x=>x.feedFor).map(x=>({id:x.id,feedFor:x.feedFor,loader:x.loader,cap:x.cap,speed:x.speed}));
+ const feederBefore=w.workers.filter(x=>x.feedFor).map(x=>({id:x.id,feedFor:x.feedFor,loader:x.loader,kind:x.loaderKind||null,cap:x.cap,speed:x.speed}));
  if(condition==='baseline'){for(const x of w.workers)if(x.feedFor)x.loader=false;w.refreshStats();}
- if(condition==='legacy-upgraded'){for(const x of w.workers)if(x.feedFor)x.loader=true;w.refreshStats();}
- const feederInitial=w.workers.filter(x=>x.feedFor).map(x=>({id:x.id,feedFor:x.feedFor,loader:x.loader,cap:x.cap,speed:x.speed}));
+ if(condition==='legacy-upgraded'){for(const x of w.workers)if(x.feedFor){x.loader=true;x.loaderKind=null;}w.refreshStats();}
+ if(condition==='patched-upgrade'){for(const x of w.workers)if(x.feedFor){x.loader=true;x.loaderKind='small';}w.refreshStats();}
+ const feederInitial=w.workers.filter(x=>x.feedFor).map(x=>({id:x.id,feedFor:x.feedFor,loader:x.loader,kind:x.loaderKind||null,cap:x.cap,speed:x.speed}));
  const p=w.player,stands=Object.values(w.objs).filter(o=>o.kind==='stand'); let picks=0,drops=0;const events={pick:{},drop:{}};const waitSeconds={},feederWaits={};
  const emit=w.emit.bind(w);w.emit=(name,data={})=>{if(name==='pick'||name==='drop'){events[name][data.item]=(events[name][data.item]||0)+1;if(name==='pick')picks++;else drops++;}return emit(name,data);};p.sources=stands;
  let mode='',source=null,target=null,sink=null,standCursor=0,missingSink=0;const sold0={...w.stats.sold},produced0={...w.stats.produced};
@@ -24,7 +29,7 @@ function run(li,season,seed,condition){
    w.update(DT,ix,iy);
  }
  const delta=(obj,old)=>Object.fromEntries(Object.entries(obj).map(([k,v])=>[k,v-(old[k]||0)]).filter(([,v])=>v>0));
- const feeds=w.workers.filter(x=>x.feedFor).map(x=>({id:x.id,machine:x.feedFor,cap:x.cap,loader:x.loader,trips:x.trips,done:x.done,stack:x.stack.length,state:x.state,waitReason:x.waitReason}));
+ const feeds=w.workers.filter(x=>x.feedFor).map(x=>({id:x.id,machine:x.feedFor,cap:x.cap,loader:x.loader,kind:x.loaderKind||null,trips:x.trips,done:x.done,stack:x.stack.length,state:x.state,waitReason:x.waitReason}));
  return {level:li+1,season,condition,seed,feedersBefore:feederBefore,feedersAfter:feederInitial,feedersEnd:feeds,feederWaits:Object.fromEntries(Object.entries(feederWaits).map(([m,q])=>[m,Object.fromEntries(Object.entries(q).map(([k,v])=>[k,+v.toFixed(1)]))])),processors:w.procs.map(q=>({id:q.id,buf:q.buf,inc:q.inc,out:q.out,pile:q.outPile?.total})),picks,drops,sold:delta(w.stats.sold,sold0),produced:delta(w.stats.produced,produced0),earned:Math.floor(w.stats.earned),goal:w.L.goal?.n?.[season]??w.L.goal?.n??0,waits:Object.fromEntries(Object.entries(waitSeconds).map(([k,v])=>[k,+v.toFixed(1)])),tableStocks:stands.map(s=>`${s.id}:${s.pile.total+s.pile.pending}/${s.pile.cap}`).join(',')};
 }
 const levels=(process.env.LEVELS||"53,56,59").split(",").map(Number), seasons=(process.env.SEASONS||"0").split(",").map(Number);

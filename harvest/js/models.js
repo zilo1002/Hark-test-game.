@@ -718,6 +718,72 @@ export function makeLoader(kind) {
   }
   return { root: g, body, wheels };
 }
+// v4.9.8: the BIG shovel loader — harvest workers' upgrade (the big red harvester in Jin's
+// reference). ~1.35x the old small loader: bigger wheels, a cab with a roof, a wide rear bed
+// for the bigger load, and a much bigger front bucket with teeth. Faces +Z. kind 'log' keeps
+// the lumberjacks' timber-yard green; everyone else is red.
+// (The old makeLoader above is superseded — no worker rides it in the game any more —
+// but kept as the fallback shape for a loader without a kind.)
+export function makeBigLoader(kind) {
+  const g = new THREE.Group();
+  const R = kind === 'log' ? '#4CB24E' : '#E8452C', R2 = kind === 'log' ? '#2F8F3A' : '#C23A24', D = '#3A3A44', S = '#AEB6C2';
+  const parts = [
+    P(box(30, 6, 42), D, [0, 8, 0]),                                   // chassis
+    P(box(30, 9, 24), R, [0, 15.5, -6]), P(box(30.4, 1.6, 24.4), '#FF8A6E', [0, 20.4, -6]),   // body + trim
+    P(box(24, 9, 14), R, [0, 14.5, 13]), P(box(24.4, 1.6, 14.4), R2, [0, 19.4, 13]),           // hood
+    P(box(5, 3, 1), '#FFF6C0', [-7.5, 15, 20.4]), P(box(5, 3, 1), '#FFF6C0', [7.5, 15, 20.4]),   // headlights
+    P(box(7, 1, 0.8), D, [0, 12, 20.4]), P(box(7, 1, 0.8), D, [0, 14.5, 20.4]),            // grille
+    P(box(26, 13, 16), R, [0, 24, -6]), P(box(24, 8, 1.2), '#2F3440', [0, 26, 2.4]), P(box(28, 2, 18), D, [0, 31, -6]),   // cab + glass + roof
+    P(box(11, 3, 9), D, [0, 19, -6]), P(box(11, 8, 2.5), D, [0, 23, -10]),            // seat + backrest
+    P(cyl(1, 1, 10, 6), D, [0, 22.5, 5], [0.55, 0, 0]), P(tor(3.6, 0.85, 4, 10), '#2F3440', [0, 27, 7.6], [H + 0.55, 0, 0]),
+    P(cyl(1.3, 1.3, 10, 6), '#2F3440', [9, 22, 6]), P(cyl(1.8, 1.8, 1.8, 6), '#E8452C', [9, 27.5, 6]),   // exhaust
+    // load bed (rear) with rails — the bigger load rides here
+    P(box(32, 3, 16), R2, [0, 20, -21]),
+    P(box(2, 5, 16), R, [-15.2, 23.5, -21]), P(box(2, 5, 16), R, [15.2, 23.5, -21]), P(box(32, 5, 2), R, [0, 23.5, -28.4]),
+    // loader arms + the big front bucket with teeth
+    P(box(3.5, 3.5, 22), R, [-15.5, 14, 22], [0.32, 0, 0]), P(box(3.5, 3.5, 22), R, [15.5, 14, 22], [0.32, 0, 0]),
+    P(box(38, 3, 10), S, [0, 4, 33]), P(box(38, 11, 3), S, [0, 8, 28.5]), P(box(3, 9, 10), S, [-17.5, 8, 33]), P(box(3, 9, 10), S, [17.5, 8, 33]),
+    P(box(39, 2, 2), '#8C94A0', [0, 12.5, 29]),
+  ];
+  for (let k = -3; k <= 3; k++) parts.push(P(box(2.6, 1.6, 3.4), '#D8DEE6', [k * 5.8, 2.8, 38.4]));
+  const body = new THREE.Mesh(merge(parts), vcMat()); body.castShadow = true; g.add(body);
+  const wheels = [];
+  for (const [x, z, r, w] of [[-18, -11, 9, 7], [18, -11, 9, 7], [-17, 14, 7, 6], [17, 14, 7, 6]]) {
+    const wl = new THREE.Mesh(merge([P(cyl(r, r, w, 12), '#24242A', [0, 0, 0], [0, 0, H]), P(cyl(r * 0.55, r * 0.55, w + 0.2, 8), R, [0, 0, 0], [0, 0, H]), P(cyl(r * 0.2, r * 0.2, w + 0.4, 6), D, [0, 0, 0], [0, 0, H])]), vcMat());
+    wl.position.set(x, r, z); wl.castShadow = true; g.add(wl); wheels.push(wl);
+  }
+  return { root: g, body, wheels };
+}
+// v4.9.8: the SMALL forklift — machine feeders' upgrade. Compact yellow truck with an overhead
+// guard, a mast up front and two forks that carry the load piled full to the machine. Faces +Z.
+export function makeForklift() {
+  const g = new THREE.Group();
+  const Y = '#FFC21A', Y2 = '#F29C0E', D = '#3A3A44', S = '#AEB6C2';
+  const parts = [
+    P(box(18, 5, 26), D, [0, 6, 0]),                                   // chassis
+    P(box(18, 6, 14), Y, [0, 11, -3]), P(box(18.4, 1.4, 14.4), '#FFE07A', [0, 14.4, -3]),   // body + trim
+    P(box(16, 6, 8), Y2, [0, 10, -12]),                                // rear counterweight
+    P(box(9, 2.5, 8), D, [0, 13.5, -3]), P(box(9, 6, 2), D, [0, 17, -7]),   // seat + backrest
+    // overhead guard: four posts + roof
+    P(box(1.6, 10, 1.6), D, [-8, 19, 2]), P(box(1.6, 10, 1.6), D, [8, 19, 2]),
+    P(box(1.6, 10, 1.6), D, [-8, 19, -8]), P(box(1.6, 10, 1.6), D, [8, 19, -8]),
+    P(box(19, 1.6, 20), D, [0, 24.5, -3]),
+    P(cyl(0.8, 0.8, 7, 6), D, [0, 17, 3], [0.55, 0, 0]), P(tor(2.8, 0.7, 4, 10), '#2F3440', [0, 20, 5], [H + 0.55, 0, 0]),   // steering
+    P(box(3, 2, 1), '#FFF6C0', [-5, 11, 11]), P(box(3, 2, 1), '#FFF6C0', [5, 11, 11]),   // headlights
+    // mast + carriage + the two forks (the load rides on these, piled full)
+    P(box(2, 22, 2.5), S, [-7, 13, 12]), P(box(2, 22, 2.5), S, [7, 13, 12]),
+    P(box(16, 2, 2), D, [0, 22, 12]), P(box(16, 2, 2), D, [0, 5, 12]),
+    P(box(16, 3, 2), D, [0, 9, 13]),
+    P(box(2.5, 1.2, 18), S, [-5, 8.5, 22]), P(box(2.5, 1.2, 18), S, [5, 8.5, 22]),
+  ];
+  const body = new THREE.Mesh(merge(parts), vcMat()); body.castShadow = true; g.add(body);
+  const wheels = [];
+  for (const [x, z, r, w] of [[-11, -8, 4.5, 4], [11, -8, 4.5, 4], [-10, 9, 4, 3.5], [10, 9, 4, 3.5]]) {
+    const wl = new THREE.Mesh(merge([P(cyl(r, r, w, 12), '#24242A', [0, 0, 0], [0, 0, H]), P(cyl(r * 0.55, r * 0.55, w + 0.2, 8), Y, [0, 0, 0], [0, 0, H]), P(cyl(r * 0.2, r * 0.2, w + 0.4, 6), D, [0, 0, 0], [0, 0, H])]), vcMat());
+    wl.position.set(x, r, z); wl.castShadow = true; g.add(wl); wheels.push(wl);
+  }
+  return { root: g, body, wheels };
+}
 // 洒水器: a post with a spinning blue head (water arcs are drawn on the overlay)
 export function makeSprinkler() {
   const g = new THREE.Group();

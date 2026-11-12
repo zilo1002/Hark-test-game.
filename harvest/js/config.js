@@ -25,6 +25,12 @@ export const CFG = {
   worker: { speed: 92, pickR: 28, harvestR: 26, cutRate: 26, cap: 50, pickRate: 30, dropRate: 40 },
   // 园丁换铲车: gardeners ride small loaders (bigger swath, faster, much bigger load on the rear bed)
   loader: { speed: 122, pickR: 40, harvestR: 42, cap: 150, pickRate: 60, dropRate: 90, body: 14 },
+  // v4.9.8 升级分两种车: 收割工人 (gardeners, lumberjacks, fishers) 换超大铲车 (wider swath, bigger
+  // load, bigger body — the big red harvester in Jin's reference); 管加工的工人 (machine feeders)
+  // 换小铲车 (same full load, nimbler body for tight machine rows). loader stays as the fallback
+  // for a loader without a kind (e.g. a check that flips w.loader by hand).
+  loaderBig: { speed: 122, pickR: 48, harvestR: 50, cap: 180, pickRate: 60, dropRate: 90, body: 18 },
+  loaderSmall: { speed: 122, pickR: 40, harvestR: 42, cap: 150, pickRate: 60, dropRate: 90, body: 12 },
   // 园丁成长: Lv1→Lv5, one level every `per` delivery trips; each level +speed% and +cap%
   workerLv: { per: 3, max: 5, speed: 0.08, cap: 0.10 },
   // 金色作物: ~1 in 150 field plants sparkles gold; cutting one pays mul × the crop price straight away

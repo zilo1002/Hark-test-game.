@@ -340,7 +340,7 @@ export class World {
     });
     this.player = makeCollector('player', this.L.start[0], this.L.start[1]);
     // v4.0 B 宠物狗 (opts.pet = 'dog'); the sims never pass it, so their results are unchanged
-    this.dog = opts.pet === 'dog' ? { x: this.player.x - 30, y: this.player.y + 20, vx: 0, vy: 0, moving: false, walk: 0, face: 1, dirY: 0, sway: 0, state: 'follow', fetchT: CFG.pet.every * 0.6, carry: null, n: 0, tgt: null, fetched: 0, wag: 0 } : null;
+    this.dog = opts.pet === 'dog' ? { x: this.player.x - 30, y: this.player.y + 20, vx: 0, vy: 0, moving: false, walk: 0, face: 1, dirY: 0, sway: 0, state: 'follow', fetchT: CFG.pet.every * 0.6, carry: null, n: 0, tgt: null, fetched: 0, wag: 0, path: null, pathI: 0, pathT: 0, pathGoal: { x: 0, y: 0 }, prog: null, unstick: 0, dodge: null, dodgeT: 0 } : null;
     this.applyEnv();
     if (opts.money) this.money = opts.money;
     if (opts.speedUp) this.upg.speed += opts.speedUp;
@@ -552,6 +552,10 @@ export class World {
     return base * (this.L.foodMarketMultiplier || 1);
   }
 
+  // v4.9.8: a loader's stat table follows its vehicle kind — big shovel loader for harvest
+  // workers, small forklift for machine feeders; a loader without a kind falls back to the
+  // old single table (a check that flips w.loader by hand).
+  loaderCfg(w) { return w.loaderKind === 'big' ? CFG.loaderBig : w.loaderKind === 'small' ? CFG.loaderSmall : CFG.loader; }
   refreshStats() {
     const p = this.player, u = this.upg;
     if (p.vehicle) {
@@ -568,7 +572,7 @@ export class World {
       const F = CFG.fever; p.speed *= F.speedMul; p.harvestR *= F.radiusMul; p.pickR *= 1 + (F.radiusMul - 1) * 0.5; p.pickRate *= 1.4;
     }
     for (const w of this.workers) {
-      const Wk = w.loader ? CFG.loader : CFG.worker, Lv = CFG.workerLv, k = (w.lv || 1) - 1;
+      const Wk = w.loader ? this.loaderCfg(w) : CFG.worker, Lv = CFG.workerLv, k = (w.lv || 1) - 1;
       w.speed = (Wk.speed + u.wspeed) * (1 + Lv.speed * k); w.cap = Math.round((Wk.cap + u.wcap) * (1 + Lv.cap * k));
       w.pickR = Wk.pickR; w.harvestR = Wk.harvestR;
       w.cutRate = Wk.cutRate || 0; w.pickRate = Wk.pickRate; w.dropRate = Wk.dropRate;
@@ -663,7 +667,10 @@ export class World {
     }
     if (e.upgradeWorkers === 'loader') {
       this.loaders = true;
-      for (const w of this.workers) if (!w.cart && !w.loader && !w.porter && (!this.L.foodCollectionTables || !w.feedFor)) { w.loader = true; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
+      // v4.9.8: two vehicles from one upgrade — harvest workers ride the big shovel loader,
+      // machine feeders (feedFor) drive the small forklift. Carts and processed-goods porters
+      // keep their own rigs, as before.
+      for (const w of this.workers) if (!w.cart && !w.loader && !w.porter && (!this.L.foodCollectionTables || !w.feedFor)) { w.loader = true; w.loaderKind = w.feedFor ? 'small' : 'big'; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
       this.refreshStats();
     }
     if (e.sprinkler) for (const id of e.sprinkler) { const f = this.objs[id]; if (f && (f.kind === 'field' || f.kind === 'pond')) { f.growMul = CFG.sprinkler.growMul; f.sprinkler = true; f.sprinklerT = this.t; } }
@@ -690,6 +697,7 @@ export class World {
       w.lumber = w.from.some((id) => this.objs[id] && this.objs[id].item === 'log');
       w.fisher = w.from.some((id) => this.objs[id] && this.objs[id].item === 'fish');   // Fisher look applies to ponds and the valley's winter fish field.
       w.lv = 1; w.trips = 0; w.lvT = -9; w.feedFor = feeder; w.loader = this.loaders && !w.cart && (!this.L.foodCollectionTables || !w.feedFor);
+      if (w.loader) w.loaderKind = w.feedFor ? 'small' : 'big';   // v4.9.8: a hire after the upgrade rides the same vehicle its job would have given it
       w.done = 0; const cm = this.crew && this.crew[this.workers.length];
       if (cm) { w.crewId = cm.id; w.crewName = cm.name; w.crewMul = cm.mul; }
       this.workers.push(w); this.refreshStats();
@@ -1521,7 +1529,7 @@ export class World {
       else if (w.blocked && !w.blocked.hidden) { const z = w.blocked.inZone || w.blocked.zone, k = w.seed | 0; tx = z.cx - 30 + (k % 3) * 8; ty = z.cy + 34 + (k % 2) * 8; w.blocked = null; }   // a blocked sink waits nearby
       else if (w.stack.length) { const o = this.post(w, srcs); tx = o.x; ty = o.y; w.holding = true; w.blocked = null; } // preserve cargo until a compatible sink is available
     }
-    const goal = Math.hypot(tx - w.x, ty - w.y), body = w.loader ? CFG.loader.body : 9;
+    const goal = Math.hypot(tx - w.x, ty - w.y), body = w.loader ? this.loaderCfg(w).body : 9;
     // stuck detection: no real progress for a while while trying to move → force a fresh
     // path; still nothing → give up on this target (pick another plant/pile cell / sink spot)
     const wantMove = goal > 3;
@@ -1543,7 +1551,7 @@ export class World {
     w.lastX = w.x; w.lastY = w.y;
     const k = Math.min(1, dt * 10);
     w.vx += (vx - w.vx) * k; w.vy += (vy - w.vy) * k;
-    this.stepMove(w, dt, w.loader ? CFG.loader.body : 9);
+    this.stepMove(w, dt, w.loader ? this.loaderCfg(w).body : 9);
   }
 
   // v4.3 bot / debug walker: the workers' A* path toward the guide target. navigate's straight-line test skips the
@@ -1668,9 +1676,58 @@ export class World {
     }
     return best;
   }
+  // v4.9.8: the dog's goal can sit inside a solid (the follow spot behind a player standing at a
+  // fence / desk / hedge, a pile cell against a board). The old corner-steer returned the raw
+  // target in that case, so the dog walked into the solid face and stayed there (in 4.9.6 the
+  // fetch to the wooden board pinned it for a whole level). Push the goal out to the nearest
+  // free point — same minimum-penetration rule as collide — so the dog waits at the face instead.
+  dogGoalOut(tx, ty, r) {
+    let x = Math.min(this.W - 18, Math.max(18, tx)), y = Math.min(this.H - 18, Math.max(18, ty));
+    for (let pass = 0; pass < 4; pass++) {
+      let moved = false;
+      for (const s of this.solids) {
+        if (x > s.x - r && x < s.x + s.w + r && y > s.y - r && y < s.y + s.h + r) {
+          const pl = x - (s.x - r), pr = s.x + s.w + r - x, pt = y - (s.y - r), pb = s.y + s.h + r - y;
+          const m = Math.min(pl, pr, pt, pb);
+          if (m === pl) x = s.x - r; else if (m === pr) x = s.x + s.w + r; else if (m === pt) y = s.y - r; else y = s.y + s.h + r;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    return { x, y };
+  }
   dogMove(dt, tx, ty, sp) {
-    const d = this.dog, wp = this.steer(d, tx, ty, 8), ex = wp.x - d.x, ey = wp.y - d.y, e = Math.hypot(ex, ey);
-    const v = e < 2 ? 0 : Math.min(sp, e * 6), k = Math.min(1, dt * 10);
+    const d = this.dog;
+    // v4.9.8: the dog walked with the old corner-steer, the one the workers' A* replaced:
+    // two fences meeting in an L made it pick the corner it was already standing on, forever
+    // (speed 0 when the waypoint is < 2 away). The dog now plans the same A* path the workers
+    // use, toward the clamped goal, with the same stuck watchdog (fresh path, then a dodge).
+    const g = this.dogGoalOut(tx, ty, 8);
+    // (2) pressed against a solid, the dog sits inside that solid's inflated rect, so
+    // navigate's straight-line test ignores the solid and hands back the raw goal — the A*
+    // path is discarded the next frame and the dog walks into the face forever. Step out of
+    // the inflated rect first (4 units clear, so the < 2 dead zone below cannot re-pin it);
+    // the real goal resumes once clear.
+    const out = this.dogGoalOut(d.x, d.y, 12);
+    const goal = Math.hypot(out.x - d.x, out.y - d.y) > 0.5 ? out : g;
+    if (!d.prog) d.prog = { x: d.x, y: d.y, t: this.t };
+    const pg = d.prog, goalDist = Math.hypot(goal.x - d.x, goal.y - d.y);
+    if (goalDist <= 12 || Math.hypot(d.x - pg.x, d.y - pg.y) > 10) { pg.x = d.x; pg.y = d.y; pg.t = this.t; d.unstick = 0; d.dodge = null; }
+    let force = false;
+    if (goalDist > 20 && this.t - pg.t > 1.5 && d.unstick === 0) { d.unstick = 1; force = true; }
+    else if (goalDist > 20 && this.t - pg.t > 3 && d.unstick === 1) {
+      d.unstick = 2; d.path = null;
+      const a = this.rnd() * Math.PI * 2;
+      d.dodge = this.dogGoalOut(d.x + Math.cos(a) * 60, d.y + Math.sin(a) * 60, 8);
+      d.dodgeT = this.t + 1.0;
+    } else if (goalDist > 20 && this.t - pg.t > 5) { pg.t = this.t; d.unstick = 0; }   // retry the cycle (workers do the same)
+    const tgt = (d.dodge && this.t < d.dodgeT) ? d.dodge : goal;
+    const wp = this.navigate(d, tgt.x, tgt.y, 8, force), ex = wp.x - d.x, ey = wp.y - d.y, e = Math.hypot(ex, ey);
+    // v4.9.8 (3): no < 2 dead zone — the old `e < 2 ? 0` pinned the dog 1 unit from its step-out
+    // point (and from any waypoint it had nearly reached) with a far goal still ahead. Speed
+    // already falls to 0 as e shrinks (v = e * 6), so the dog still settles at its goal.
+    const v = Math.min(sp, e * 6), k = Math.min(1, dt * 10);
     d.vx += ((e ? ex / e : 0) * v - d.vx) * k; d.vy += ((e ? ey / e : 0) * v - d.vy) * k;
     this.stepMove(d, dt, 7);
     return Math.hypot(tx - d.x, ty - d.y);
