@@ -2,7 +2,7 @@
 
 > 种菜，卖菜，雇人替你干活。
 
-> 🆕 另一个小游戏：**[半亩·丰收](./harvest/)** —— 走进田地收获、加工、装箱并出售，解锁新关卡、雇工和庄园。现有 60 关；当前 Android 版本为 4.9.6（versionCode 36），第 54–60 关加入早餐与茶点加工。**[在线试玩](https://zilo1002.github.io/Hark-test-game./harvest/)**；安卓 APK 可在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 查看。版本、测试状态和关卡说明见 [harvest/README.md](./harvest/README.md)。
+> 🆕 另一个小游戏：**[半亩·丰收](./harvest/)** —— 走进田地收获、加工、装箱并出售，解锁新关卡、雇工和庄园。现有 60 关；当前 Android 版本为 5.0.4（versionCode 44）。果园改成田里种；60 关都有平木台，工人开车送货，收银台单品类 3×4 摆货，背筐一排、筐里果饱满。**[在线试玩](https://zilo1002.github.io/Hark-test-game./harvest/)**；安卓 APK 可在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 查看。版本、测试状态和关卡说明见 [harvest/README.md](./harvest/README.md)。
 
 一个月下水墨风的放置种田小游戏。纯静态网页：没有构建步骤、没有外部依赖、不联网，打开即玩。手机竖屏优先，电脑用鼠标也行。
 
