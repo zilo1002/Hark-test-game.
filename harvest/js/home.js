@@ -29,6 +29,11 @@ function shadow(g, x, y, rx, ry) {
 function rr(g, x, y, w, h, r, fill, stroke, lw = 1.4) { g.beginPath(); g.roundRect(x, y, w, h, r); g.fillStyle = fill; g.fill(); if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw; g.stroke(); } }
 // v4.0 四季: the estate follows the season of the real week (border trees, lawn, drifting petals / leaves / snow)
 let HSEASON = null;
+// v5.0.9 夜市地图: the estate at night — dark ground, lanterns, a market stall, fireflies.
+// HNIGHT is set by drawHome from save.night (the frame loop passes it); like HSEASON it
+// only affects the estate's look, never gameplay.
+let HNIGHT = false;
+const NIGHT_GROUND = ['#33523E', '#2A4536', '#3A5A44', '#314E3B', '#6B4A30', '#7A8A4A']; // [grass light, grass dark, plot lawn, plot lawn stripe, soil lip, field crop]
 const HS = {
   bg: [['#A8E27A', '#76C84C'], null, ['#C9CC6A', '#A3AE48'], ['#D6E6EF', '#B4CCD9']],
   lawn: ['#92D958', null, '#B9C25A', '#EAF2F6'],
@@ -516,6 +521,30 @@ function lampString(g, t, len) {
   for (let k = 1; k < n; k++) { const u = k / n, x = u * len, y = -38 + Math.sin(u * Math.PI) * 6 + 6 + Math.sin(t * 2 + k) * 0.6;
     rr(g, x - 4, y - 5, 8, 10, 4, '#E8283C', OL, 0.8); g.fillStyle = '#FFC21A'; g.fillRect(x - 2.5, y - 6.4, 5, 1.6); g.fillRect(x - 2.5, y + 4.8, 5, 1.6); g.fillRect(x - 0.4, y + 6.4, 0.8, 3); }
 }
+// v5.0.9 夜市地图: a warm radial glow (drawn on top of the night tint, so the light stays bright)
+function nightGlow(g, x, y, r) {
+  const gr = g.createRadialGradient(x, y, 2, x, y, r);
+  gr.addColorStop(0, 'rgba(255,205,90,0.34)'); gr.addColorStop(1, 'rgba(255,205,90,0)');
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+}
+function nightStall(g, t) {
+  // a decorative night-market stall (visual only: no build spot, no interaction).
+  // Striped awning, warm light spilling from under it, buns and fruit on the counter, one red lantern.
+  shadow(g, 0, 0, 30, 6);
+  g.fillStyle = '#5A3414'; g.fillRect(-29, -46, 3, 46); g.fillRect(26, -46, 3, 46);
+  rr(g, -32, -58, 64, 12, 3, '#E8452C', OL, 1.2);
+  g.fillStyle = '#FFF3DC'; for (let k = 0; k < 4; k++) g.fillRect(-24 + k * 16, -58, 8, 12);
+  const gr = g.createRadialGradient(0, -30, 2, 0, -30, 34);
+  gr.addColorStop(0, 'rgba(255,210,90,0.5)'); gr.addColorStop(1, 'rgba(255,210,90,0)');
+  g.fillStyle = gr; g.beginPath(); g.arc(0, -30, 34, 0, TAU); g.fill();
+  rr(g, -27, -18, 54, 18, 2, '#8E5627', OL, 1.2);
+  rr(g, -29, -21, 58, 5, 2, '#C8874A', OL, 1);
+  for (const [x, c] of [[-18, '#F2CF8A'], [-10, '#E8283C'], [-2, '#FFC21A'], [6, '#F2CF8A'], [14, '#7A3EA8'], [21, '#E8283C']]) { g.fillStyle = c; g.beginPath(); g.arc(x, -24, 3.4, 0, TAU); g.fill(); }
+  const sway = Math.sin(t * 1.8) * 1.2;
+  g.fillStyle = `rgba(255,210,90,${0.3 + 0.12 * Math.sin(t * 3)})`; g.beginPath(); g.arc(sway, -36, 10, 0, TAU); g.fill();
+  g.fillStyle = '#3A2210'; g.fillRect(sway - 0.6, -46, 1.2, 6);
+  rr(g, sway - 4.5, -40, 9, 11, 4, '#E8283C', OL, 0.9); g.fillStyle = '#FFC21A'; g.fillRect(sway - 3, -41.5, 6, 1.6); g.fillRect(sway - 3, -30.5, 6, 1.6);
+}
 // lounging cat (cosmetic): stretched out on its side, breathing, tail swish, the odd ear flick
 function cat2d(g, t, col) {
   const B = col.body, W = col.belly || '#FFFFFF', br = 1 + Math.sin(t * 1.8) * 0.03;
@@ -666,11 +695,11 @@ function inPlot(x, y, m) { return x > PLOT.x - m && x < PLOT.x + PLOT.w + m && y
 // its soil lip, lawn stripes, picket fence and the lane out of the gate. Cached until size / season / page change.
 let GROUND = null;
 function groundLayer(W, H, dpr, L, page) {
-  const key = [W, H, dpr, L.s.toFixed(3), L.ox | 0, L.oy | 0, HSEASON, page].join('|');
+  const key = [W, H, dpr, L.s.toFixed(3), L.ox | 0, L.oy | 0, HSEASON, HNIGHT, page].join('|');
   if (GROUND && GROUND.key === key) return GROUND.cv;
   const cv = GROUND && GROUND.cv || document.createElement('canvas');
   cv.width = Math.max(1, Math.round(W * dpr)); cv.height = Math.max(1, Math.round(H * dpr));
-  const g = cv.getContext('2d'), C = SEASON_GROUND[HSEASON ?? 1] || SEASON_GROUND[1];
+  const g = cv.getContext('2d'), C = HNIGHT ? NIGHT_GROUND : (SEASON_GROUND[HSEASON ?? 1] || SEASON_GROUND[1]);
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.fillStyle = C[0]; g.fillRect(0, 0, W, H);
   const { s, ox, oy } = L;
@@ -681,7 +710,7 @@ function groundLayer(W, H, dpr, L, page) {
   for (let k = Math.floor((x0 - y1) / 56) - 1; k * 56 < x1 - y0; k++) { const a = k * 56; g.beginPath(); g.moveTo(a + y0, y0); g.lineTo(a + 28 + y0, y0); g.lineTo(a + 28 + y1, y1); g.lineTo(a + y1, y1); g.closePath(); g.globalAlpha = 0.45; g.fill(); }
   g.globalAlpha = 1;
   // crop fields in the open land left / right / below the plot (rows of little plants)
-  const crops = HSEASON === 3 ? ['#FFFFFF', '#E6EEF2'] : [C[5], '#5DBB3A', '#E8453C', '#7A3EA8'];
+  const crops = HSEASON === 3 ? ['#FFFFFF', '#E6EEF2'] : HNIGHT ? [C[5], '#4A6B3A', '#8A4A3A', '#5A4A6B'] : [C[5], '#5DBB3A', '#E8453C', '#7A3EA8'];
   for (let gx = Math.floor(x0 / 150) * 150; gx < x1; gx += 150) for (let gy = Math.floor(y0 / 120) * 120; gy < y1; gy += 120) {
     const k = Math.round(gx * 0.7 + gy * 1.3), fx = gx + 14 + (hsh(k + 11) - 0.5) * 16, fy = gy + 16 + (hsh(k + 12) - 0.5) * 12, fw = 120, fh = 88;
     if (inPlot(fx + fw / 2, fy + fh / 2, 150) || hsh(k) < 0.58) continue;
@@ -697,7 +726,7 @@ function groundLayer(W, H, dpr, L, page) {
     if (inPlot(x, y, -6)) continue;
     g.strokeStyle = HSEASON === 3 ? 'rgba(150,180,195,0.6)' : 'rgba(50,120,25,0.5)'; g.lineWidth = 1.3; g.beginPath();
     g.moveTo(x - 3, y); g.lineTo(x - 4, y - 5); g.moveTo(x, y); g.lineTo(x, y - 7); g.moveTo(x + 3, y); g.lineTo(x + 4, y - 5); g.stroke();
-    if (i % 5 === 0 && HSEASON !== 3) { g.fillStyle = ['#FFFFFF', '#FFE14D', '#FF8FB0', '#B98CFF'][i % 4]; g.beginPath(); g.arc(x + 6, y - 3, 2, 0, TAU); g.fill(); }
+    if (i % 5 === 0 && HSEASON !== 3 && !HNIGHT) { g.fillStyle = ['#FFFFFF', '#FFE14D', '#FF8FB0', '#B98CFF'][i % 4]; g.beginPath(); g.arc(x + 6, y - 3, 2, 0, TAU); g.fill(); }
   }
   // woods: trees scattered around the plot (never on it), back ones first
   const trees = [];
@@ -768,6 +797,7 @@ export function hitSpot(W, H, area, page, save, px, py) {
 export function drawHome(g, W, H, save, t, dpr, area, page = 1) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   HSEASON = Number.isInteger(save.season) ? save.season : null;
+  HNIGHT = !!save.night;
   const L = homeLayout(W, H, area), { s, ox, oy } = L;
   g.drawImage(groundLayer(W, H, dpr, L, page), 0, 0, W, H);
   g.save(); g.translate(ox, oy); g.scale(s, s);
@@ -813,9 +843,35 @@ export function drawHome(g, W, H, save, t, dpr, area, page = 1) {
   if (hat && hat !== 'straw') decoHat(g, look); else if (look.scarf) decoHat(g, { scarf: look.scarf });
   g.restore();
   g.restore();
+  // v5.0.9 夜市地图: a dark-blue tint over the whole estate (the global colour filter the
+  // night look needs — it dims the daytime-bright walls and roofs so they sit with the
+  // dark ground instead of clashing with it), then the bright night elements on top:
+  // lantern strings with warm glows, and one market stall. The stall and strings are
+  // drawn after the tint so their light stays bright; the ground itself is already dark
+  // (NIGHT_GROUND in groundLayer), so this is a tint, not a second darkening.
+  if (HNIGHT) {
+    g.fillStyle = 'rgba(10,20,48,0.22)'; g.fillRect(0, 0, W, H);
+    g.save(); g.translate(ox, oy); g.scale(s, s);
+    nightGlow(g, 95, 105, 80); nightGlow(g, 265, 105, 80); nightGlow(g, 180, 415, 80); nightGlow(g, 90, 395, 70);
+    for (const [x, y, L] of [[40, 120, 110], [210, 120, 110], [120, 430, 120]]) { g.save(); g.translate(x, y); lampString(g, t, L); g.restore(); }
+    g.save(); g.translate(90, 420); nightStall(g, t); g.restore();
+    g.restore();
+    // fireflies instead of petals / leaves / snow: slow warm dots hovering with a pulse
+    const h = (k) => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+    for (let k = 0; k < 24; k++) {
+      const x = h(k + 90) * W + Math.sin(t * 0.6 + k * 2.1) * 18;
+      const y = h(k + 50) * H + Math.sin(t * 0.45 + k * 1.3) * 14;
+      const a = 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(t * 2 + k * 2.4));
+      g.fillStyle = '#FFE27A'; g.globalAlpha = a;
+      g.beginPath(); g.arc(x, y, 1.6 + h(k + 7) * 1.2, 0, TAU); g.fill();
+      g.globalAlpha = a * 0.35;
+      g.beginPath(); g.arc(x, y, 4.5 + h(k + 7) * 2, 0, TAU); g.fill();
+    }
+    g.globalAlpha = 1;
+  }
   // drifting petals / leaves / snow over the estate (screen space, a couple of dozen)
   const PSE = fest === 'xmas' ? 3 : HSEASON;   // 圣诞: it snows on the estate too
-  if (PSE === 0 || PSE === 2 || PSE === 3) {
+  if (!HNIGHT && (PSE === 0 || PSE === 2 || PSE === 3)) {
     const n = PSE === 3 ? 40 : 22, h = (k) => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
     for (let k = 0; k < n; k++) {
       const y = (t * (26 + h(k) * 26) + h(k + 50) * (H + 40)) % (H + 40) - 20, x = ((h(k + 90) * (W + 60) + Math.sin(t * 0.8 + k) * 20 + t * 10) % (W + 60)) - 30;

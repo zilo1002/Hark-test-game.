@@ -89,7 +89,7 @@ export class Preview {
       this.stage.rotation.y = 0.45; this.disc.visible = !close;
       this.cam.position.set(0, look + dist * 0.22, dist); this.cam.lookAt(0, look, 0);
     } else {
-      this.show({ kind: 'deco', id: item.id });
+      this.show({ kind: 'deco', id: item.thumb || item.id });   // v5.0.9: a map previews its representative deco (a map has no 3D model)
       const v = this.view; this.stage.rotation.y = 0.5; this.disc.visible = false;
       this.cam.position.set(0, v.look + v.dist * 0.3, v.dist * 0.85); this.cam.lookAt(0, v.look, 0);
     }

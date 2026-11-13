@@ -1,7 +1,8 @@
 // 商店 (v3.4): a persistent 金币 wallet earned by clearing levels, spent on purely cosmetic
 // outfits for the farmer and decorations for the estate. DOM-free (shared with the sims/tests).
 import { CFG } from './config.js';
-import { currentFestival, FESTIVALS } from './festival.js';
+import { currentFestival, FESTIVALS, FEST_IDS } from './festival.js';
+import { valleySeason, currentSeason } from './seasons.js';
 
 // ---- how 金币 are earned -------------------------------------------------------------------
 // every clear: 10 + 2% of what the level earned + 10 per star of this run;
@@ -86,6 +87,69 @@ export const STAR_DECOS = [
   { id: 'moonGate', name: '月亮门', starPrice: 8 },
 ];
 
+// ---- 庄园地图 (v5.0.9): bought with stars, switched on the home screen (never placed as decor).
+// A map is a shop item with a `map` field; owned maps live in data.shop.maps (NOT in
+// data.shop.owned / data.shop.deco), and homeMap.map must always be one of them.
+// `thumb` is an existing deco id used for the shop / tray preview (a map has no 3D model).
+export const MAPS = [
+  { id: 'mapValley', name: '山谷地图', starPrice: 15, map: 'valley', unlockAfter: 45, icon: '🌾', thumb: 'windmill', desc: '庄园换上山谷的季节' },
+  { id: 'mapNight',  name: '夜市地图', starPrice: 20, map: 'night',  unlockAfter: 60, icon: '🏮', thumb: 'lanterns', desc: '夜色庄园，灯笼与摊位' },
+];
+export const MAP_IDS = MAPS.map((m) => m.map);
+export const mapById = (id) => MAPS.find((m) => m.id === id) || null;
+export const mapByMap = (map) => MAPS.find((m) => m.map === map) || null;
+// a map is buyable only once its area is open (valley after level 45, night market after level 60)
+export const mapUnlocked = (data, map) => { const m = mapByMap(map); return !!m && (data.unlocked || 0) >= m.unlockAfter; };
+export const mapOwned = (data, map) => Array.isArray(data.shop && data.shop.maps) && data.shop.maps.includes(map);
+// the switcher's cycle list, in fixed order: the default estate, every owned map, every collected festival map
+export const ownedMapKeys = (data) => {
+  const keys = ['default'];
+  for (const m of MAPS) if (mapOwned(data, m.map)) keys.push(m.map);
+  for (const id of (data.festivalMaps || [])) if (FEST_IDS.includes(id) && !keys.includes(id)) keys.push(id);
+  return keys;
+};
+// which map the home screen is on right now ('default' = 四季庄园, the calendar estate)
+export const currentMapKey = (data) => {
+  const hm = data.homeMap || {};
+  if (hm.mode === 'map' && MAP_IDS.includes(hm.map) && mapOwned(data, hm.map)) return hm.map;
+  if (hm.mode === 'festival' && FEST_IDS.includes(hm.festival) && (data.festivalMaps || []).includes(hm.festival)) return hm.festival;
+  return 'default';
+};
+export const nextMapKey = (data) => {
+  const keys = ownedMapKeys(data);
+  return keys[(keys.indexOf(currentMapKey(data)) + 1) % keys.length];
+};
+export const mapLabel = (key) => {
+  if (key === 'default') return '四季庄园';
+  const m = mapByMap(key); if (m) return m.name;
+  return FESTIVALS[key] ? FESTIVALS[key].name : key;
+};
+export const mapIcon = (key) => {
+  if (key === 'default') return '🏡';
+  const m = mapByMap(key); if (m) return m.icon;
+  return FESTIVALS[key] ? FESTIVALS[key].icon : '🗺️';
+};
+// the estate's display season for the current map (pure; the frame loop and the season badge share it).
+// Valley follows the valley's gameplay season; night follows the calendar week (but renders as night).
+// Resolved through effectiveHomeMap, so a stale homeMap can never pick a season it does not own.
+export const homeSeasonFor = (data) => {
+  const hm = effectiveHomeMap(data);
+  if (hm.mode === 'season') return hm.season;
+  if (hm.mode === 'map' && hm.map === 'valley') return valleySeason(data);
+  return currentSeason();
+};
+// save invariant: a non-default homeMap must point at something the player actually owns;
+// anything else falls back to the default estate (calendar). Used by save.load and by the renderers,
+// so a stale or hand-edited save can never leave the estate on a map the player does not own.
+export const effectiveHomeMap = (data) => {
+  const hm = (data.homeMap && typeof data.homeMap === 'object') ? data.homeMap : {};
+  const cal = { mode: 'calendar', season: null, festival: null, map: null };
+  if (hm.mode === 'season' && Number.isInteger(hm.season) && hm.season >= 0 && hm.season < 4) return { mode: 'season', season: hm.season, festival: null, map: null };
+  if (hm.mode === 'festival' && FEST_IDS.includes(hm.festival) && (data.festivalMaps || []).includes(hm.festival)) return { mode: 'festival', season: null, festival: hm.festival, map: null };
+  if (hm.mode === 'map' && MAP_IDS.includes(hm.map) && mapOwned(data, hm.map)) return { mode: 'map', season: null, festival: null, map: hm.map };
+  return cal;
+};
+
 // ---- 宠物 (v4.0 B): a dog that follows the farmer in levels (and now and then fetches a ripe plant
 // into the stack) and a cat that lounges on the estate. One of each at a time; colour variants.
 export const PETS = [
@@ -120,30 +184,33 @@ export const STAR_UNIFORMS = [
   { id: 'u_star',    uni: true, name: '星空工装',     starPrice: 10, style: { ...U0, shirt: '#2A2A5A', sleeve: '#2A2A5A', vest: '#FFD23F', pants: '#2A2A5A', hat: 'beanie', capColor: '#FFD23F' }, sw: ['#2A2A5A', '#FFD23F'] },
 ];
 
-// all star-shop goods, in shop order (clothes first — Jin asked for clothes — then pets, uniforms, decos)
-export const STAR_ITEMS = [...STAR_OUTFITS, ...STAR_PETS, ...STAR_UNIFORMS, ...STAR_DECOS];
+// all star-shop goods, in shop order (clothes first — Jin asked for clothes — then pets, uniforms, decos, maps)
+export const STAR_ITEMS = [...STAR_OUTFITS, ...STAR_PETS, ...STAR_UNIFORMS, ...STAR_DECOS, ...MAPS];
 // a star-shop item is one with a starPrice (and no coin price); everything else is a coin item
 export const isStar = (it) => !!it && typeof it.starPrice === 'number';
 // the default hired-hand look (the gardener) used for the 制服 preview
 export const WORKER_BASE = { shirt: '#F7F5EE', overalls: '#3567C8', pants: '#3567C8', hair: '#5A3414', hat: 'straw', sleeve: '#F7F5EE' };
 export const uniformStyle = (id) => { const u = UNIFORMS.find((x) => x.id === id) || STAR_UNIFORMS.find((x) => x.id === id); return u ? u.style : null; };
 
-export const itemById = (id) => OUTFITS.find((o) => o.id === id) || STAR_OUTFITS.find((o) => o.id === id) || DECOS.find((d) => d.id === id) || STAR_DECOS.find((d) => d.id === id) || UNIFORMS.find((u) => u.id === id) || STAR_UNIFORMS.find((u) => u.id === id) || PETS.find((p) => p.id === id) || STAR_PETS.find((p) => p.id === id);
+export const itemById = (id) => OUTFITS.find((o) => o.id === id) || STAR_OUTFITS.find((o) => o.id === id) || DECOS.find((d) => d.id === id) || STAR_DECOS.find((d) => d.id === id) || MAPS.find((m) => m.id === id) || UNIFORMS.find((u) => u.id === id) || STAR_UNIFORMS.find((u) => u.id === id) || PETS.find((p) => p.id === id) || STAR_PETS.find((p) => p.id === id);
 // a limited item can be bought only while its festival is on; a 图鉴 reward is never sold
 export const onSale = (it) => !!it && !it.book && (!it.fest || currentFestival() === it.fest);
 export const festName = (it) => (it && it.fest && FESTIVALS[it.fest] ? FESTIVALS[it.fest].name : '');
 
-export function shopDefaults() { return { owned: [], eq: { hat: null, top: null, neck: null, feet: null }, deco: [], uni: null, pet: { dog: null, cat: null } }; }
+export function shopDefaults() { return { owned: [], eq: { hat: null, top: null, neck: null, feet: null }, deco: [], uni: null, pet: { dog: null, cat: null }, maps: [] }; }
 
-// normalise whatever is in the save (old saves have nothing; drop unknown ids)
+// normalise whatever is in the save (old saves have nothing; drop unknown ids).
+// Maps are tracked ONLY in `maps` (never in owned/deco): a map id that leaked into
+// owned/deco (e.g. a hand-edited save) is dropped here, so a map can never be placed as decor.
 export function normShop(s) {
   const d = shopDefaults();
   if (!s || typeof s !== 'object') return d;
-  d.owned = Array.isArray(s.owned) ? s.owned.filter((id) => itemById(id)) : [];
+  d.owned = Array.isArray(s.owned) ? s.owned.filter((id) => { const it = itemById(id); return it && !it.map; }) : [];
   for (const [k] of SLOTS) { const id = s.eq && s.eq[k]; const it = itemById(id); d.eq[k] = it && it.slot === k && d.owned.includes(id) ? id : null; }
-  d.deco = Array.isArray(s.deco) ? s.deco.filter((id) => { const it = itemById(id); return it && !it.slot && !it.uni && !it.pet && d.owned.includes(id); }) : [];
+  d.deco = Array.isArray(s.deco) ? s.deco.filter((id) => { const it = itemById(id); return it && !it.map && !it.slot && !it.uni && !it.pet && d.owned.includes(id); }) : [];
   d.uni = (() => { const u = itemById(s.uni); return u && u.uni && d.owned.includes(s.uni) ? s.uni : null; })();
   for (const k of ['dog', 'cat']) { const id = s.pet && s.pet[k], p = petById(id); d.pet[k] = p && p.pet === k && d.owned.includes(id) ? id : null; }
+  d.maps = Array.isArray(s.maps) ? [...new Set(s.maps.filter((id) => MAP_IDS.includes(id)))] : [];
   return d;
 }
 
@@ -162,6 +229,18 @@ export const starBalance = (data) => Object.values(data.stars || {}).reduce((a, 
 // buy / equip (pure: mutate the save object, return a result code)
 export function buy(data, id) {
   const it = itemById(id); if (!it) return 'unknown';
+  if (it.map) {
+    // maps: owned in data.shop.maps only (never owned/deco); one purchase, atomic star deduction.
+    // The caller Save.saves immediately after 'ok', so a re-entered game can never see a
+    // half-bought map or a refunded star balance.
+    if (mapOwned(data, it.map)) return 'owned';
+    if (!mapUnlocked(data, it.map)) return 'locked';
+    if (starBalance(data) < it.starPrice) return 'poor';
+    data.spent = (data.spent || 0) + it.starPrice;
+    if (!Array.isArray(data.shop.maps)) data.shop.maps = [];
+    data.shop.maps.push(it.map);
+    return 'ok';
+  }
   if (data.shop.owned.includes(id)) return 'owned';
   if (it.book) return 'reward';
   if (!onSale(it)) return 'closed';
@@ -182,6 +261,7 @@ export function buy(data, id) {
 }
 export function toggle(data, id) {
   const it = itemById(id); if (!it || !data.shop.owned.includes(id)) return 'locked';
+  if (it.map) return 'locked';   // maps are switched on the home screen, never placed / worn
   if (it.pet) { data.shop.pet[it.pet] = data.shop.pet[it.pet] === id ? null : id; return data.shop.pet[it.pet] ? 'on' : 'off'; }
   if (it.uni) { data.shop.uni = data.shop.uni === id ? null : id; return data.shop.uni ? 'on' : 'off'; }
   if (it.slot) { data.shop.eq[it.slot] = data.shop.eq[it.slot] === id ? null : id; return data.shop.eq[it.slot] ? 'on' : 'off'; }
@@ -189,5 +269,5 @@ export function toggle(data, id) {
   if (i >= 0) { data.shop.deco.splice(i, 1); return 'off'; }
   data.shop.deco.push(id); return 'on';
 }
-export const isOn = (data, id) => { const it = itemById(id); return !!it && (it.pet ? data.shop.pet[it.pet] === id : it.uni ? data.shop.uni === id : it.slot ? data.shop.eq[it.slot] === id : data.shop.deco.includes(id)); };
+export const isOn = (data, id) => { const it = itemById(id); if (!it || it.map) return false; return it.pet ? data.shop.pet[it.pet] === id : it.uni ? data.shop.uni === id : it.slot ? data.shop.eq[it.slot] === id : data.shop.deco.includes(id); };
 export const levelsTotal = () => CFG.levels.length;

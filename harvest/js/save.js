@@ -1,6 +1,6 @@
 // localStorage save with a graceful in-memory fallback (private mode, blocked storage, file://).
 import { CFG } from './config.js';
-import { shopDefaults, normShop, migrateCoins } from './shop.js';
+import { shopDefaults, normShop, migrateCoins, effectiveHomeMap } from './shop.js';
 import { crewDefaults, normCrew } from './crew.js';
 import { ordersDefaults, normOrders } from './orders.js';
 import { dailyDefaults, normDaily } from './daily.js';
@@ -16,7 +16,7 @@ try {
 export const storageAvailable = () => !!storage;
 
 export function defaults() {
-  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true, mode: 'auto', quality: 'auto' }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults(), daily: dailyDefaults(), book: { ...bookDefaults(), filled: true }, valley: { season: null }, homeMap: { mode: 'calendar', season: null, festival: null }, festivalMaps: [] };
+  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true, mode: 'auto', quality: 'auto' }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults(), daily: dailyDefaults(), book: { ...bookDefaults(), filled: true }, valley: { season: null }, homeMap: { mode: 'calendar', season: null, festival: null, map: null }, festivalMaps: [] };
 }
 
 export function load() {
@@ -43,14 +43,12 @@ export function load() {
     const vs = d.valley && d.valley.season;
     out.valley = { season: Number.isInteger(vs) && vs >= 0 && vs < 4 ? vs : null };
     // v5.1: the estate's display map is independent of gameplay seasons; unlocked festival maps never expire.
-    const hm = d.homeMap && typeof d.homeMap === 'object' ? d.homeMap : {};
-    const mode = ['calendar', 'season', 'festival'].includes(hm.mode) ? hm.mode : 'calendar';
-    out.homeMap = {
-      mode,
-      season: Number.isInteger(hm.season) && hm.season >= 0 && hm.season < 4 ? hm.season : null,
-      festival: typeof hm.festival === 'string' && hm.festival.length <= 40 ? hm.festival : null,
-    };
+    // v5.0.9: homeMap gains a 'map' mode (valley / night). The invariant lives in
+    // effectiveHomeMap (shop.js): a non-default map must be owned (data.shop.maps), or the
+    // estate falls back to the default calendar map — so an old save (no maps list) and a
+    // stale save (map no longer owned) both load cleanly.
     out.festivalMaps = Array.isArray(d.festivalMaps) ? [...new Set(d.festivalMaps.filter((id) => typeof id === 'string' && id.length <= 40))] : [];
+    out.homeMap = effectiveHomeMap({ homeMap: d.homeMap, shop: out.shop, festivalMaps: out.festivalMaps });
     if (out.cur && typeof out.cur !== 'object') out.cur = null;
     return out;
   } catch (_) { return defaults(); }

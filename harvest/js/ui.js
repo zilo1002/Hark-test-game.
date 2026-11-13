@@ -1,7 +1,7 @@
 // DOM layer: HUD, banners, pause menu, home panel, level select, settings, win card.
 import { CFG, goalText } from './config.js';
 import { starsLeft, storageAvailable } from './save.js';
-import { OUTFITS, DECOS, UNIFORMS, PETS, SLOTS, itemById, isOn, onSale, festName, STAR_ITEMS, isStar } from './shop.js';
+import { OUTFITS, DECOS, UNIFORMS, PETS, SLOTS, itemById, isOn, onSale, festName, STAR_ITEMS, isStar, MAPS, mapOwned, mapUnlocked, mapLabel, mapIcon, currentMapKey, homeSeasonFor } from './shop.js';
 import { PAGES, pageEntries, pageProgress, pageDone, claimable, bookTotals } from './book.js';
 import { festivalInfo, nextFestival, FESTIVALS, FEST_IDS } from './festival.js';
 import { ROSTER, TRAITS, traitBonus, xpNeed, CREW } from './crew.js';
@@ -86,7 +86,7 @@ export class UI {
     const seaBtns = (el, restart) => { el.innerHTML = CFG.seasons.map((S, i) => `<button data-s="${i}" class="s${i}">${S.name}</button>`).join('');
       for (const b of el.children) b.onclick = () => { const v = +b.dataset.s; h.valleySeason(v, restart); this.renderSeasonRow(); if (!restart) this.renderLevels(); }; };
     seaBtns($('lvSeaBtns'), false); seaBtns($('pSeaBtns'), true);
-    $('btnValley').onclick = () => { h.tap(); this.openLevels(CFG.areas.findIndex((A) => A.id === 'valley')); }; // v5.0.6: was CFG.areas.length - 1 — the night-market tab is last now, the valley button must still open the valley
+    $('btnValley').onclick = () => { this.h.cycleMap(); }; // v5.0.9: the button is the map switcher now (the valley level list is one tap away on 选择关卡); cycleMap plays its own sound + toast
     $('lvGo').onclick = () => { const li = +$('lvGo').dataset.li; this.closeAll(); h.start(li); };
     swipe($('levelGrid').parentNode, (d) => { const n = Math.max(0, Math.min(CFG.areas.length - 1, this.lvPage + d)); if (n !== this.lvPage) { this.lvPage = n; h.tap(); this.renderLevels(); } });
     // 商店
@@ -95,8 +95,9 @@ export class UI {
     $('shopAct').onclick = () => {
       const it = this.shopSel && itemById(this.shopSel); if (!it) return;
       const d = h.data();
-      if (!d.shop.owned.includes(it.id)) { const r = h.shopBuy(it.id); if (r !== 'ok') { const a = $('shopAct'); a.classList.remove('shake'); void a.offsetWidth; a.classList.add('shake'); } }
-      else h.shopToggle(it.id);
+      const owned = it.map ? mapOwned(d, it.map) : d.shop.owned.includes(it.id);
+      if (owned) { if (it.map) return; h.shopToggle(it.id); }   // v5.0.9: an owned map has nothing to toggle — the home button switches it
+      else { const r = h.shopBuy(it.id); if (r !== 'ok') { const a = $('shopAct'); a.classList.remove('shake'); void a.offsetWidth; a.classList.add('shake'); } }
       this.renderShop();
     };
     // 订单板 / 雇工 / 图鉴 / 每日挑战
@@ -211,6 +212,13 @@ export class UI {
     if (text === this._tip) return;
     this._tip = text; this.el.tip.textContent = text; this.el.tip.classList.remove('hidden');
   }
+  // a light transient toast on the home screen (the #tip pill, auto-cleared): used by the
+  // map switcher ("已切换至夜市地图") and the single-map hint. It never blocks taps.
+  toast(text) {
+    clearTimeout(this._toastT);
+    this.tip(text);
+    this._toastT = setTimeout(() => { if (this._tip === text) this.tip(''); }, 2200);
+  }
   openPause() {
     const w = this.h.world();
     $('pauseSaveInfo').classList.add('hidden');
@@ -245,6 +253,10 @@ export class UI {
     $('playSub').textContent = allDone ? `全部通关！再玩第 ${L} 关` : `第 ${next + 1} 关 · ${CFG.levels[next].name}`;
     this.el.play.dataset.li = next;
     $('btnValley').classList.toggle('hidden', !valleyOpen(data));   // v4.6 四季山谷 entry on the home screen
+    // v5.0.9: the 四季山谷 button is the map switcher — it always shows the current map
+    // (icon + name + switch mark), so the player can see where they are at a glance.
+    const mk = currentMapKey(data);
+    $('btnValley').textContent = `${mapIcon(mk)} ${mapLabel(mk)} ⇄`;
     const restored = new Set(data.restored);
     if (!this.page) this.page = 1;
     if (data.unlocked >= 15 && !this._auto2) { this._auto2 = true; this.page = 2; }   // once past level 15, open on the new farm
@@ -264,7 +276,7 @@ export class UI {
     $('buildHint').textContent = `${doneN}/${metas.length}`;
     // 季节 / 节日: a tiny badge by the title (tap for details)
     const hm = data.homeMap || { mode: 'calendar', season: null, festival: null };
-    const chosenSeason = hm.mode === 'season' && Number.isInteger(hm.season) ? hm.season : seasonInfo().i;
+    const chosenSeason = homeSeasonFor(data);   // v5.0.9: the badge follows the map's season (valley = valley season, night = calendar week)
     const shownFestival = hm.mode === 'festival' && FEST_IDS.includes(hm.festival) && (data.festivalMaps || []).includes(hm.festival) ? FESTIVALS[hm.festival] : (hm.mode === 'calendar' ? festivalInfo() : null);
     for (const id of ['seasonBadge', 'seasonBadge2']) { const sb = $(id); sb.textContent = CFG.seasons[chosenSeason].name; sb.className = `sbadge s${chosenSeason}`; }
     const fb = $('festBadge'); if (shownFestival) { fb.className = `fbadge ${shownFestival.id}`; fb.textContent = shownFestival.name.slice(0, 1); } else fb.className = 'fbadge hidden';
@@ -290,6 +302,21 @@ export class UI {
   renderDecoTray(data) {
     const own = new Set(data.shop.owned), list = DECOS.filter((it) => own.has(it.id) || (!it.fest && !it.book) || onSale(it));
     $('restoreHint').textContent = '摆出来的装饰在庄园和关卡围栏外都看得到';
+    // v5.0.9 地图区 (above the decorations): each map is a card — name, preview, star
+    // price, unlock condition. Unowned → the shop (star tab); owned → "✓ 已拥有" and a
+    // note that the home button switches maps. Locked maps show their unlock level.
+    for (const m of MAPS) {
+      const owned = mapOwned(data, m.map), open = mapUnlocked(data, m.map);
+      const b = document.createElement('button');
+      b.className = 'rbtn deco' + (owned ? ' done on' : open ? ' can' : ' poor');
+      b.innerHTML = `<img alt="" src="${this.h.thumb(m) || ''}"><span>${m.icon} ${m.name}</span><small>${owned ? '✓ 已拥有 · 主页按钮切换' : open ? `★${m.starPrice} 去商店` : `过第 ${m.unlockAfter} 关开放`}</small>`;
+      b.onclick = () => {
+        if (owned) { this.toast('已拥有，在主页“四季山谷”按钮切换'); return; }
+        if (!open) return;
+        this.shopTab = 'star'; this.shopSel = m.id; this.openShop();
+      };
+      this.el.list.appendChild(b);
+    }
     for (const it of list) {
       const b = document.createElement('button'), o = own.has(it.id), on = isOn(data, it.id);
       b.className = 'rbtn deco' + (on ? ' done on' : o ? '' : ' poor');
@@ -336,19 +363,28 @@ export class UI {
       else this.h.homeMap('season', +key.split(':')[1]);
       this.closeAll(); this.renderHome(this.h.data());
     };
-    const owned = (data.festivalMaps || []).filter((id) => FEST_IDS.includes(id));
+    // v5.0.9: the fine-control list — every map the player owns (festival maps + bought
+    // estate maps). The home button cycles; this list picks one directly.
+    const ownedFest = (data.festivalMaps || []).filter((id) => FEST_IDS.includes(id));
+    const ownedMaps = MAPS.filter((m) => mapOwned(data, m.map));
     const festRoot = $('festivalMapChoices');
-    $('festivalMapTitle').classList.toggle('hidden', !owned.length);
-    festRoot.classList.toggle('hidden', !owned.length);
-    festRoot.innerHTML = owned.map((id) => {
+    const anyMap = ownedFest.length + ownedMaps.length > 0;
+    $('festivalMapTitle').textContent = anyMap ? '已拥有的地图' : '已收藏的节日地图';
+    $('festivalMapTitle').classList.toggle('hidden', !anyMap);
+    festRoot.classList.toggle('hidden', !anyMap);
+    festRoot.innerHTML = ownedFest.map((id) => {
       const f = FESTIVALS[id], active = hm.mode === 'festival' && hm.festival === id;
       return `<button class="${active ? 'on' : ''}" data-festival-map="${id}">${f.icon} ${f.name}</button>`;
+    }).join('') + ownedMaps.map((m) => {
+      const active = hm.mode === 'map' && hm.map === m.map;
+      return `<button class="${active ? 'on' : ''}" data-estate-map="${m.map}">${m.icon} ${m.name}</button>`;
     }).join('');
     for (const b of festRoot.children) b.onclick = () => {
-      this.h.homeMap('festival', b.dataset.festivalMap);
+      if (b.dataset.estateMap) this.h.homeMap('map', b.dataset.estateMap);
+      else this.h.homeMap('festival', b.dataset.festivalMap);
       this.closeAll(); this.renderHome(this.h.data());
     };
-    $('homeMapNote').textContent = owned.length ? '节日地图解锁后会一直保留；主页地图只改变庄园外观，不影响关卡效果。' : '先在节日活动期间进入游戏，即可永久收藏该节日地图。切换只影响庄园外观，不影响关卡效果。';
+    $('homeMapNote').textContent = anyMap ? '地图解锁后会一直保留；主页地图只改变庄园外观，不影响关卡效果。' : '先在节日活动期间进入游戏，即可永久收藏该节日地图；庄园地图在装扮里用星星兑换。切换只影响庄园外观，不影响关卡效果。';
     $('seasonText').textContent = `${si.full}（第 ${si.day} 天）· 当季 ${cropNames(si.crops).join(' ')} 生长 +${Math.round(CFG.season.bonus * 100)}% · ${si.left <= 1 ? '明天换季' : `${si.left} 天后换季`}`;
     const fb = $('festBanner');
     if (fi) { fb.className = `fest ${fi.id}`; $('festBadge2').textContent = fi.name.slice(0, 1); $('festText').textContent = `${fi.name}活动 · ${fi.desc} · ${fi.left <= 1 ? '今天最后一天' : `还剩 ${fi.left} 天`} · 商店有限定`; }
@@ -371,7 +407,9 @@ export class UI {
   shopList() {
     const d = this.h.data(), own = (it) => d.shop.owned.includes(it.id);
     const L = this.shopTab === 'outfit' ? OUTFITS : this.shopTab === 'uni' ? UNIFORMS : this.shopTab === 'pet' ? PETS : this.shopTab === 'star' ? STAR_ITEMS : DECOS;
-    return L.filter((it) => (!it.fest && !it.book) || own(it) || (it.fest && onSale(it)));
+    // v5.0.9: a map shows in the star tab only once its area is open (or once owned);
+    // the 装扮 screen is where a locked map is discovered.
+    return L.filter((it) => it.map ? (mapOwned(d, it.map) || mapUnlocked(d, it.map)) : ((!it.fest && !it.book) || own(it) || (it.fest && onSale(it))));
   }
   renderShop() {
     const d = this.h.data(), list = this.shopList();
@@ -382,7 +420,7 @@ export class UI {
     const priceHtml = (x) => isStar(x) ? `★${x.starPrice}` : `<i class="gc"></i>${x.price}`;
     const g = $('shopGrid'); g.innerHTML = '';
     for (const it of list) {
-      const b = document.createElement('button'), own = d.shop.owned.includes(it.id), on = isOn(d, it.id);
+      const b = document.createElement('button'), own = it.map ? mapOwned(d, it.map) : d.shop.owned.includes(it.id), on = isOn(d, it.id);
       b.className = 'sitem' + (own ? ' owned' : afford(it) ? ' can' : ' poor') + (on ? ' on' : '') + (it.id === this.shopSel ? ' sel' : '');
       b.dataset.id = it.id;
       const slot = it.slot ? SLOTS.find((x) => x[0] === it.slot)[1] : '';
@@ -392,12 +430,12 @@ export class UI {
       b.onclick = () => { this.shopSel = it.id; this.h.tap(); this.renderShop(); };
       g.appendChild(b);
     }
-    const it = itemById(this.shopSel), own = d.shop.owned.includes(it.id), on = isOn(d, it.id), a = $('shopAct');
+    const it = itemById(this.shopSel), own = it.map ? mapOwned(d, it.map) : d.shop.owned.includes(it.id), on = isOn(d, it.id), a = $('shopAct');
     $('shopName').textContent = it.name;
     const petSub = it.pet === 'dog' ? (own ? (on ? '关卡里跟着你，偶尔叼来作物' : '在家休息') : '关卡里跟着你跑，偶尔叼来附近的作物放进背篓') : it.pet === 'cat' ? (own ? (on ? '在庄园里晒太阳' : '在家休息') : '在庄园门前懒洋洋地晒太阳') : '';
-    $('shopSub').textContent = it.pet ? petSub : (it.fest && !own ? `${festName(it)}限定 · 活动结束就买不到了 · ` : '') + (it.uni ? (own ? (on ? '所有雇工都穿着' : '一次只能穿一套') : '买了雇工们马上换上') : it.slot ? `${SLOTS.find((x) => x[0] === it.slot)[1]}${own ? '' : ' · 买了自动穿上'}` : own ? (on ? '庄园和关卡里都看得到' : '收在仓库里') : '摆在庄园，关卡围栏外也有');
-    a.className = 'small ' + (own ? (on ? 'off' : 'warm') : afford(it) ? 'warm' : 'poor');
-    a.innerHTML = own ? (it.slot || it.uni ? (on ? '脱下' : '穿上') : it.pet ? (on ? '让它休息' : '带上它') : (on ? '收起来' : '摆出来')) : `购买 ${priceHtml(it)}`;
+    $('shopSub').textContent = it.map ? (own ? '已拥有 · 在主页“四季山谷”按钮切换' : `${it.desc} · 买了就能在主页切换`) : it.pet ? petSub : (it.fest && !own ? `${festName(it)}限定 · 活动结束就买不到了 · ` : '') + (it.uni ? (own ? (on ? '所有雇工都穿着' : '一次只能穿一套') : '买了雇工们马上换上') : it.slot ? `${SLOTS.find((x) => x[0] === it.slot)[1]}${own ? '' : ' · 买了自动穿上'}` : own ? (on ? '庄园和关卡里都看得到' : '收在仓库里') : '摆在庄园，关卡围栏外也有');
+    a.className = 'small ' + (own ? (it.map ? 'off' : (on ? 'off' : 'warm')) : afford(it) ? 'warm' : 'poor');
+    a.innerHTML = own ? (it.map ? '已拥有' : (it.slot || it.uni ? (on ? '脱下' : '穿上') : it.pet ? (on ? '让它休息' : '带上它') : (on ? '收起来' : '摆出来'))) : `购买 ${priceHtml(it)}`;
     const nf = nextFestival(), fi = festivalInfo();
     $('shopHow').textContent = this.shopTab === 'star' ? '星星是过关拿到的（每关 1–3 颗）。庄园和星星商店共用一个星星钱包，买了衣服就少了修庄园的星。买不全没关系：回去把老关刷到 3★，星星就回来了。'
       : this.shopTab === 'pet' ? '小狗：关卡里跟着你，大约每 9 秒叼回 1–2 个附近成熟的作物（背篓满了就只跟着）。小猫：庄园里的装饰伙伴。各一只，可以随时换。'
@@ -407,6 +445,7 @@ export class UI {
   shopView() {
     const d = this.h.data(), it = itemById(this.shopSel || '');
     if (it && isStar(it)) {   // v5.0.7 星星 tab: dispatch by the item's own kind, not the tab
+      if (it.map) return { kind: 'deco', id: it.thumb || 'lanterns' };   // v5.0.9: a map has no 3D model — preview its representative deco
       if (it.pet) return { kind: 'pet', id: it.id };
       if (it.uni) return { kind: 'person', uni: it.id, style: it.style };
       if (it.slot) { const eq = { ...d.shop.eq }; eq[it.slot] = it.id; return { kind: 'person', eq }; }

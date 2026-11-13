@@ -10,8 +10,8 @@ android {
         applicationId = "com.zilo.banmuharvest"
         minSdk = 24
         targetSdk = 34
-        versionCode = 48
-        versionName = "5.0.8"
+        versionCode = 49
+        versionName = "5.0.9"
     }
 
     // fixed debug key (checked in) so every debug build installs over the previous one

@@ -39,6 +39,20 @@ const ITEM_BITS = { wheat: ['#F6CB4A', '#FFE07A', '#C9962A'], potato: ['#5DBB3A'
                     log: ['#9A5A2E', '#F2CF8A', '#5DBB3A', '#C99A5E'], corn: ['#FFD23F', '#6CCB3E', '#F2B529'], pumpkin: ['#F2871E', '#5DBB3A', '#FFAE58'], berry: ['#E8243C', '#5DBB3A', '#FFFFFF'],
                     fish: ['#BDE8FF', '#FFFFFF', '#4FA8F0', '#FF8A3D'], grape: ['#7A3EA8', '#8E4EC0', '#5DBB3A'], pepper: ['#E8302C', '#FFC21A', '#5DBB3A'], chips: ['#FFD23F', '#E8302C'] };
 
+// v5.0.9: the estate's display map. One setter for every mode, so the switcher, the
+// season popup and the shop all go through the same validation + save. 'map' accepts
+// only a map the player owns (data.shop.maps); anything else is rejected, so homeMap.map
+// can never point at an unowned map. Switching maps replaces the whole homeMap object,
+// which is also how a locked season (mode 'season') is cleared.
+function setHomeMap(mode, value = null) {
+  if (mode === 'calendar') data.homeMap = { mode: 'calendar', season: null, festival: null, map: null };
+  else if (mode === 'season' && Number.isInteger(value) && value >= 0 && value < 4) data.homeMap = { mode: 'season', season: value, festival: null, map: null };
+  else if (mode === 'festival' && Fest.FEST_IDS.includes(value) && (data.festivalMaps || []).includes(value)) data.homeMap = { mode: 'festival', season: null, festival: value, map: null };
+  else if (mode === 'map' && Shop.MAP_IDS.includes(value) && Shop.mapOwned(data, value)) data.homeMap = { mode: 'map', season: null, festival: null, map: value };
+  else return false;
+  Save.save(data); snd.play('appear'); hap.tick(14, 0); return true;
+}
+
 const ui = new UI({
   home: () => goHome(),
   play: () => { snd.unlock(); snd.play('tap'); const li = +ui.el.play.dataset.li || 0; start(li); },
@@ -99,12 +113,24 @@ const ui = new UI({
     Save.save(data); snd.play('appear'); hap.tick(14, 0);
     if (restart && world && Seasons.isValleyLi(world.li) && world.season !== s) { const li = world.li; world = null; start(li); }
   },
-  homeMap: (mode, value = null) => {
-    if (mode === 'calendar') data.homeMap = { mode: 'calendar', season: null, festival: null };
-    else if (mode === 'season' && Number.isInteger(value) && value >= 0 && value < 4) data.homeMap = { mode: 'season', season: value, festival: null };
-    else if (mode === 'festival' && Fest.FEST_IDS.includes(value) && (data.festivalMaps || []).includes(value)) data.homeMap = { mode: 'festival', season: null, festival: value };
-    else return false;
-    Save.save(data); snd.play('appear'); hap.tick(14, 0); return true;
+  homeMap: (mode, value = null) => setHomeMap(mode, value),
+  // v5.0.9: the home map switcher (the 四季山谷 button under 选择关卡). Cycles through the
+  // maps the player owns; with only one map it stays put and says so (the button is not
+  // broken, there is just nothing else to switch to). Switching clears a locked season
+  // (mode 'season') because each map brings its own season; nothing else is changed.
+  // Purchase stays in the 装扮 screen, use stays on this button — the switcher never
+  // jumps to a purchase prompt.
+  cycleMap: () => {
+    const keys = Shop.ownedMapKeys(data);
+    if (keys.length <= 1) { ui.toast('只有四季庄园一张地图，去装扮兑换更多地图'); snd.play('full'); hap.tick(30, 0); return false; }
+    const next = Shop.nextMapKey(data);
+    const wasSeason = !!(data.homeMap && data.homeMap.mode === 'season');
+    let ok = false;
+    if (next === 'default') ok = setHomeMap('calendar');
+    else if (Shop.MAP_IDS.includes(next)) ok = setHomeMap('map', next);
+    else ok = setHomeMap('festival', next);
+    if (ok) { ui.toast(wasSeason ? `已切换至${Shop.mapLabel(next)}，解除季节锁定` : `已切换至${Shop.mapLabel(next)}`); ui.renderHome(data); }
+    return ok;
   },
   dailyStart: () => { snd.unlock(); snd.play('tap'); startDaily(); },
   locked: () => { snd.play('full'); hap.tick(30, 0); },
@@ -380,10 +406,14 @@ function frame(now) {
     saveT += dt; if (saveT > 5) { saveT = 0; snapshot(); }
   } else {
     fx.update(dt);
-    const hm = data.homeMap || { mode: 'calendar', season: null, festival: null };
-    const homeSeason = hm.mode === 'season' && Number.isInteger(hm.season) ? hm.season : Seasons.currentSeason();
-    const homeFestival = hm.mode === 'festival' && (data.festivalMaps || []).includes(hm.festival) ? hm.festival : (hm.mode === 'calendar' ? Fest.currentFestival() : null);
-    drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: homeSeason, fest: homeFestival, build: ui.build }, time, R.dpr, areaRect(), ui.page || 1);
+    // v5.0.9: the estate's display map / season / night all resolve through the same
+    // helpers the button and the badge use, so the canvas, the button and the badge
+    // always agree — and a stale homeMap (map no longer owned) renders as the default.
+    const hm = Shop.effectiveHomeMap(data);
+    const homeSeason = Shop.homeSeasonFor(data);
+    const homeFestival = hm.mode === 'festival' ? hm.festival : (hm.mode === 'calendar' ? Fest.currentFestival() : null);
+    const homeNight = hm.mode === 'map' && hm.map === 'night';
+    drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: homeSeason, fest: homeFestival, night: homeNight, build: ui.build }, time, R.dpr, areaRect(), ui.page || 1);
     R.g.setTransform(R.dpr, 0, 0, R.dpr, 0, 0); R.fxScreen(fx);
     if (preview && ui.shopOpenNow()) {   // turntable preview inside the shop
       const c = preview.cv, w = c.clientWidth, h = c.clientHeight;
