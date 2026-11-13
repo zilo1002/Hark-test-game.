@@ -648,6 +648,8 @@ export class World {
     t.cool = 1.0;
     if (t.repeat && t.bought < t.repeat.times) t.price = Math.round(t.price0 * Math.pow(t.repeat.mul, t.bought));
     else t.done = true;
+    // v5.0.8: a machine upgrade bought once shows "II" — the next purchase is Lv2.
+    if (t.effect.procUp && t.bought === 1 && t.repeat && t.bought < t.repeat.times && !t.label.endsWith(' II')) t.label += ' II';
     this.updateTileVis(silent);
   }
   applyEffect(e, t, silent) {
@@ -1847,6 +1849,19 @@ export class World {
       const t = this.tiles.find((x) => x.id === ts.id); if (!t) continue;
       for (let k = 0; k < ts.bought && !t.done; k++) this.completeTile(t, true);
       t.paid = Math.min(ts.paid || 0, t.price - 1);
+    }
+    // v5.0.8 migration: a food-level `proc` tile that covered several machines was
+    // split into one procUp tile per machine. An old save that bought the single tile
+    // upgraded ALL of them (×0.42); the new sibling tiles (marked fromProc) have no
+    // saved record, so grant them one purchase (Lv1) when the original tile was bought
+    // and the sibling is absent from the save. A save made in v5.0.8+ lists the sibling
+    // (bought 0+), so it is never migrated twice — and a player who only bought one
+    // machine's path in the new version keeps exactly that.
+    const savedIds = new Set((s.tiles || []).map((ts) => ts.id));
+    const savedBought = new Map((s.tiles || []).map((ts) => [ts.id, ts.bought || 0]));
+    for (const t of this.tiles) {
+      if (!t.fromProc || savedIds.has(t.id)) continue;
+      if ((savedBought.get(t.fromProc) || 0) > 0) this.completeTile(t, true);
     }
     this.t = s.t || 0; this.money = s.money || 0;
     if (s.stats) this.stats = { collected: {}, sold: {}, produced: {}, golden: {}, earned: 0, unlocks: 0, ...s.stats };

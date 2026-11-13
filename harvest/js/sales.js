@@ -275,6 +275,42 @@ function splitFoodLevel(L0) {
       req: firstMachineTile ? [firstMachineTile.id] : [first.id],
       effect: { worker: { from: boards, to: [sale.id], tally: true } } });
   }
+  // v5.0.8: food machines get the same two-tier upgrade path as machine levels
+  // (procUp Lv1 ×0.42, Lv2 ×0.7, cumulative ×0.294). A config `proc` tile that sped
+  // up several machines becomes one procUp path per machine (same as splitSales0
+  // step 4); machines with no upgrade get their own path (step 7). No one-time
+  // `proc` tile is left behind — a single upgrade system for every machine.
+  // The k>0 sibling tiles carry `fromProc` (the original tile id) so an old save
+  // that bought the single tile keeps its upgrade on every machine (see restore()).
+  const upgraded = new Set();
+  for (const t of tiles.slice()) {
+    if (!t.effect.proc) continue;
+    const ids = t.effect.proc.map((pe) => pe.id).filter((id) => procs.some((p) => p.id === id));
+    if (!ids.length) continue;
+    const price = Math.round(t.price * CFG.procUp.price / Math.sqrt(ids.length));
+    ids.forEach((id, k) => {
+      upgraded.add(id);
+      let u = t;
+      if (k > 0) {
+        const p = procs.find((q) => q.id === id);
+        const sp = spot(L, p.x + 10, p.y + 80);
+        u = add({ id: 'u_' + id, x: sp[0], y: sp[1], icon: t.icon, label: t.label, fromProc: t.id });
+      }
+      u.price = price; u.effect = { procUp: id }; u.repeat = { times: CFG.v43.mup.times, mul: CFG.v43.mup.mul };
+      u.req = (u.req || []).filter((r) => r !== t.id || u === t);
+      if (k > 0) u.req = [];
+      const mt = tileForObject(id);
+      if (mt && mt !== u && !(u.req || []).includes(mt.id)) u.req = [...(u.req || []), mt.id];
+    });
+  }
+  for (const p of procs) {
+    if (upgraded.has(p.id)) continue;
+    const mt = tileForObject(p.id);
+    const sp = spot(L, p.x + 10, p.y + 80);
+    add({ id: 'u_' + p.id, x: sp[0], y: sp[1], price: r10(hirePrice * CFG.v43.mup.base), icon: 'gear',
+          label: '快' + (MNAME[p.out] || '机器'), req: mt ? [mt.id] : [first.id],
+          repeat: { times: CFG.v43.mup.times, mul: CFG.v43.mup.mul }, effect: { procUp: p.id } });
+  }
   // Keep every tile's prerequisite references valid and place the new hires early after the starter tile.
   const ids = new Set(tiles.map((t) => t.id));
   tiles = tiles.filter((t) => (t.req || []).every((id) => ids.has(id)));
