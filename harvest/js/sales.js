@@ -322,24 +322,29 @@ function splitFoodLevel(L0) {
   // v5.1.2 (A补): the clerk also CARRIES raw goods — from the raw wooden stands
   // (R_<crop>) to C1. In food levels nobody stocks C1 except the player, so while
   // Jin is busy with the machines the raw counter runs dry and regular customers
-  // leave. Raw carrier (raw: true) with no batch gate — it is NOT a feeder, NOT a
+  // leave. Raw carrier (raw: true) — it is NOT a feeder, NOT a
   // porter, and NOT a tally clerk: it carries no `tally` flag, because the sim
   // checks use `tally` to mean the processed-goods tally clerk (delivers to PS
-  // only); flagging the clerk as tally would misidentify it. No fullBatch, so it
-  // delivers partial loads; only raw goods, only when the counter needs topping
+  // only); flagging the clerk as tally would misidentify it. Only raw goods, only when the counter needs topping
   // up (sinkOpen's rawLow/rawFull gate). Cashier stays — one tile, two jobs, no
   // extra hire. Old saves get the carrying automatically: restore() re-applies
   // the current tile effect for every bought tile.
-  // `clerk: true` marks the carrying worker: it stays ON FOOT (no loader, cap
-  // fixed at base 50 — see world.js). A loader would let it hoard up to 180 raw
-  // goods while the counter only ever needs ~50, starving the machine feeders'
-  // buffer and slowing the processed counter (fit: L13/L22/L51/L52 PS front
-  // wait +0.4-0.5 s over the limit, v5.1.1 baseline was 37/37).
+  // v5.1.4: fullBatch — Jin: 一次拿满、一次放满. The clerk waits for a full
+  // load (cap items) and drops it all on C1 at once, then goes back for another
+  // full load; no more partial dribbles. It also rides a loader now (see
+  // world.js): when workers upgrade to trucks, the clerk upgrades too.
+  // `clerk: true` marks the carrying worker: its carrying capacity stays fixed
+  // at base 50 (see world.js) — a loader would otherwise let it hoard up to 180
+  // raw goods while the counter only ever needs ~50, starving the machine
+  // feeders' buffer and slowing the processed counter (fit: L13/L22/L51/L52 PS
+  // front wait +0.4-0.5 s over the limit, v5.1.1 baseline was 37/37). The loader
+  // gives it speed and the truck look; the cap stays 50 so every batch stays
+  // fillable from a deep raw stand (same rule as the v5.1.1 chain specialist).
   if (sale && main) {
     const pos = spot(L, main.x - 90, main.y + 100);
     const rawStands = stands.filter((x) => x.role === 'raw' && main.items.includes(x.item)).map((x) => x.id);
     const eff = { cashier: [main.id] };
-    if (rawStands.length) eff.worker = { from: rawStands, to: [main.id], raw: true, clerk: true };
+    if (rawStands.length) eff.worker = { from: rawStands, to: [main.id], raw: true, clerk: true, fullBatch: true };
     add({ id: 'food_clerk', x: pos[0], y: pos[1], price: hirePrice, icon: 'cashier', label: '普通售货员',
       req: firstMachineTile ? [firstMachineTile.id] : [first.id],
       effect: eff });

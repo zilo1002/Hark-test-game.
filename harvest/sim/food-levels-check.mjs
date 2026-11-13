@@ -83,7 +83,10 @@ for (const [lv, [name, outputs]] of expected) {
     assert.equal(w.workers.length, L.tiles.filter(t => t.effect?.worker).length, `level ${lv} all one-per-field and one-per-machine hires can be bought`);
     const workerRoutes = w.workers.map(x => ({ from: x.from[0], to: x.to[0], feed: x.feedFor, tally: x.tally }));
     for (const x of w.workers) if (x.feedFor) assert.equal(x.loader, false, `level ${lv}: machine specialist keeps normal-batch capacity after loader upgrade`);
-    if (w.loaders) for (const x of w.workers) if (!x.feedFor && !x.cart && !x.porter && !x.clerk) assert.equal(x.loader, true, `level ${lv}: field/stand worker retains loader upgrade`);
+    // v5.1.4: the regular salesperson (clerk) rides a loader too — Jin: 换货车
+    // 的时候理货员也要换. It is included here (no !x.clerk exclusion): a clerk
+    // hired before the upgrade must keep its truck, same as field/stand workers.
+    if (w.loaders) for (const x of w.workers) if (!x.feedFor && !x.cart && !x.porter) assert.equal(x.loader, true, `level ${lv}: field/stand worker retains loader upgrade`);
     const hadLoaderUpgrade = w.loaders; w.loaders = true;
     const lateFeeder = w.addWorker(['F1'], ['M1'], 0, 0, false, 'M1');
     assert.equal(lateFeeder.loader, false, `level ${lv}: a feeder hired after loader upgrade also keeps normal-batch capacity`);

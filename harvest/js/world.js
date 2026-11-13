@@ -584,6 +584,10 @@ export class World {
       // still grows with level, as for chain workers). Its counter only ever
       // needs ~50 raw goods per top-up; a growing cap would hoard stand stock
       // the machine feeders need. The crew roster bonus must not grow it either.
+      // v5.1.4: the clerk now RIDES a loader (speed + truck look, see the buy
+      // handler below) — but the cap stays fixed here, so the loader never
+      // turns a 50-item batch into a 180-item hoard. Same rule as the v5.1.1
+      // chain specialist: vehicle for speed, base cap for a fillable batch.
       if (w.clerk) w.cap = CFG.worker.cap + u.wcap;
       w.pickR = Wk.pickR; w.harvestR = Wk.harvestR;
       w.cutRate = Wk.cutRate || 0; w.pickRate = Wk.pickRate; w.dropRate = Wk.dropRate;
@@ -687,22 +691,22 @@ export class World {
       if (e.worker.standCarrier) w.standCarrier = true;
       if (e.worker.fullBatch) w.fullBatch = true;
       if (e.worker.tally) w.tally = true;   // v4.9.9 理货员 (processed boards → goods counter, no batch gate)
-      // v5.1.2 (A补): the regular salesperson (clerk) stays ON FOOT — it walks the
-      // short stand → raw counter leg, and a loader would let it hoard up to 180
-      // raw goods while the counter only ever needs ~50, starving the machine
-      // feeders' buffer. Clear any loader addWorker gave it (hired after the
-      // loader upgrade); the upgradeWorkers handler below also skips clerks.
-      // Recompute stats right away: addWorker already ran refreshStats with the
-      // loader on, so the cap would otherwise stay at the loader value (180)
-      // until some later purchase recomputed it.
-      if (e.worker.clerk) { w.clerk = true; w.loader = false; w.loaderKind = null; this.refreshStats(); }
+      // v5.1.4: the regular salesperson (clerk) rides a loader like other
+      // workers — Jin: 工人换货车的时候理货员也要换货车. addWorker already gave
+      // it a loader when the upgrade was bought (no feedFor → big shovel
+      // loader); keep it. The capacity stays fixed at base 50 in refreshStats
+      // above, so the loader gives speed + the truck look without turning a
+      // 50-item batch into a 180-item hoard. Recompute stats right away so a
+      // clerk hired after the upgrade gets the loader speed immediately.
+      if (e.worker.clerk) { w.clerk = true; this.refreshStats(); }
     }
     if (e.upgradeWorkers === 'loader') {
       this.loaders = true;
       // v4.9.8: two vehicles from one upgrade — harvest workers ride the big shovel loader,
       // machine feeders (feedFor) drive the small forklift. Carts and processed-goods porters
-      // keep their own rigs, as before.
-      for (const w of this.workers) if (!w.cart && !w.loader && !w.porter && !w.clerk && (!this.L.foodCollectionTables || !w.feedFor)) { w.loader = true; w.loaderKind = w.feedFor ? 'small' : 'big'; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
+      // keep their own rigs, as before. v5.1.4: clerks ride too (no feedFor → big
+      // shovel loader, same as harvest workers) — Jin: 换货车的时候理货员也要换.
+      for (const w of this.workers) if (!w.cart && !w.loader && !w.porter && (!this.L.foodCollectionTables || !w.feedFor)) { w.loader = true; w.loaderKind = w.feedFor ? 'small' : 'big'; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
       this.refreshStats();
     }
     if (e.sprinkler) for (const id of e.sprinkler) { const f = this.objs[id]; if (f && (f.kind === 'field' || f.kind === 'pond')) { f.growMul = CFG.sprinkler.growMul; f.sprinkler = true; f.sprinklerT = this.t; } }
@@ -1532,7 +1536,12 @@ export class World {
       if (nl > w.lv) { w.lv = nl; w.lvT = T; this.refreshStats(); this.emit('workerLevel', { x: w.x, y: w.y, lv: nl }); }
     }
     // v4.6 分工: nobody fills up for a sink that has no room (full counter / machine) — collect a fair batch, then wait at a post
-    if (this.smart && !w.feedFor && w.state === 'collect' && w.stack.length >= Math.ceil(w.cap * CFG.v46.holdAt)) {
+    // v5.1.4: fullBatch workers are exempt — they must hold a complete load to
+    // deliver (Jin: 一次拿满、一次放满). Letting holdAt send a half-full clerk
+    // to the counter would drop a partial load the moment the counter reopened.
+    // A fullBatch worker instead fills up, then waits in 'deliver' until the
+    // sink has room (the deliver-state sinkOpen gate below blocks it there).
+    if (this.smart && !w.feedFor && !w.fullBatch && w.state === 'collect' && w.stack.length >= Math.ceil(w.cap * CFG.v46.holdAt)) {
       const items = new Set(srcs.map((o) => o.item));
       if (!sinks.some((k) => this.sinkOpen(w, k) && (k.kind === 'counter' ? [...items].some((t) => k.items.includes(t)) : k.kind === 'stand' ? items.has(k.item) : items.has(k.inItem)))) w.state = 'deliver';
     }
