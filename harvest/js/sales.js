@@ -84,6 +84,16 @@ function saveStand(L, stands, stand) { stands.push(stand); L.objects.push(stand)
 // the level takes twice as long (L47 +3:48, L49 +3:16). The board is there for the player
 // to heap and package on (the level-3 pattern); machine levels, where a feeder carries
 // board -> machine, do route through it (see splitSales0 step 0.5 / 2b).
+// v5.1.5: Jin — 没有机器加工的关卡，农工收割也要放在木台上 (要不然后面就没法玩了).
+// The board now JOINS the counter in the harvest workers' `to` (dual-target), instead
+// of replacing it. The deliver logic already prefers a low counter (x0.004 below
+// rawLow), so the counter stays topped up and the worker fills the board the rest of
+// the time; when the board cannot take the whole load it is blocked (all-or-nothing)
+// and the worker falls back to the counter — no freeze, because the counter is always
+// an alternative sink (unlike a machine level's farmhand, whose only sink is the board,
+// which is the L25 freeze). This is NOT the v4.9.7 reroute: the counter is never
+// starved, so the bot does not have to shuttle. No partial-drop (that fix was tried
+// and reverted: L53 3★->2★, L27/L32 fit waits over 3.0s).
 function addRawStands(L0) {
   const L = { ...L0, objects: L0.objects.map((o) => ({ ...o, items: o.items ? o.items.slice() : o.items })),
               tiles: L0.tiles.map((t) => ({ ...t, effect: { ...t.effect }, req: t.req ? t.req.slice() : t.req })) };
@@ -97,6 +107,23 @@ function addRawStands(L0) {
     const y = src.reduce((n, o) => n + o.y + o.h / 2, 0) / src.length;
     const [sx, sy] = standSpot(L, stands, x, y, 120, 60);   // v4.9.7: the raw board is BIG (Jin: 一个大木台子) — a wide pile keeps 3-4 workers from stacking on one spot
     saveStand(L, stands, { id: `R_${item}`, type: 'stand', role: 'raw', item, x: sx, y: sy, w: 120, h: 60, cap: 300 });
+  }
+  // v5.1.5: dual-target — a harvest worker (field/coop -> counter) also heaps onto
+  // the raw board of what it carries. Only harvest workers are touched: porters
+  // (from a tray/stand) and workers already bound for a stand keep their route.
+  // standByItem covers pre-existing boards too (level 3's T1), not just the ones
+  // created above.
+  const standByItem = new Map(L.objects.filter((o) => o.type === 'stand' && o.role === 'raw').map((s) => [s.item, s.id]));
+  for (const t of L.tiles) {
+    const w0 = t.effect && t.effect.worker;
+    if (!w0 || !w0.from || !w0.to) continue;
+    const fromObjs = w0.from.map((id) => L.objects.find((o) => o.id === id)).filter(Boolean);
+    if (!fromObjs.some((o) => o.type === 'field' || o.type === 'coop')) continue;
+    if (!w0.to.some((id) => { const o = L.objects.find((x) => x.id === id); return o && o.type === 'counter'; })) continue;
+    const items = [...new Set(fromObjs.filter((o) => o.type === 'field' || o.type === 'coop').map(sourceObj))];
+    const add = items.map((it) => standByItem.get(it)).filter(Boolean);
+    const to = [...new Set([...w0.to, ...add])];
+    if (to.length !== w0.to.length) t.effect.worker = { ...w0, to };
   }
   return L;
 }
