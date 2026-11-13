@@ -83,7 +83,7 @@ for (const [lv, [name, outputs]] of expected) {
     assert.equal(w.workers.length, L.tiles.filter(t => t.effect?.worker).length, `level ${lv} all one-per-field and one-per-machine hires can be bought`);
     const workerRoutes = w.workers.map(x => ({ from: x.from[0], to: x.to[0], feed: x.feedFor, tally: x.tally }));
     for (const x of w.workers) if (x.feedFor) assert.equal(x.loader, false, `level ${lv}: machine specialist keeps normal-batch capacity after loader upgrade`);
-    if (w.loaders) for (const x of w.workers) if (!x.feedFor && !x.cart && !x.porter) assert.equal(x.loader, true, `level ${lv}: field/stand worker retains loader upgrade`);
+    if (w.loaders) for (const x of w.workers) if (!x.feedFor && !x.cart && !x.porter && !x.clerk) assert.equal(x.loader, true, `level ${lv}: field/stand worker retains loader upgrade`);
     const hadLoaderUpgrade = w.loaders; w.loaders = true;
     const lateFeeder = w.addWorker(['F1'], ['M1'], 0, 0, false, 'M1');
     assert.equal(lateFeeder.loader, false, `level ${lv}: a feeder hired after loader upgrade also keeps normal-batch capacity`);
@@ -91,6 +91,12 @@ for (const [lv, [name, outputs]] of expected) {
     for (const route of workerRoutes) {
       if (route.feed) assert.ok(w.procs.some(p => p.id === route.feed && route.to === p.id), 'machine specialist only serves its assigned machine');
       else if (route.tally) assert.equal(route.to, 'PS', 'tally clerk delivers only to the processed counter');
+      else if (w.counters.some((c) => c.id === route.to && !c.sale2)) {
+        // v5.1.2 (A补): the regular salesperson also carries raw goods — from the
+        // raw stands to the raw counter. A fourth route: neither feeder, tally
+        // clerk nor field worker.
+        assert.ok(rawStands.some((s) => s.id === route.from), 'clerk takes raw goods from a raw stand');
+      }
       else assert.ok(rawStands.some(s => s.id === route.to), 'field worker deposits at the matching raw-goods stand');
     }
     const deliveries = [];

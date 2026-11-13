@@ -580,6 +580,11 @@ export class World {
       // machine can stock, so the worker would never complete a full batch for
       // the downstream machine. The crew roster bonus must not grow it either.
       if (w.chainFor) w.cap = Wk.cap + u.wcap;
+      // v5.1.2 (A补): a clerk's carrying capacity stays at its base value (speed
+      // still grows with level, as for chain workers). Its counter only ever
+      // needs ~50 raw goods per top-up; a growing cap would hoard stand stock
+      // the machine feeders need. The crew roster bonus must not grow it either.
+      if (w.clerk) w.cap = CFG.worker.cap + u.wcap;
       w.pickR = Wk.pickR; w.harvestR = Wk.harvestR;
       w.cutRate = Wk.cutRate || 0; w.pickRate = Wk.pickRate; w.dropRate = Wk.dropRate;
       const cm = w.crewMul;   // 雇工特长 (persistent roster level), at most +30%
@@ -682,13 +687,22 @@ export class World {
       if (e.worker.standCarrier) w.standCarrier = true;
       if (e.worker.fullBatch) w.fullBatch = true;
       if (e.worker.tally) w.tally = true;   // v4.9.9 理货员 (processed boards → goods counter, no batch gate)
+      // v5.1.2 (A补): the regular salesperson (clerk) stays ON FOOT — it walks the
+      // short stand → raw counter leg, and a loader would let it hoard up to 180
+      // raw goods while the counter only ever needs ~50, starving the machine
+      // feeders' buffer. Clear any loader addWorker gave it (hired after the
+      // loader upgrade); the upgradeWorkers handler below also skips clerks.
+      // Recompute stats right away: addWorker already ran refreshStats with the
+      // loader on, so the cap would otherwise stay at the loader value (180)
+      // until some later purchase recomputed it.
+      if (e.worker.clerk) { w.clerk = true; w.loader = false; w.loaderKind = null; this.refreshStats(); }
     }
     if (e.upgradeWorkers === 'loader') {
       this.loaders = true;
       // v4.9.8: two vehicles from one upgrade — harvest workers ride the big shovel loader,
       // machine feeders (feedFor) drive the small forklift. Carts and processed-goods porters
       // keep their own rigs, as before.
-      for (const w of this.workers) if (!w.cart && !w.loader && !w.porter && (!this.L.foodCollectionTables || !w.feedFor)) { w.loader = true; w.loaderKind = w.feedFor ? 'small' : 'big'; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
+      for (const w of this.workers) if (!w.cart && !w.loader && !w.porter && !w.clerk && (!this.L.foodCollectionTables || !w.feedFor)) { w.loader = true; w.loaderKind = w.feedFor ? 'small' : 'big'; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
       this.refreshStats();
     }
     if (e.sprinkler) for (const id of e.sprinkler) { const f = this.objs[id]; if (f && (f.kind === 'field' || f.kind === 'pond')) { f.growMul = CFG.sprinkler.growMul; f.sprinkler = true; f.sprinklerT = this.t; } }
@@ -1528,6 +1542,18 @@ export class World {
       let best = null, bv = 0;
       for (const s of srcs) {
         const v = s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + (s.ripe || 0);
+        // v5.1.2 (A补): a clerk yields to machine feeders — it only takes from
+        // a stand that holds a deep surplus, so a feeder never waits for a
+        // batch the clerk just took. The clerk and the feeders share the
+        // single raw stand in L13/L51; taking freely slowed PS front wait
+        // +0.4s (fit 35/37). The reserve is five base batches on top of the
+        // clerk's own load: machine levels already stock C1 from the fields
+        // (raw carriers), so a waiting clerk costs nothing there — it only
+        // tops up when the stand is genuinely over-supplied. Food levels rely
+        // on the clerk alone, but their stands run deep (L54 R_wheat/R_berry
+        // 500+), so the clerk still works there. If every stand is below it,
+        // the clerk waits (best stays null) instead of starving the machines.
+        if (w.clerk && s.kind === 'stand' && s.pile && s.pile.total < w.cap + CFG.worker.cap * 5) continue;
         if (v > bv) { bv = v; best = s; }
       }
       // v5.0.3: ease the approach only for pile pickups (board / coop / machine pile).

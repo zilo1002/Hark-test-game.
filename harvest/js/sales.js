@@ -308,11 +308,30 @@ function splitFoodLevel(L0) {
   // v5.1.0 (A): a regular salesperson for the raw counter (C1) only. Every food
   // level gets one (single- and two-machine alike); req is the first machine
   // unlock so it can be hired soon after the level opens. No counterUp for it.
+  // v5.1.2 (A补): the clerk also CARRIES raw goods — from the raw wooden stands
+  // (R_<crop>) to C1. In food levels nobody stocks C1 except the player, so while
+  // Jin is busy with the machines the raw counter runs dry and regular customers
+  // leave. Raw carrier (raw: true) with no batch gate — it is NOT a feeder, NOT a
+  // porter, and NOT a tally clerk: it carries no `tally` flag, because the sim
+  // checks use `tally` to mean the processed-goods tally clerk (delivers to PS
+  // only); flagging the clerk as tally would misidentify it. No fullBatch, so it
+  // delivers partial loads; only raw goods, only when the counter needs topping
+  // up (sinkOpen's rawLow/rawFull gate). Cashier stays — one tile, two jobs, no
+  // extra hire. Old saves get the carrying automatically: restore() re-applies
+  // the current tile effect for every bought tile.
+  // `clerk: true` marks the carrying worker: it stays ON FOOT (no loader, cap
+  // fixed at base 50 — see world.js). A loader would let it hoard up to 180 raw
+  // goods while the counter only ever needs ~50, starving the machine feeders'
+  // buffer and slowing the processed counter (fit: L13/L22/L51/L52 PS front
+  // wait +0.4-0.5 s over the limit, v5.1.1 baseline was 37/37).
   if (sale && main) {
     const pos = spot(L, main.x - 90, main.y + 100);
+    const rawStands = stands.filter((x) => x.role === 'raw' && main.items.includes(x.item)).map((x) => x.id);
+    const eff = { cashier: [main.id] };
+    if (rawStands.length) eff.worker = { from: rawStands, to: [main.id], raw: true, clerk: true };
     add({ id: 'food_clerk', x: pos[0], y: pos[1], price: hirePrice, icon: 'cashier', label: '普通售货员',
       req: firstMachineTile ? [firstMachineTile.id] : [first.id],
-      effect: { cashier: [main.id] } });
+      effect: eff });
   }
   // v5.0.8: food machines get the same two-tier upgrade path as machine levels
   // (procUp Lv1 ×0.42, Lv2 ×0.7, cumulative ×0.294). A config `proc` tile that sped
@@ -659,6 +678,16 @@ function splitSales0(L0) {
   let rc = null;
   if (rawC.length) {
     const spR = spot(L, main.x + CFG.counter.cashDx - 30, main.y + CFG.counter.cashDy + 50);
+    // v5.1.2 (A补): cashier ONLY in machine levels — no carrying. Raw carriers
+    // already stock the raw counters from the fields here, so the clerk's job
+    // is the cash. Carrying from the stands was tried and REVERTED: the clerk
+    // and the machine feeders share the single raw stand (L13 R_tomato, L51
+    // R_rose), and the clerk taking from it starved the feeders and slowed
+    // PS front wait +0.4s (fit 35/37: L13 B 3.3s, L51 A 2.6s). A surplus
+    // gate (stand must hold clerk load + 3-5 feeder batches) could not fix
+    // it either — it either let the clerk take and slow PS, or left the
+    // clerk idle 100% (fit idle limit) and delivering 0 in L26. Food levels
+    // keep the carrying (food_clerk): there C1 has no other stocker at all.
     rc = add({ id: 'x_rc', x: spR[0], y: spR[1], price: r10(s * 0.5), icon: 'cashier', label: '普通售货员', req: [firstMachineTile.id], effect: { cashier: rawC.map((c) => c.id) } });
   }
   // 7) machines that never had an upgrade get their own path
