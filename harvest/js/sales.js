@@ -234,8 +234,10 @@ function splitFoodLevel(L0) {
     L.objects.push(sale);
     firstMachineTile = tileForObject(procs[0].id);
     if (firstMachineTile) firstMachineTile.effect.show = [...new Set([...(firstMachineTile.effect.show || []), sale.id])];
-    // One clerk serves both desks (same as splitSales0: reuse the level's cashier).
-    for (const t of tiles) if (t.effect.cashier && t.effect.cashier.length) t.effect = { ...t.effect, cashier: [...new Set([...t.effect.cashier, sale.id])] };
+    // v5.1.0 (A): the level's original cashier keeps only the processed counter
+    // (PS); the raw counter (C1) gets its own regular salesperson (food_clerk,
+    // added below). One clerk no longer serves both desks.
+    for (const t of tiles) if (t.effect.cashier && t.effect.cashier.length) t.effect = { ...t.effect, cashier: [sale.id] };
   }
   L.tiles = tiles; // keep procedural hire tiles in the placement blockers as they are added.
   const first = tiles[0];
@@ -274,6 +276,15 @@ function splitFoodLevel(L0) {
     add({ id: 'food_tally', x: pos[0], y: pos[1], price: hirePrice, icon: 'porter', label: '加工品理货员',
       req: firstMachineTile ? [firstMachineTile.id] : [first.id],
       effect: { worker: { from: boards, to: [sale.id], tally: true } } });
+  }
+  // v5.1.0 (A): a regular salesperson for the raw counter (C1) only. Every food
+  // level gets one (single- and two-machine alike); req is the first machine
+  // unlock so it can be hired soon after the level opens. No counterUp for it.
+  if (sale && main) {
+    const pos = spot(L, main.x - 90, main.y + 100);
+    add({ id: 'food_clerk', x: pos[0], y: pos[1], price: hirePrice, icon: 'cashier', label: '普通售货员',
+      req: firstMachineTile ? [firstMachineTile.id] : [first.id],
+      effect: { cashier: [main.id] } });
   }
   // v5.0.8: food machines get the same two-tier upgrade path as machine levels
   // (procUp Lv1 ×0.42, Lv2 ×0.7, cumulative ×0.294). A config `proc` tile that sped
@@ -599,8 +610,9 @@ function splitSales0(L0) {
   let pc = null, pu = null;
   const existingCashiers = L.tiles.filter((t) => t.effect.cashier && t.effect.cashier.length);
   if (existingCashiers.length && !L0.separateProcessedCashier) {
-    // Most levels can reuse their original cashier for the paired goods counter.
-    for (const t of existingCashiers) t.effect = { ...t.effect, cashier: [...new Set([...t.effect.cashier, sale.id])] };
+    // v5.1.0 (A): the original cashier keeps only the processed counter (PS);
+    // the raw counters get their own regular salesperson (x_rc, below).
+    for (const t of existingCashiers) t.effect = { ...t.effect, cashier: [sale.id] };
   } else {
     // Food workshops may explicitly give the busy processed counter its own cashier.
     const spC = spot(L, sale.x + CFG.counter.cashDx - 30, sale.y + CFG.counter.cashDy + 50);
@@ -609,6 +621,18 @@ function splitSales0(L0) {
   }
   const ups = [];
   for (const t of L.tiles.slice()) if (t.effect.cashier && t !== pc && t.effect.cashier.length) ups.push(cup('x_cu' + t.id, t, t.effect.cashier.slice(), t.id));
+  // v5.1.0 (A): a regular salesperson for the raw counters (C1, C2) only — every
+  // machine level gets one (single- and two-machine alike), including levels that
+  // had no cashier of their own (the x_pc branch above). No counterUp for it;
+  // the upgrade stays with the processed counter's cashier. Price is 0.5x the
+  // median hire: the raw counter sells cheaper goods, and a cheaper clerk is
+  // affordable as soon as the machines are fed, so the raw counter is automated
+  // without stalling the opening purchases.
+  let rc = null;
+  if (rawC.length) {
+    const spR = spot(L, main.x + CFG.counter.cashDx - 30, main.y + CFG.counter.cashDy + 50);
+    rc = add({ id: 'x_rc', x: spR[0], y: spR[1], price: r10(s * 0.5), icon: 'cashier', label: '普通售货员', req: [firstMachineTile.id], effect: { cashier: rawC.map((c) => c.id) } });
+  }
   // 7) machines that never had an upgrade get their own path
   const mups = [];
   for (const p of procs) if (!upgraded.has(p.id)) {
@@ -628,7 +652,13 @@ function splitSales0(L0) {
   // Hire the first porter promptly after the machine; both stands already appear at machine unlock.
   order.splice(firstTerm + 1, 0, por[0], ...(tally ? [tally] : []), ...(pc ? [pc] : []), ...(rawT[0] ? [rawT[0]] : []));
   T.forEach((p, k) => { if (!k) return; const i = order.indexOf(mTile[p.id]); if (i >= 0) order.splice(i + 1, 0, por[k]); else order.push(por[k]); });
-  order.push(...gen.filter((t) => t.id.startsWith('x_f')), ...rawT.slice(1), ...por.slice(T.length), ...feed2, ...feed3, ...(pu ? [pu] : []), ...ups, ...gen.filter((t) => t.id.startsWith('u_')));
+  // v5.1.0 (A): x_rc goes after the machine specialists (feed2/feed3) — the raw
+  // counter's clerk is hired once the machines are fed. Hiring it right after
+  // the first machine cost L15 casual 1s past par; hiring it here keeps the
+  // balance at baseline, and its 0.5x price means it is affordable as soon as
+  // the specialists are in, so the raw counter is automated before the
+  // processed counter gets busy (L27 fit-check).
+  order.push(...gen.filter((t) => t.id.startsWith('x_f')), ...rawT.slice(1), ...por.slice(T.length), ...feed2, ...feed3, ...(rc ? [rc] : []), ...(pu ? [pu] : []), ...ups, ...gen.filter((t) => t.id.startsWith('u_')));
   const seen = new Set(); L.tiles = order.filter((t) => t && !seen.has(t) && seen.add(t));
   for (const t of gen) if (!seen.has(t)) L.tiles.push(t);
   L.sale2 = 'PS';
