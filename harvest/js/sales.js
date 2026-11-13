@@ -253,14 +253,42 @@ function splitFoodLevel(L0) {
     add({ id: `food_farm_${src.id}`, x: pos[0], y: pos[1], price: hirePrice, icon: src.type === 'coop' ? 'cart' : 'worker', label: '田间采收工', req,
       effect: { worker: { from: [src.id], to: [stand.id], raw: true, standCarrier: true, fullBatch: true } } });
   }
+  // v5.1.1 (C) chain specialist: in a two-stage food chain (M1 -> M2, where
+  // M1's output is M2's input), ONE worker feeds both machines, rotating
+  // between them (see workerAI updateChainTarget). It REPLACES the two single
+  // specialists (food_machine_M1 + food_machine_M2) — Jin confirmed 2026-11-13:
+  // hire one chain specialist and that's enough, no need for two singles.
+  // Price is a single specialist x1.5 (cheaper than two at 2x, one fewer worker).
+  // Single-stage machines (M3, M4) keep one specialist each, as before.
+  // NOTE: machine levels (splitSales0) have no chain tile — there M2 is fed
+  // directly by M1's output (world.js chain branch), so no M2 feeder exists to
+  // replace and a chain worker would have no second feeding task.
+  // A chain pair is (M1, M2) with M1.out === M2.in.
+  const chainNext = new Map(); // M1.id -> M2 proc
+  for (const p of procs) { const q = procs.find((r) => r !== p && r.in === p.out); if (q) chainNext.set(p.id, q); }
+  const chainSecond = new Set([...chainNext.values()].map((q) => q.id));
   // Exactly one full-batch machine specialist per processor, including intermediate stages.
   for (const proc of procs) {
+    if (chainSecond.has(proc.id)) continue; // second stage is covered by the chain tile
     const source = stands.find((x) => x.item === proc.in && (x.role === 'raw' || x.role === 'processed'));
     const machineTile = tileForObject(proc.id);
     if (!source || !machineTile) continue;
     const upstream = procs.find((q) => q.out === proc.in);
     const upstreamTile = upstream && tileForObject(upstream.id);
     const pos = spot(L, proc.x - 80, proc.y + 65);
+    const m2 = chainNext.get(proc.id);
+    if (m2) {
+      // Chain tile for (M1=proc, M2=m2): feeds M1 from its source stand and
+      // M2 from its (processed) source stand, rotating. Replaces both singles.
+      const source2 = stands.find((x) => x.item === m2.in && (x.role === 'raw' || x.role === 'processed'));
+      const machineTile2 = tileForObject(m2.id);
+      if (!source2 || !machineTile2) continue;
+      add({ id: `food_chain_${proc.id}`, x: pos[0], y: pos[1], price: r10(hirePrice * 1.5), icon: 'worker', label: '链式专员',
+        req: [...new Set([machineTile2.id, machineTile.id])],
+        fromSingle: [`food_machine_${proc.id}`, `food_machine_${m2.id}`],
+        effect: { worker: { from: [source.id, source2.id], to: [proc.id, m2.id], feeder: [proc.id, m2.id], fullBatch: true } } });
+      continue;
+    }
     add({ id: `food_machine_${proc.id}`, x: pos[0], y: pos[1], price: hirePrice, icon: 'worker', label: '机器专员',
       req: [...new Set([machineTile.id, ...(upstreamTile ? [upstreamTile.id] : [])])],
       effect: { worker: { from: [source.id], to: [proc.id], feeder: proc.id, fullBatch: true } } });

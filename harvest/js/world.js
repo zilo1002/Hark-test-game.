@@ -574,6 +574,12 @@ export class World {
     for (const w of this.workers) {
       const Wk = w.loader ? this.loaderCfg(w) : CFG.worker, Lv = CFG.workerLv, k = (w.lv || 1) - 1;
       w.speed = (Wk.speed + u.wspeed) * (1 + Lv.speed * k); w.cap = Math.round((Wk.cap + u.wcap) * (1 + Lv.cap * k));
+      // v5.1.1 (C): a chain worker's carrying capacity stays at its base value
+      // (speed still grows with level). Its batch must stay fillable from one
+      // machine's output stand; a growing cap would outgrow what the upstream
+      // machine can stock, so the worker would never complete a full batch for
+      // the downstream machine. The crew roster bonus must not grow it either.
+      if (w.chainFor) w.cap = Wk.cap + u.wcap;
       w.pickR = Wk.pickR; w.harvestR = Wk.harvestR;
       w.cutRate = Wk.cutRate || 0; w.pickRate = Wk.pickRate; w.dropRate = Wk.dropRate;
       const cm = w.crewMul;   // 雇工特长 (persistent roster level), at most +30%
@@ -708,7 +714,15 @@ export class World {
       w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = cart;
       w.lumber = w.from.some((id) => this.objs[id] && this.objs[id].item === 'log');
       w.fisher = w.from.some((id) => this.objs[id] && this.objs[id].item === 'fish');   // Fisher look applies to ponds and the valley's winter fish field.
-      w.lv = 1; w.trips = 0; w.lvT = -9; w.feedFor = feeder; w.loader = this.loaders && !w.cart && (!this.L.foodCollectionTables || !w.feedFor);
+      w.lv = 1; w.trips = 0; w.lvT = -9;
+      // v5.1.1 (C) chain specialist: the tile's feeder is a LIST [M1, M2].
+      // feedFor stays a single id (the CURRENT target machine, starting at the
+      // primary M1) so every existing `feedFor === p.id` check keeps working
+      // unchanged; chainFor holds the full list the worker rotates over.
+      // A single-id feeder (all other workers) behaves exactly as before.
+      if (Array.isArray(feeder)) { w.chainFor = feeder.slice(); w.feedFor = feeder[0]; }
+      else { w.feedFor = feeder; w.chainFor = null; }
+      w.loader = this.loaders && !w.cart && (!this.L.foodCollectionTables || !w.feedFor);
       if (w.loader) w.loaderKind = w.feedFor ? 'small' : 'big';   // v4.9.8: a hire after the upgrade rides the same vehicle its job would have given it
       w.done = 0; const cm = this.crew && this.crew[this.workers.length];
       if (cm) { w.crewId = cm.id; w.crewName = cm.name; w.crewMul = cm.mul; }
@@ -1400,11 +1414,54 @@ export class World {
     const mates = this.workers.filter((o) => o.feedFor === w.feedFor);
     return mates.length >= 3 && mates.some((o) => o !== w && o.state === 'deliver' && o.stack.length + o.incoming > 0);
   }
+  // v5.1.1 (C) chain specialist target selection: primary/secondary + dynamic
+  // emergency. The worker serves its primary machine (M1, the chain's first
+  // stage) by default and only goes to the secondary (M2) when M2 is dry
+  // (cannot run even one batch) while M1 is safe (can run at least one batch),
+  // then returns to M1. Priority weighs downstream impact: M1 stopping cuts
+  // the whole chain, so M1 dry always pulls the worker back. Task-switch
+  // protection: the target NEVER changes while the worker carries anything
+  // (stack or incoming) or is mid-delivery — target and carried items are
+  // independent states, so changing target cannot reset/drop the load.
+  // The worker must be empty and in 'collect' to switch; a switch also clears
+  // its pickup target so it re-aims at the new machine's source.
+  updateChainTarget(w) {
+    if (!w.chainFor || w.chainFor.length < 2) return;
+    if (w.state !== 'collect' || w.stack.length > 0 || w.incoming > 0) return;
+    const [primary, secondary] = w.chainFor;
+    const p1 = this.objs[primary], p2 = this.objs[secondary];
+    if (!p1 || !p2 || p1.hidden || p2.hidden) return;
+    const dry = (p) => p.buf + p.inc < p.ratio;
+    const safe = (p) => p.buf + p.inc >= p.ratio;
+    // v5.1.1 (C) only go to the secondary when its source stand already holds
+    // a FULL batch (the worker's cap) of its input. Otherwise the worker would
+    // pick up a partial batch, the primary would go unfed and stop making the
+    // secondary's input, and the worker would wait forever holding a partial
+    // batch it can neither complete (no more input coming) nor drop (feeders
+    // only drop full batches) — and it cannot switch back while carrying.
+    // The cap is fixed at base for chain workers (see refreshStats), so a full
+    // batch stays fillable from one machine's output stand.
+    const src2 = w.from.map((id) => this.objs[id]).find((o) => o && o.item === p2.inItem);
+    const fullBatchReady = !!(src2 && src2.pile && (src2.pile.total || 0) >= w.cap);
+    if (w.feedFor === primary && dry(p2) && safe(p1) && fullBatchReady) { w.feedFor = secondary; w.tgt = null; w.retarget = 0; return; }
+    if (w.feedFor === secondary && (!dry(p2) || dry(p1))) { w.feedFor = primary; w.tgt = null; w.retarget = 0; }
+  }
   workerAI(w, dt) {
     const T = this.t;
     w.waitReason = null;
+    // v5.1.1 (C): decide the chain worker's current target BEFORE anything
+    // else reads feedFor / sources this tick.
+    if (w.chainFor) this.updateChainTarget(w);
     // v4.7 fixed roles: everyone only ever works its own sources → its own sinks (no farm help, no assisting machines)
     let srcs = w.from.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
+    // v5.1.1 (C): a chain worker only collects its CURRENT target machine's
+    // input, from the stand that holds it. Without this it would take
+    // whichever board is fullest — even the other machine's material — and
+    // then be unable to deliver it to its target.
+    if (w.chainFor && w.feedFor) {
+      const target = this.objs[w.feedFor];
+      if (target) srcs = srcs.filter((o) => o.item === target.inItem);
+    }
     // v5.0.2: a farmhand (standCarrier) works exactly one field/coop; if that source
     // is still hidden (e.g. L25's A2, opened by tile b), it has no visible source
     // and idles at its post forever — L25 x_rf_apple_2 hired before b idled 100%
@@ -1862,6 +1919,17 @@ export class World {
     for (const t of this.tiles) {
       if (!t.fromProc || savedIds.has(t.id)) continue;
       if ((savedBought.get(t.fromProc) || 0) > 0) this.completeTile(t, true);
+    }
+    // v5.1.1 (C) migration: a food-level chain specialist replaces the two
+    // single machine specialists (food_machine_M1 + food_machine_M2). An old
+    // save that bought either single gets the chain tile (one purchase) so the
+    // chain keeps a worker — the player hired one chain specialist instead of
+    // two singles, exactly as Jin confirmed. A save made in v5.1.1+ lists the
+    // chain tile, so it is never migrated twice; a save that bought neither
+    // single gets nothing.
+    for (const t of this.tiles) {
+      if (!t.fromSingle || savedIds.has(t.id)) continue;
+      if (t.fromSingle.some((id) => (savedBought.get(id) || 0) > 0)) this.completeTile(t, true);
     }
     this.t = s.t || 0; this.money = s.money || 0;
     if (s.stats) this.stats = { collected: {}, sold: {}, produced: {}, golden: {}, earned: 0, unlocks: 0, ...s.stats };

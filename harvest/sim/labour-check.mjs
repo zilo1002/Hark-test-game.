@@ -33,7 +33,11 @@ CFG.levels.forEach((L, li) => {
       else if (x.porter) { if (x.stack.some((t) => !made.has(t))) bump('搬运工拿了原料'); if (x.sources && x.sources.some((s) => s.kind !== 'proc')) bump('搬运工去田里'); }
       // v4.9.9 理货员: only holds machine goods, only ever works the processed boards → goods counter.
       else if (x.tally) { if (x.stack.some((t) => !made.has(t))) bump('理货员拿了原料'); if (x.sources && x.sources.some((s) => s.kind !== 'stand' || s.role !== 'processed')) bump('理货员去别处'); if (x.toObjs && x.toObjs.some((s) => s.kind !== 'counter' || !s.sale2)) bump('理货员去别处'); }
-      else if (x.feedFor) { const m = w.objs[x.feedFor]; if (x.stack.some((t) => t !== m.inItem)) bump('专员拿了别的'); if (x.toObjs && x.toObjs.some((s) => s !== m)) bump('专员去别处'); }
+      // v5.1.1 (C) chain specialist: its role is the two machines in chainFor, so
+      // its sink list legitimately holds both (feedFor is only the CURRENT one).
+      // It must still hold only its current target's input, and never go to a
+      // machine outside its chain.
+      else if (x.feedFor) { const m = w.objs[x.feedFor]; if (x.stack.some((t) => t !== m.inItem)) bump('专员拿了别的'); const allowed = x.chainFor ? new Set(x.chainFor) : new Set([x.feedFor]); if (x.toObjs && x.toObjs.some((s) => !allowed.has(s.id))) bump('专员去别处'); }
       else if (x.rawCarrier) { if (x.stack.some((t) => !rawItems.has(t))) bump('原料工拿了别的'); if (x.toObjs && x.toObjs.some((s) => s.kind !== 'counter' || s.sale2)) bump('原料工去机器'); }
     }
     const ws = w.workers;
