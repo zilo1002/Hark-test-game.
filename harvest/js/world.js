@@ -1931,7 +1931,9 @@ export class World {
     for (const ts of s.tiles || []) {
       const t = this.tiles.find((x) => x.id === ts.id); if (!t) continue;
       for (let k = 0; k < ts.bought && !t.done; k++) this.completeTile(t, true);
-      t.paid = Math.min(ts.paid || 0, t.price - 1);
+      // v5.1.3: a price-0 (free) tile must restore with paid 0, not -1 —
+      // Math.min(paid, price - 1) would give -1 and make the player pay 1 coin for it.
+      t.paid = t.price > 0 ? Math.min(ts.paid || 0, t.price - 1) : 0;
     }
     // v5.0.8 migration: a food-level `proc` tile that covered several machines was
     // split into one procUp tile per machine. An old save that bought the single tile

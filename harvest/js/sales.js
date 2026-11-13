@@ -188,6 +188,17 @@ function splitFoodLevel(L0) {
   validIds = new Set(tiles.map((t) => t.id));
   tiles = tiles.map((t) => { const req = (t.req || []).filter((id) => validIds.has(id)); const reqAny = (t.reqAny || []).filter((id) => validIds.has(id)); return { ...t, req: req.length ? req : undefined, reqAny: reqAny.length ? reqAny : undefined }; });
   const tileForObject = (id) => tiles.find((t) => t.effect.show?.includes(id));
+  // v5.1.3: the initial (farm-fed) machine is free — Jin: 初始机器不用金币解锁.
+  // A chained (second-stage) machine keeps its coin price. This covers a config
+  // reveal tile (e.g. L59 tile 'b' for M1) as well as a generated food_unlock gate.
+  // ONLY zero a tile that reveals the machine alone — a tile bundling a field
+  // with the machine keeps its price (the field is the real cost; see the
+  // machine-level rule above, L45 'c'/'e').
+  for (const proc of procs) {
+    if (procs.some((q) => q.outTo === proc.id)) continue; // chained — keep its price
+    const tile = tileForObject(proc.id);
+    if (tile && tile.effect && tile.effect.show && tile.effect.show.length === 1 && tile.effect.show[0] === proc.id) tile.price = 0;
+  }
   const cropKinds = [...new Set(sources.map(sourceObj))];
   const stands = [];
   for (const item of cropKinds) {
@@ -536,6 +547,21 @@ function splitSales0(L0) {
     const prebuilt = Object.values(mTile).filter((t) => t.id.startsWith('m_')).length;
     mTile[p.id] = add({ id: 'm_' + p.id, x: p.x, y: p.y, price: r10(s * (prebuilt ? V.machine2 : V.machine)), icon: p.out, label: MNAME[p.out] || '加工机',
                         req: feeder ? [mTile[feeder.id].id] : [first.id], effect: { show: [p.id] } });
+  }
+  // v5.1.3: the initial (farm-fed) machine is free — Jin: 初始机器不用金币解锁.
+  // A chained (second-stage) machine keeps its coin price. This covers both a
+  // config reveal tile and a generated m_ tile (no tile reveals two machines,
+  // so zeroing one machine's tile cannot free another).
+  // ONLY zero a tile that reveals the machine alone. Some tiles bundle a field
+  // with the machine (L45 'c' 挖鱼塘 shows ['P1','M3'], 'e' 温室番茄 shows
+  // ['T1','M4']) — those tiles are really about unlocking the field/area, and
+  // zeroing them would give the field away free too and break the level's
+  // progression (L45 casual bot stalls at 9 unlocks, times out). They keep
+  // their price; the machine inside is unlocked when the field is bought.
+  for (const p of procs) {
+    if (procs.some((q) => q.outTo === p.id)) continue; // chained — keep its price
+    const t = mTile[p.id];
+    if (t.effect && t.effect.show && t.effect.show.length === 1 && t.effect.show[0] === p.id) t.price = 0;
   }
   for (const p of procs) p.hidden = true;
   // v4.9.7: a terminal machine's processed board appears with the machine itself.

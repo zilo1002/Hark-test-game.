@@ -743,8 +743,8 @@ export const CFG = {
       objects: [
         { id: 'K1', type: 'coop', item: 'milk', producer: 'cow', x: 80, y: 80, w: 300, h: 250, n: 5, max: 11, prefill: 800 },
         { id: 'B1', type: 'field', crop: 'berry', x: 40, y: 420, w: 320, h: 310, gap: 9 },
-        { id: 'M1', type: 'proc', in: 'milk', out: 'icecream', ratio: 2, time: 0.9, x: 760, y: 200, outTo: 'C1' }, // v4.8.8: ratio 6->3 + time 0.45->0.9, starve was 20%, tray 64; v4.9.9: ratio 3->2, 一田一人后 PS 柜前等 3.1s
-        { id: 'M2', type: 'proc', in: 'berry', out: 'jam', ratio: 4, time: 0.8, x: 560, y: 680, outTo: 'C1', hidden: true }, // v4.8.8: time 0.5->0.8, tray was 64; v4.9.9: ratio 5->4, 一田一人后 PS 柜前等 3.0s
+        { id: 'M1', type: 'proc', in: 'milk', out: 'icecream', ratio: 2, time: 0.8, x: 760, y: 200, outTo: 'C1' }, // v4.8.8: ratio 6->3 + time 0.45->0.9, starve was 20%, tray 64; v4.9.9: ratio 3->2, 一田一人后 PS 柜前等 3.1s; v5.1.3: time 0.9->0.8 — 初始机器免费后机器人先拿免费机、农工晚到几秒，PS 柜前等 3.4s，提速补回 3.0s
+        { id: 'M2', type: 'proc', in: 'berry', out: 'jam', ratio: 4, time: 0.7, x: 560, y: 680, outTo: 'C1', hidden: true }, // v4.8.8: time 0.5->0.8, tray was 64; v4.9.9: ratio 5->4, 一田一人后 PS 柜前等 3.0s; v5.1.3: time 0.8->0.7，同 M1
         { id: 'C1', type: 'counter', items: ['berry', 'icecream', 'jam'], x: 770, y: 470 },
       ],
       tiles: [
