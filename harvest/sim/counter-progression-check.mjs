@@ -31,10 +31,21 @@ for (let i = 0; i < CFG.levels.length; i++) {
   const raw = w.counters.find((c) => !c.sale2), goods = w.counters.find((c) => c.sale2);
   if (!raw || !goods) { fail(label, 'missing ordinary or generated processed counter'); continue; }
   const made = new Set(terminal.map((p) => p.outItem));
-  if (initial.length !== 1 || initial[0] !== raw || !goods.hidden) fail(label, 'processed counter is visible before processing unlock');
+  const firstMachine = terminal[0];
+  // v5.1.9: a pre-built first machine is unlocked from t=0, so its processed
+  // counter is visible from t=0 too — that is the unlock, not a leak. The
+  // check below only requires PS hidden when the first machine still needs
+  // its unlock tile. NOTE: PS is revealed by the first machine overall
+  // (procs[0]), not the first terminal machine — in a chain level the first
+  // terminal machine is M2 (chained, never pre-built), but PS is still
+  // revealed because M1 is pre-built.
+  const firstProc = w.procs[0];
+  const prebuiltFirst = firstProc && w.tiles.some((t) => t.prebuilt && t.effect?.show?.includes(firstProc.id));
+  if (prebuiltFirst) {
+    if (initial.length !== 2 || !initial.includes(raw) || !initial.includes(goods) || goods.hidden) fail(label, 'pre-built first machine should reveal the processed counter at start');
+  } else if (initial.length !== 1 || initial[0] !== raw || !goods.hidden) fail(label, 'processed counter is visible before processing unlock');
   if (raw.items.some((item) => made.has(item))) fail(label, 'processed goods appear on ordinary counter before unlock');
   if (w.tiles.some((t) => t.id === 'x_ps')) fail(label, 'processed counter still requires a separate paid purchase');
-  const firstMachine = terminal[0];
   const machineUnlock = w.tiles.find((t) => t.effect?.show?.includes(firstMachine.id));
   const unlock = w.tiles.find((t) => t.effect?.worker?.porter && t.effect.worker.to.includes(goods.id));
   if (!machineUnlock) fail(label, 'first terminal machine has no unlock tile');

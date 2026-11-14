@@ -336,7 +336,9 @@ export class World {
     }
     this.L.tiles.forEach((t, i) => {
       const price = t.effect && t.effect.proc ? Math.max(1, Math.round(t.price * CFG.procUp.price)) : t.price;   // v4.1 cheaper machine upgrades
-      this.tiles.push({ ...t, price, order: i, paid: 0, bought: 0, done: false, visible: false, price0: price, payFx: 0, appearT: -9, cool: 0 });
+      // v5.1.9: a `prebuilt` tile (initial machine, sales.js) starts bought + done —
+      // it never appears as an unlock frame and its dependents treat it as bought.
+      this.tiles.push({ ...t, price, order: i, paid: 0, bought: t.prebuilt ? 1 : 0, done: !!t.prebuilt, visible: false, price0: price, payFx: 0, appearT: -9, cool: 0 });
     });
     this.player = makeCollector('player', this.L.start[0], this.L.start[1]);
     // v4.0 B 宠物狗 (opts.pet = 'dog'); the sims never pass it, so their results are unchanged
@@ -1577,6 +1579,8 @@ export class World {
         const collectWait = collectWaitLimit(w, srcs, CFG);
         if (w.stack.length > 0 && w.wait > collectWait && !w.feedFor && !w.fullBatch) w.state = 'deliver';
         if ((w.feedFor || w.fullBatch) && w.stack.length + w.incoming > 0) w.waitReason = '等原料补齐整批';
+        // v4.7 nothing to pick up: wait at its own post (porter by its tray, others at the edge of their field)
+        else if (this.smart && w.idleT > CFG.v47.idleWait) { const o = this.idlePost(w, srcs); tx = o.x; ty = o.y; }
         // v5.1.8: a fullBatch clerk holding a partial load gives up after a
         // short wait (Jin 2026-11-14: 中间可以等个两三秒，但是不能等半分钟)
         // — it delivers what it has instead of standing at the stand forever
@@ -1585,9 +1589,12 @@ export class World {
         // there is NO eligible source and the 3 s grace period is over.
         // Scoped to the clerk only — chain/machine specialists keep waiting
         // for their full batch (a machine needs a complete batch).
+        // NOTE: standalone `if` AFTER the else-if above — it must NOT sit
+        // between the waitReason `if` and its `else if`, or the else would
+        // rebind to this line and fullBatch feeders would walk away to their
+        // idle post instead of waiting at the stand (fit: L17/L27/L28/L44
+        // PS front wait over 3 s when merged with prebuilt machines).
         if (w.fullBatch && w.clerk && w.stack.length > 0 && w.wait > 3) w.state = 'deliver';
-        // v4.7 nothing to pick up: wait at its own post (porter by its tray, others at the edge of their field)
-        else if (this.smart && w.idleT > CFG.v47.idleWait) { const o = this.idlePost(w, srcs); tx = o.x; ty = o.y; }
       } else {
         w.idleT = 0; w.wait = 0;
         // v4.9.7: a board-filler (standCarrier) with a fair load leaves when its source is

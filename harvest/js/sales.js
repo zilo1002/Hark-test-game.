@@ -215,16 +215,32 @@ function splitFoodLevel(L0) {
   validIds = new Set(tiles.map((t) => t.id));
   tiles = tiles.map((t) => { const req = (t.req || []).filter((id) => validIds.has(id)); const reqAny = (t.reqAny || []).filter((id) => validIds.has(id)); return { ...t, req: req.length ? req : undefined, reqAny: reqAny.length ? reqAny : undefined }; });
   const tileForObject = (id) => tiles.find((t) => t.effect.show?.includes(id));
-  // v5.1.3: the initial (farm-fed) machine is free — Jin: 初始机器不用金币解锁.
-  // A chained (second-stage) machine keeps its coin price. This covers a config
-  // reveal tile (e.g. L59 tile 'b' for M1) as well as a generated food_unlock gate.
-  // ONLY zero a tile that reveals the machine alone — a tile bundling a field
-  // with the machine keeps its price (the field is the real cost; see the
-  // machine-level rule above, L45 'c'/'e').
+  // v5.1.9: the initial machine is pre-built — Jin: 现有的机器不用花金币，也不用框解锁.
+  // A chained (second-stage) machine keeps its tile + coin price, and a machine
+  // for a later crop (its input source is still hidden) keeps its tile + price
+  // too — Jin: 其他作物还是要花金币. This covers a config reveal tile (e.g. L59
+  // tile 'b' for M1) as well as a generated food_unlock gate.
+  // ONLY pre-build a tile that reveals the machine alone — a tile bundling a
+  // field with the machine keeps its price (the field is the real cost; see the
+  // machine-level rule, L45 'c'/'e').
+  // A pre-built machine's tile is marked `prebuilt` (World starts it bought +
+  // done, so it never appears as a frame and its dependents treat it as bought);
+  // the machine itself is made visible here, its processed stand and (for the
+  // first machine) the PS counter are made visible where they are created below.
+  const prebuilt = new Set();
   for (const proc of procs) {
-    if (procs.some((q) => q.outTo === proc.id)) continue; // chained — keep its price
+    if (procs.some((q) => q.outTo === proc.id)) continue; // chained (M2) — keep its tile + price
     const tile = tileForObject(proc.id);
-    if (tile && tile.effect && tile.effect.show && tile.effect.show.length === 1 && tile.effect.show[0] === proc.id) tile.price = 0;
+    if (!tile || !tile.effect || !tile.effect.show || tile.effect.show.length !== 1 || tile.effect.show[0] !== proc.id) continue; // bundled — keep
+    // The machine's input must be available from the start (a visible field/coop).
+    // A machine for a later crop (hidden source) keeps its tile + price.
+    if (!sources.some((o) => sourceObj(o) === proc.in && !o.hidden)) continue;
+    // v5.1.3: an initial machine is free. NOTE (v5.1.9): food levels do NOT
+    // pre-build the machine — the player is the main collector here, and the
+    // free tile paces the early cash (sell raw first, then unlock the machine);
+    // removing it stalls the casual bot (L65 8:31→9:39, L59 casual no longer
+    // finishes). The tile stays, price 0, and reveals machine + stand + PS.
+    tile.price = 0;
   }
   const cropKinds = [...new Set(sources.map(sourceObj))];
   const stands = [];
@@ -240,7 +256,7 @@ function splitFoodLevel(L0) {
     const p = procs.find((q) => q.out === item);
     const id = `P_${item}`;
     const [sx, sy] = standSpot(L, stands, Math.min(L.W - 105, p.x + 76), p.y + 56);
-    const stand = saveStand(L, stands, { id, type: 'stand', role: 'processed', item, x: sx, y: sy, w: 64, h: 42, cap: 500, hidden: true });
+    const stand = saveStand(L, stands, { id, type: 'stand', role: 'processed', item, x: sx, y: sy, w: 64, h: 42, cap: 500, hidden: !prebuilt.has(p.id) });
     p.outTo = id;
     const unlock = tileForObject(p.id);
     if (unlock) unlock.effect.show = [...new Set([...(unlock.effect.show || []), id])];
@@ -268,7 +284,7 @@ function splitFoodLevel(L0) {
     if (!best) for (let x = 45; x <= L.W - 45; x += 16) for (let y = 45; y <= L.H - 45; y += 16) tryAt(x, y, 3);
     const psPos = best || [Math.min(L.W - 50, Math.max(50, main.x)), Math.min(L.H - 50, Math.max(50, main.y + 120))];
     if (!best) console.warn(`[sales] ${L.name}: no clear spot for the processed counter, using ${psPos}`);
-    sale = { id: 'PS', type: 'counter', items: [...outItems], x: psPos[0], y: psPos[1], hidden: true, sale2: true };
+    sale = { id: 'PS', type: 'counter', items: [...outItems], x: psPos[0], y: psPos[1], hidden: !prebuilt.has(procs[0].id), sale2: true };
     L.objects.push(sale);
     firstMachineTile = tileForObject(procs[0].id);
     if (firstMachineTile) firstMachineTile.effect.show = [...new Set([...(firstMachineTile.effect.show || []), sale.id])];
@@ -580,22 +596,46 @@ function splitSales0(L0) {
     mTile[p.id] = add({ id: 'm_' + p.id, x: p.x, y: p.y, price: r10(s * (prebuilt ? V.machine2 : V.machine)), icon: p.out, label: MNAME[p.out] || '加工机',
                         req: feeder ? [mTile[feeder.id].id] : [first.id], effect: { show: [p.id] } });
   }
-  // v5.1.3: the initial (farm-fed) machine is free — Jin: 初始机器不用金币解锁.
-  // A chained (second-stage) machine keeps its coin price. This covers both a
-  // config reveal tile and a generated m_ tile (no tile reveals two machines,
-  // so zeroing one machine's tile cannot free another).
-  // ONLY zero a tile that reveals the machine alone. Some tiles bundle a field
+  // v5.1.9: the initial machine is pre-built — Jin: 现有的机器不用花金币，也不用框解锁.
+  // A chained (second-stage) machine keeps its tile + coin price, and a machine
+  // for a later crop (its input source is still hidden) keeps its tile + price
+  // too — Jin: 其他作物还是要花金币. This covers both a config reveal tile and
+  // a generated m_ tile (no tile reveals two machines, so pre-building one
+  // machine's tile cannot free another).
+  // ONLY pre-build a tile that reveals the machine alone. Some tiles bundle a field
   // with the machine (L45 'c' 挖鱼塘 shows ['P1','M3'], 'e' 温室番茄 shows
   // ['T1','M4']) — those tiles are really about unlocking the field/area, and
   // zeroing them would give the field away free too and break the level's
   // progression (L45 casual bot stalls at 9 unlocks, times out). They keep
   // their price; the machine inside is unlocked when the field is bought.
+  // A pre-built machine's tile is marked `prebuilt` (World starts it bought +
+  // done, so it never appears as a frame and its dependents treat it as bought);
+  // the machine itself, its processed stand and (for the first machine) the PS
+  // counter are made visible from t=0.
+  // Original config visibility of each machine (L0 is untouched by split).
+  const origHidden = new Map(L0.objects.filter((o) => o.type === 'proc').map((o) => [o.id, !!o.hidden]));
+  const prebuilt = new Set();
   for (const p of procs) {
-    if (procs.some((q) => q.outTo === p.id)) continue; // chained — keep its price
+    if (procs.some((q) => q.outTo === p.id)) continue; // chained (M2) — keep its tile + price
     const t = mTile[p.id];
-    if (t.effect && t.effect.show && t.effect.show.length === 1 && t.effect.show[0] === p.id) t.price = 0;
+    if (!t || !t.effect || !t.effect.show || t.effect.show.length !== 1 || t.effect.show[0] !== p.id) continue; // bundled — keep
+    // The machine's input must be available from the start (a visible field/coop).
+    // A machine for a later crop (hidden source) keeps its tile + price.
+    // (Use L0: the machine-tile loop above sets p.hidden=true for generated
+    // tiles, so p.hidden here no longer carries the config value.)
+    if (!L.objects.some((o) => (o.type === 'field' || o.type === 'coop') && sourceObj(o) === p.in && !o.hidden)) continue;
+    // v5.1.3: an initial machine is free. A machine the config hides is not
+    // "there at the start" even when its crop is, so it keeps its (free) frame
+    // to reveal it; only a machine that is itself visible is pre-built.
+    t.price = 0;
+    if (origHidden.get(p.id)) continue;
+    prebuilt.add(p.id);
+    p.hidden = false;
+    t.prebuilt = true;
+    if (pStand[p.id]) pStand[p.id].hidden = false;
+    if (p === procs[0]) sale.hidden = false;
   }
-  for (const p of procs) p.hidden = true;
+  for (const p of procs) if (!prebuilt.has(p.id)) p.hidden = true;
   // v4.9.7: a terminal machine's processed board appears with the machine itself.
   for (const p of T) {
     const stand = pStand[p.id]; if (!stand) continue;
