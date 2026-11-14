@@ -1555,14 +1555,17 @@ export class World {
         // a stand that holds a deep surplus, so a feeder never waits for a
         // batch the clerk just took. The clerk and the feeders share the
         // single raw stand in L13/L51; taking freely slowed PS front wait
-        // +0.4s (fit 35/37). The reserve is five base batches on top of the
-        // clerk's own load: machine levels already stock C1 from the fields
-        // (raw carriers), so a waiting clerk costs nothing there — it only
-        // tops up when the stand is genuinely over-supplied. Food levels rely
-        // on the clerk alone, but their stands run deep (L54 R_wheat/R_berry
-        // 500+), so the clerk still works there. If every stand is below it,
-        // the clerk waits (best stays null) instead of starving the machines.
-        if (w.clerk && s.kind === 'stand' && s.pile && s.pile.total < w.cap + CFG.worker.cap * 5) continue;
+        // +0.4s (fit 35/37). Food levels rely on the clerk alone for C1.
+        // v5.1.8: the reserve is ONE base batch, not five. The old 300
+        // (cap + 5×base) assumed food stands run deep like L54 (R_wheat/
+        // R_berry 500+), but some food lines run shallow (L67 pumpkin hovers
+        // 0–230) and the clerk would stand idle for half a minute waiting
+        // for a stand that never reaches 300 (Jin 2026-11-14: 就拿一点、
+        // 有时候还等着). One batch (100 = cap + 1×base) still leaves a full
+        // feeder load behind after the clerk takes its 50, so machine
+        // feeders are not starved. If every stand is below it, the clerk
+        // waits (best stays null) instead of starving the machines.
+        if (w.clerk && s.kind === 'stand' && s.pile && s.pile.total < w.cap + CFG.worker.cap) continue;
         if (v > bv) { bv = v; best = s; }
       }
       // v5.0.3: ease the approach only for pile pickups (board / coop / machine pile).
@@ -1574,6 +1577,15 @@ export class World {
         const collectWait = collectWaitLimit(w, srcs, CFG);
         if (w.stack.length > 0 && w.wait > collectWait && !w.feedFor && !w.fullBatch) w.state = 'deliver';
         if ((w.feedFor || w.fullBatch) && w.stack.length + w.incoming > 0) w.waitReason = '等原料补齐整批';
+        // v5.1.8: a fullBatch clerk holding a partial load gives up after a
+        // short wait (Jin 2026-11-14: 中间可以等个两三秒，但是不能等半分钟)
+        // — it delivers what it has instead of standing at the stand forever
+        // waiting for a full batch. Full-batch-first, leave-on-timeout: while
+        // a source is available it keeps filling up; this only fires when
+        // there is NO eligible source and the 3 s grace period is over.
+        // Scoped to the clerk only — chain/machine specialists keep waiting
+        // for their full batch (a machine needs a complete batch).
+        if (w.fullBatch && w.clerk && w.stack.length > 0 && w.wait > 3) w.state = 'deliver';
         // v4.7 nothing to pick up: wait at its own post (porter by its tray, others at the edge of their field)
         else if (this.smart && w.idleT > CFG.v47.idleWait) { const o = this.idlePost(w, srcs); tx = o.x; ty = o.y; }
       } else {
