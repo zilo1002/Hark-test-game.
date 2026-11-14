@@ -794,6 +794,111 @@ export function hitSpot(W, H, area, page, save, px, py) {
   return best;
 }
 
+// ---- v5.1.7 庄园散步: the farmer on the estate walks where you tap, dog in tow ----
+// Pure state + math (no canvas), so the sim probe can drive it in Node. Design space
+// is 360x440; the farmer starts by the house, the dog beside him, as before.
+export const WALK_HOME = { fx: 214, fy: 216, dx: 240, dy: 224 };
+const WALK_SPEED = 82;      // design units / second (a stroll across the lawn takes ~4 s)
+const DOG_SPEED = 96;       // a touch faster, so the dog catches up instead of lagging forever
+const DOG_GAP = 24;         // the dog stops this far behind the farmer
+const WALK_BOUNDS = { x0: 10, x1: 350, y0: 104, y1: 446 };
+const WALK = {
+  fx: WALK_HOME.fx, fy: WALK_HOME.fy, tx: WALK_HOME.fx, ty: WALK_HOME.fy,
+  dx: WALK_HOME.dx, dy: WALK_HOME.dy,
+  phase: 0, dphase: 0, face: 1, moving: false, dmoving: false,
+};
+export function resetWalk() {
+  WALK.fx = WALK_HOME.fx; WALK.fy = WALK_HOME.fy; WALK.tx = WALK_HOME.fx; WALK.ty = WALK_HOME.fy;
+  WALK.dx = WALK_HOME.dx; WALK.dy = WALK_HOME.dy;
+  WALK.phase = 0; WALK.dphase = 0; WALK.face = 1; WALK.moving = false; WALK.dmoving = false;
+}
+export function walkState() {
+  return { fx: WALK.fx, fy: WALK.fy, tx: WALK.tx, ty: WALK.ty, dx: WALK.dx, dy: WALK.dy,
+           phase: WALK.phase, dphase: WALK.dphase, face: WALK.face, moving: WALK.moving, dmoving: WALK.dmoving };
+}
+// obstacle radii for built spots (flat ones — path, gate, fence, dock — are walkable, r 0;
+// unbuilt spots are not obstacles at all: nothing stands there yet). Decos use their own table.
+const SPOT_R = { manor: 30, lodge: 30, winery: 30, pond: 24, fountain: 22, barn: 26, greenhouse: 26, gazebo: 22,
+                 windmill: 20, tree: 18, well: 14, arch: 12, bench: 12, path: 0, gate: 0, fence2: 0, dock: 0 };
+const DECO_R = { pond: 22, fountain: 20, windmill: 16, rainbow: 0, balloon: 0 };
+export function walkObstacles(page = 1, save = {}, night = false) {
+  const spots = page === 3 ? SPOTS3 : page === 2 ? SPOTS2 : SPOTS;
+  const restored = new Set(save.restored || []);
+  const out = [];
+  for (const [id, [x, y]] of Object.entries(spots)) {
+    if (!restored.has(id)) continue;
+    const r = SPOT_R[id] ?? 22;
+    if (r > 0) out.push({ x, y, r });
+  }
+  for (const id of (save.shop && save.shop.deco) || []) {
+    const s = DECO_SPOTS[id]; if (!s) continue;
+    const r = DECO_R[id] ?? 14;
+    if (r > 0) out.push({ x: s[0], y: s[1], r });
+  }
+  if (page === 3) out.push({ x: 92, y: 372, r: 46 });   // the lake
+  if (night) out.push({ x: 90, y: 420, r: 20 });        // night-market stall
+  return out;
+}
+// push a point out of every obstacle circle (a few passes for overlaps): the farmer
+// slides round a building instead of walking through it, and a tap on a building
+// lands on the nearest walkable point beside it.
+function pushOut(x, y, obs) {
+  for (let pass = 0; pass < 3; pass++) {
+    let moved = false;
+    for (const o of obs) {
+      const dx = x - o.x, dy = y - o.y, d = Math.hypot(dx, dy);
+      if (d < o.r) {
+        if (d < 0.001) { x = o.x + o.r; y = o.y; }
+        else { const k = o.r / d; x = o.x + dx * k; y = o.y + dy * k; }
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return [x, y];
+}
+// set where the farmer walks to (design coords): clamped to the lawn, then pushed
+// out of any building / pond / stall it landed on.
+export function setWalkTarget(x, y, page = 1, save = {}, night = false) {
+  x = Math.max(WALK_BOUNDS.x0, Math.min(WALK_BOUNDS.x1, x));
+  y = Math.max(WALK_BOUNDS.y0, Math.min(WALK_BOUNDS.y1, y));
+  [x, y] = pushOut(x, y, walkObstacles(page, save, night));
+  x = Math.max(WALK_BOUNDS.x0, Math.min(WALK_BOUNDS.x1, x));
+  y = Math.max(WALK_BOUNDS.y0, Math.min(WALK_BOUNDS.y1, y));
+  WALK.tx = x; WALK.ty = y;
+  return { x, y };
+}
+function stepToward(px, py, tx, ty, speed, dt, obs) {
+  const dx = tx - px, dy = ty - py, d = Math.hypot(dx, dy);
+  if (d < 0.5) return [px, py, 0];
+  const s = Math.min(d, speed * dt), nx = px + dx / d * s, ny = py + dy / d * s;
+  const [ox, oy] = pushOut(nx, ny, obs);
+  return [ox, oy, s];
+}
+export function updateWalk(dt, page = 1, save = {}, night = false) {
+  if (!(dt > 0)) return;
+  const obs = walkObstacles(page, save, night);
+  if (Math.hypot(WALK.tx - WALK.fx, WALK.ty - WALK.fy) > 1.5) {
+    if (Math.abs(WALK.tx - WALK.fx) > 2) WALK.face = WALK.tx > WALK.fx ? 1 : -1;
+    const [nx, ny, s] = stepToward(WALK.fx, WALK.fy, WALK.tx, WALK.ty, WALK_SPEED, dt, obs);
+    WALK.fx = nx; WALK.fy = ny; WALK.phase += s * 0.085; WALK.moving = true;
+    if (Math.hypot(WALK.tx - WALK.fx, WALK.ty - WALK.fy) <= 1.5) { WALK.fx = WALK.tx; WALK.fy = WALK.ty; WALK.moving = false; }
+  } else WALK.moving = false;
+  // the dog trails the farmer and stops a short gap behind (never on top of him)
+  const dd = Math.hypot(WALK.fx - WALK.dx, WALK.fy - WALK.dy);
+  if (dd > DOG_GAP) {
+    const [nx, ny, s] = stepToward(WALK.dx, WALK.dy, WALK.fx, WALK.fy, DOG_SPEED, dt, obs);
+    const nd = Math.hypot(WALK.fx - nx, WALK.fy - ny);
+    if (nd < DOG_GAP) {
+      const k = DOG_GAP / Math.max(nd, 0.001);
+      WALK.dx = WALK.fx - (WALK.fx - nx) * k; WALK.dy = WALK.fy - (WALK.fy - ny) * k;
+      const [ox, oy] = pushOut(WALK.dx, WALK.dy, obs);
+      WALK.dx = ox; WALK.dy = oy;
+    } else { WALK.dx = nx; WALK.dy = ny; }
+    WALK.dphase += s * 0.085; WALK.dmoving = true;
+  } else WALK.dmoving = false;
+}
+
 export function drawHome(g, W, H, save, t, dpr, area, page = 1) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   HSEASON = Number.isInteger(save.season) ? save.season : null;
@@ -836,10 +941,17 @@ export function drawHome(g, W, H, save, t, dpr, area, page = 1) {
   // v4.0 B 宠物: the cat lounges in front of the house, the dog sits by the farmer
   const pets = save.shop && save.shop.pet;
   if (pets && pets.cat && petById(pets.cat)) { g.save(); g.translate(150, 238); cat2d(g, t, petById(pets.cat).col); g.restore(); }
-  if (pets && pets.dog && petById(pets.dog)) { g.save(); g.translate(240, 224); dog2d(g, t, petById(pets.dog).col); g.restore(); }
+  // v5.1.7 庄园散步: the dog walks with the farmer (a little trot bounce while moving)
+  if (pets && pets.dog && petById(pets.dog)) {
+    g.save();
+    g.translate(WALK.dx, WALK.dy - (WALK.dmoving ? Math.abs(Math.sin(WALK.dphase)) * 1.5 : 0));
+    dog2d(g, t, petById(pets.dog).col);
+    g.restore();
+  }
   const look = save.shop ? heroStyle(save.shop.eq) : HERO, hat = look.hat;
-  g.save(); g.translate(214, 216); g.scale(1.05, 1.05);
-  person(g, t, 0, false, { ...look, hat: hat === 'straw', sleeve: undefined, carry: Math.sin(t * 3) > 0.3 });
+  // v5.1.7 庄园散步: the farmer walks where you tap (face flips with the direction)
+  g.save(); g.translate(WALK.fx, WALK.fy); g.scale(1.05 * WALK.face, 1.05);
+  person(g, t, WALK.phase, WALK.moving, { ...look, hat: hat === 'straw', sleeve: undefined, carry: Math.sin(t * 3) > 0.3 });
   if (hat && hat !== 'straw') decoHat(g, look); else if (look.scarf) decoHat(g, { scarf: look.scarf });
   g.restore();
   g.restore();

@@ -8,7 +8,7 @@ import { Input } from './input.js';
 import { Sound, Haptics } from './audio.js';
 import * as Save from './save.js';
 import { saveRun } from './run-save.js';
-import { drawHome, hitSpot } from './home.js';
+import { drawHome, hitSpot, homeLayout, setWalkTarget, updateWalk } from './home.js';
 import { UI } from './ui.js';
 import * as Shop from './shop.js';
 import { Preview } from './preview3d.js';
@@ -180,6 +180,24 @@ cv.addEventListener('pointerup', (e) => {
   if (mode !== 'home' || modalOpen || !ui.build) return;
   const id = hitSpot(R.W, R.H, areaRect(), ui.page || 1, data, e.clientX, e.clientY);
   if (id) restore(id);
+});
+
+// v5.1.7 庄园散步: tap the estate lawn and the farmer walks there, dog in tow.
+// A tap, not a drag: the pointer must barely move between down and up. Build mode,
+// modals and the DOM buttons above the canvas never reach here.
+const homeNightNow = () => { const hm = Shop.effectiveHomeMap(data); return hm.mode === 'map' && hm.map === 'night'; };
+let homeTap = null;
+cv.addEventListener('pointerdown', (e) => {
+  homeTap = (mode === 'home' && !modalOpen && !ui.build) ? { x: e.clientX, y: e.clientY } : null;
+});
+cv.addEventListener('pointerup', (e) => {
+  if (!homeTap || mode !== 'home' || modalOpen || ui.build) { homeTap = null; return; }
+  const moved = Math.hypot(e.clientX - homeTap.x, e.clientY - homeTap.y);
+  homeTap = null;
+  if (moved > 12) return;
+  const { s, ox, oy } = homeLayout(R.W, R.H, areaRect());
+  setWalkTarget((e.clientX - ox) / s, (e.clientY - oy) / s, ui.page || 1, data, homeNightNow());
+  snd.play('tap');
 });
 
 let forceRain = null;   // ?debug: force the next run rainy / dry
@@ -413,6 +431,7 @@ function frame(now) {
     const homeSeason = Shop.homeSeasonFor(data);
     const homeFestival = hm.mode === 'festival' ? hm.festival : (hm.mode === 'calendar' ? Fest.currentFestival() : null);
     const homeNight = hm.mode === 'map' && hm.map === 'night';
+    updateWalk(dt, ui.page || 1, data, homeNight);   // v5.1.7 庄园散步
     drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: homeSeason, fest: homeFestival, night: homeNight, build: ui.build }, time, R.dpr, areaRect(), ui.page || 1);
     R.g.setTransform(R.dpr, 0, 0, R.dpr, 0, 0); R.fxScreen(fx);
     if (preview && ui.shopOpenNow()) {   // turntable preview inside the shop
