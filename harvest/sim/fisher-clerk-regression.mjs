@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { World } from '../js/world.js';
 import { CFG } from '../js/config.js';
 import { makeFishingBoat } from '../js/models.js';
+import { splitSales } from '../js/sales.js';
 
 let checks = 0;
 const check = (name, fn) => { fn(); checks++; console.log(`PASS ${name}`); };
@@ -92,6 +93,89 @@ check('full-batch clerk keeps cargo intact if only partial counter room remains'
   w.interact(clerk, 1 / 30, false);
   assert.equal(clerk.stack.length, 0, 'once safe room exists, the whole load leaves together');
   assert.equal((clerk.drops?.C1 || 0) - beforeDrops, 25, 'C1 receives the complete batch in one delivery');
+});
+
+
+check('all fish-source hires, including late food fields, remain boat-based', () => {
+  let fishHires = 0;
+  for (let li = 0; li < CFG.levels.length; li++) {
+    const w = new World(li, { quiet: true, seed: 900 + li });
+    const hires = w.tiles.filter((t) => t.effect?.worker?.from?.some((id) => ['field', 'pond'].includes(w.objs[id]?.kind) && w.objs[id]?.item === 'fish'));
+    if (!hires.length) continue;
+    const upgrade = w.tiles.find((t) => t.effect?.upgradeWorkers === 'loader');
+    if (upgrade) buyTile(w, upgrade.id);
+    for (const tile of hires) {
+      buyTile(w, tile.id);
+      const fisher = w.workers.find((x) => x.fisher && x.from.some((id) => tile.effect.worker.from.includes(id)));
+      assert.ok(fisher, `L${li + 1} fish-source hire creates a fisher`);
+      assert.equal(fisher.boat, true, `L${li + 1} fisherman uses a boat`);
+      assert.equal(fisher.loader, false, `L${li + 1} fisherman never uses a loader`);
+      fishHires++;
+    }
+  }
+  assert.ok(fishHires >= 10, 'coverage includes multiple pond/fishing levels and late food markets');
+});
+
+check('ordinary food clerk walks before upgrade and uses the large loader after it', () => {
+  for (const li of [67, 68, 72]) { // levels 68, 69 and 73 exercise the role in distinct layouts
+    const w = new World(li, { quiet: true, seed: 150 + li });
+    const clerkTile = w.tiles.find((t) => t.id === 'food_clerk');
+    const upgrade = w.tiles.find((t) => t.effect?.upgradeWorkers === 'loader');
+    if (!clerkTile || !upgrade) continue;
+    buyTile(w, clerkTile.id);
+    const clerk = clerkOf(w);
+    assert.ok(clerk, `L${li + 1} has a normal sales clerk`);
+    assert.equal(clerk.loader, false, `L${li + 1} clerk walks before the vehicle upgrade`);
+    buyTile(w, upgrade.id);
+    assert.equal(clerk.loader, true, `L${li + 1} clerk receives the vehicle upgrade`);
+    assert.equal(clerk.loaderKind, 'big', `L${li + 1} clerk uses the large loader, not the small machine forklift`);
+  }
+  const late = new World(68, { quiet: true, seed: 180 });
+  const upgrade = late.tiles.find((t) => t.effect?.upgradeWorkers === 'loader');
+  buyTile(late, upgrade.id);
+  buyTile(late, 'food_clerk');
+  const hiredLate = clerkOf(late);
+  assert.ok(hiredLate);
+  assert.equal(hiredLate.loader, true, 'a clerk hired after the upgrade gets a vehicle');
+  assert.equal(hiredLate.loaderKind, 'big');
+});
+
+check('late supply expansions use separate paid sources and shared crop boards', () => {
+  const fishball = splitSales(CFG.levels[68]); // level 69
+  const fishFields = fishball.objects.filter((o) => o.type === 'field' && o.crop === 'fish');
+  assert.deepEqual(fishFields.map((o) => o.id), ['F1', 'F2']);
+  const secondPondUnlock = fishball.tiles.find((t) => t.effect?.show?.includes('F2'));
+  assert.ok(secondPondUnlock && secondPondUnlock.price > 0, 'second pond has its own coin unlock');
+  for (const id of ['F1', 'F2']) {
+    const hire = fishball.tiles.find((t) => t.effect?.worker?.from?.includes(id));
+    assert.ok(hire && hire.price > 0, `${id} has a separately paid fisher hire`);
+  }
+  const board = fishball.objects.find((o) => o.id === 'R_fish');
+  assert.ok(board && board.w >= 140 && board.h >= 70 && board.cap >= 900, 'fishball level has an enlarged central board');
+  assert.ok(board.x > 450 && board.x < 750 && board.y > 430 && board.y < 650, 'fishball board sits centrally, not at the far-right counter');
+  const clerkTile = fishball.tiles.find((t) => t.id === 'food_clerk');
+  const machineTile = fishball.tiles.find((t) => t.id === 'food_machine_M1');
+  assert.deepEqual(clerkTile.effect.worker.from, ['R_fish'], 'sales clerk is assigned from the shared raw board');
+  assert.deepEqual(machineTile.effect.worker.from, ['R_fish'], 'machine specialist is assigned from the same raw board');
+  assert.deepEqual(clerkTile.effect.worker.to, ['C1']);
+
+  const fishballWorld = new World(68, { quiet: true, seed: 169 });
+  buyTile(fishballWorld, 'food_machine_M1');
+  const machineWorker = fishballWorld.workers.find((x) => x.feedFor === 'M1');
+  assert.ok(machineWorker, 'fishball machine specialist is hired');
+  assert.equal(machineWorker.fisher, false, 'stand-fed machine specialist is not misclassified as a fish harvester');
+  assert.equal(machineWorker.boat, false, 'machine specialist does not use a fishing boat');
+  const fishballUpgrade = fishballWorld.tiles.find((t) => t.effect?.upgradeWorkers === 'loader');
+  buyTile(fishballWorld, fishballUpgrade.id);
+  assert.equal(machineWorker.fisher, false, 'vehicle upgrade keeps the machine role distinct from fishermen');
+
+  const rubber = splitSales(CFG.levels[67]); // level 68 single slow crop
+  assert.ok(rubber.objects.some((o) => o.id === 'F2' && o.crop === 'rubber'));
+  assert.ok(rubber.tiles.some((t) => t.effect?.show?.includes('F2') && t.price > 0), 'level 68 expansion costs coins');
+  const breakfast = splitSales(CFG.levels[71]); // level 72: rubber grows slowly and is much sparser than the other two crops
+  assert.ok(breakfast.objects.some((o) => o.id === 'F4' && o.crop === 'rubber'));
+  const fair = splitSales(CFG.levels[72]); // level 73: pumpkin's 22-unit spacing yields far fewer plants
+  assert.ok(fair.objects.some((o) => o.id === 'F4' && o.crop === 'pumpkin'));
 });
 
 console.log(`ALL FISHER/CLERK REGRESSIONS PASS (${checks} checks)`);

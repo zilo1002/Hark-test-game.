@@ -253,8 +253,10 @@ function splitFoodLevel(L0) {
     const x = Math.min(L.W - 90, Math.max(90, Math.max(...src.map((o) => o.x + o.w)) + 38));
     const y = src.reduce((n, o) => n + o.y + o.h / 2, 0) / src.length;
     const id = `R_${item}`;
-    const [sx, sy] = standSpot(L, stands, x, y);
-    saveStand(L, stands, { id, type: 'stand', role: 'raw', item, x: sx, y: sy, w: 64, h: 42, cap: 700 });
+    const board = L.rawBoardOverrides?.[item] || {};
+    const w = board.w || 64, h = board.h || 42;
+    const [sx, sy] = standSpot(L, stands, board.x ?? x, board.y ?? y, w, h);
+    saveStand(L, stands, { id, type: 'stand', role: 'raw', item, x: sx, y: sy, w, h, cap: board.cap || 700 });
   }
   for (const item of outItems) {
     const p = procs.find((q) => q.out === item);

@@ -736,7 +736,7 @@ export class World {
       w.from = from; w.to = to; w.state = 'collect'; w.wait = 0; w.tgt = null; w.retarget = 0;
       w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = cart;
       w.lumber = w.from.some((id) => this.objs[id] && this.objs[id].item === 'log');
-      w.fisher = w.from.some((id) => this.objs[id] && this.objs[id].item === 'fish');   // Fisher look applies to ponds and the valley's winter fish field.
+      w.fisher = w.from.some((id) => { const o = this.objs[id]; return o && ['field', 'pond'].includes(o.kind) && o.item === 'fish'; });   // Only fish harvesters are fishers; clerks/feeders carrying fish stay ordinary workers.
       w.boat = w.fisher; w.boatUpgrade = w.fisher && this.loaders;
       w.lv = 1; w.trips = 0; w.lvT = -9;
       // v5.1.1 (C) chain specialist: the tile's feeder is a LIST [M1, M2].
