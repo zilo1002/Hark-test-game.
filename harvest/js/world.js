@@ -574,7 +574,7 @@ export class World {
       const F = CFG.fever; p.speed *= F.speedMul; p.harvestR *= F.radiusMul; p.pickR *= 1 + (F.radiusMul - 1) * 0.5; p.pickRate *= 1.4;
     }
     for (const w of this.workers) {
-      const Wk = w.loader ? this.loaderCfg(w) : CFG.worker, Lv = CFG.workerLv, k = (w.lv || 1) - 1;
+      const Wk = w.loader ? this.loaderCfg(w) : w.boatUpgrade ? CFG.loaderBig : CFG.worker, Lv = CFG.workerLv, k = (w.lv || 1) - 1;
       w.speed = (Wk.speed + u.wspeed) * (1 + Lv.speed * k); w.cap = Math.round((Wk.cap + u.wcap) * (1 + Lv.cap * k));
       // v5.1.1 (C): a chain worker's carrying capacity stays at its base value
       // (speed still grows with level). Its batch must stay fillable from one
@@ -708,7 +708,10 @@ export class World {
       // machine feeders (feedFor) drive the small forklift. Carts and processed-goods porters
       // keep their own rigs, as before. v5.1.4: clerks ride too (no feedFor → big
       // shovel loader, same as harvest workers) — Jin: 换货车的时候理货员也要换.
-      for (const w of this.workers) if (!w.cart && !w.loader && !w.porter && (!this.L.foodCollectionTables || !w.feedFor)) { w.loader = true; w.loaderKind = w.feedFor ? 'small' : 'big'; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
+      for (const w of this.workers) {
+        if (w.fisher) { w.boat = true; w.boatUpgrade = true; continue; } // fishermen keep their boat, never become loader drivers
+        if (!w.cart && !w.loader && !w.porter && (!this.L.foodCollectionTables || !w.feedFor)) { w.loader = true; w.loaderKind = w.feedFor ? 'small' : 'big'; w.appearT = this.t; if (!silent) this.emit('loaderUp', { x: w.x, y: w.y }); }
+      }
       this.refreshStats();
     }
     if (e.sprinkler) for (const id of e.sprinkler) { const f = this.objs[id]; if (f && (f.kind === 'field' || f.kind === 'pond')) { f.growMul = CFG.sprinkler.growMul; f.sprinkler = true; f.sprinklerT = this.t; } }
@@ -734,6 +737,7 @@ export class World {
       w.stuck = 0; w.lastX = t.x; w.lastY = t.y; w.appearT = this.t; w.seed = this.workers.length; w.cart = cart;
       w.lumber = w.from.some((id) => this.objs[id] && this.objs[id].item === 'log');
       w.fisher = w.from.some((id) => this.objs[id] && this.objs[id].item === 'fish');   // Fisher look applies to ponds and the valley's winter fish field.
+      w.boat = w.fisher; w.boatUpgrade = w.fisher && this.loaders;
       w.lv = 1; w.trips = 0; w.lvT = -9;
       // v5.1.1 (C) chain specialist: the tile's feeder is a LIST [M1, M2].
       // feedFor stays a single id (the CURRENT target machine, starting at the
@@ -742,7 +746,7 @@ export class World {
       // A single-id feeder (all other workers) behaves exactly as before.
       if (Array.isArray(feeder)) { w.chainFor = feeder.slice(); w.feedFor = feeder[0]; }
       else { w.feedFor = feeder; w.chainFor = null; }
-      w.loader = this.loaders && !w.cart && (!this.L.foodCollectionTables || !w.feedFor);
+      w.loader = this.loaders && !w.cart && !w.fisher && (!this.L.foodCollectionTables || !w.feedFor);
       if (w.loader) w.loaderKind = w.feedFor ? 'small' : 'big';   // v4.9.8: a hire after the upgrade rides the same vehicle its job would have given it
       w.done = 0; const cm = this.crew && this.crew[this.workers.length];
       if (cm) { w.crewId = cm.id; w.crewName = cm.name; w.crewMul = cm.mul; }
@@ -1131,6 +1135,10 @@ export class World {
           }
         } else if (this.tryBatchDrop(c, sink, accepts, isPlayer)) {
           // v4.8.5: whole stack dropped at once (see tryBatchDrop); nothing left to trickle
+        } else if (!isPlayer && c.fullBatch && sink.kind === 'counter') {
+          // Full-batch clerks keep their cargo intact if the counter's safe headroom
+          // changed after pickup; retry the complete load when room opens.
+          c.dropAcc = 0;
         } else {
           c.dropAcc = Math.min(c.dropAcc + c.dropRate * dt, Math.max(1, c.dropRate * 0.1));
           while (c.dropAcc >= 1) {
@@ -1522,6 +1530,9 @@ export class World {
       if (have >= batch) { w.state = 'deliver'; w.batch = batch; w.batchCap = w.cap; }
       else if (have > 0) w.waitReason = srcs.some((source) => (source.kind === 'coop' ? source.pile.total : (source.pile ? source.pile.total : 0) + (source.ripe || 0)) > 0) ? '装满整批' : '等原料补充';
     }
+    if (w.state === 'collect' && w.clerk && w.clerkBatch > 0 && w.stack.length + w.incoming >= w.clerkBatch) {
+      w.state = 'deliver'; w.batch = w.clerkBatch; w.batchCap = w.clerkBatch;
+    }
     // v4.7 porter: leave the tray with a fair batch, or at once when the goods counter is running low
     if (w.state === 'collect' && w.porter && this.smart) {
       // it keeps loading while its tray has goods (a full stack goes anyway), and leaves an emptied tray with a fair batch,
@@ -1531,7 +1542,7 @@ export class World {
       if (left === 0 && w.incoming === 0 && (have >= Math.ceil(w.cap * CFG.v47.porterGo) || (low && have >= CFG.v47.porterMin))) w.state = 'deliver';
     }
     if (w.state === 'deliver' && w.stack.length === 0 && w.incoming === 0) {
-      w.state = 'collect'; w.wait = 0; w.otherTray = null; w.batch = 0; w.batchCap = 0;
+      w.state = 'collect'; w.wait = 0; w.otherTray = null; w.batch = 0; w.batchCap = 0; w.clerkBatch = 0;
       // 园丁成长: level up every few delivery trips
       w.trips++;
       const Lv = CFG.workerLv, nl = Math.min(Lv.max, 1 + Math.floor(w.trips / Lv.per));
@@ -1550,25 +1561,30 @@ export class World {
     w.canPick = w.state === 'collect';
     let tx = w.x, ty = w.y;
     if (w.state === 'collect') {
-      let best = null, bv = 0;
+      let best = null, bv = 0, bestBatch = 0;
       for (const s of srcs) {
         const v = s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + (s.ripe || 0);
-        // v5.1.2 (A补): a clerk yields to machine feeders — it only takes from
-        // a stand that holds a deep surplus, so a feeder never waits for a
-        // batch the clerk just took. The clerk and the feeders share the
-        // single raw stand in L13/L51; taking freely slowed PS front wait
-        // +0.4s (fit 35/37). Food levels rely on the clerk alone for C1.
-        // v5.1.8: the reserve is ONE base batch, not five. The old 300
-        // (cap + 5×base) assumed food stands run deep like L54 (R_wheat/
-        // R_berry 500+), but some food lines run shallow (L67 pumpkin hovers
-        // 0–230) and the clerk would stand idle for half a minute waiting
-        // for a stand that never reaches 300 (Jin 2026-11-14: 就拿一点、
-        // 有时候还等着). One batch (100 = cap + 1×base) still leaves a full
-        // feeder load behind after the clerk takes its 50, so machine
-        // feeders are not starved. If every stand is below it, the clerk
-        // waits (best stays null) instead of starving the machines.
-        if (w.clerk && s.kind === 'stand' && s.pile && s.pile.total < w.cap + CFG.worker.cap) continue;
-        if (v > bv) { bv = v; best = s; }
+        // Sales clerks respect an active feeder's raw stock reserve, but do not
+        // apply the old blanket 100-item gate to every sales stand.
+        // standalone sales boards must not make the clerk idle just because stock is
+        // below an arbitrary 100-item threshold. Choose a whole-trip size that also
+        // fits the counter's current safe capacity, so a clerk never starts a load
+        // that can only be dribbled onto the desk.
+        if (w.clerk && s.kind === 'stand' && s.pile) {
+          const counter = sinks.find((k) => k.kind === 'counter' && k.items.includes(s.item));
+          if (!counter || (this.smart && !this.sinkOpen(w, counter))) continue;
+          let room = Math.max(0, CFG.counter.stockMax - counter.stock.length - counter.incoming);
+          if (!counter.sale2 && this.procs.length) room = Math.min(room, CFG.v46.rawFull + 4 - this.rawStock(counter));
+          const feederNeeds = this.workers.some((f) => {
+            if (f === w || !f.feedFor || !f.from.includes(s.id)) return false;
+            const proc = this.objs[f.feedFor];
+            return proc && !proc.hidden && !this.procFull(proc);
+          });
+          const available = Math.max(0, v - (feederNeeds ? CFG.worker.cap : 0));
+          const trip = Math.min(w.cap, room, available);
+          if (trip <= 0) continue;
+          if (available > bv) { bv = available; best = s; bestBatch = trip; }
+        } else if (v > bv) { bv = v; best = s; }
       }
       // v5.0.3: ease the approach only for pile pickups (board / coop / machine pile).
       // Field harvesters work plants 11 px apart, so a distance-eased approach would
@@ -1581,12 +1597,9 @@ export class World {
         if ((w.feedFor || w.fullBatch) && w.stack.length + w.incoming > 0) w.waitReason = '等原料补齐整批';
         // v4.7 nothing to pick up: wait at its own post (porter by its tray, others at the edge of their field)
         else if (this.smart && w.idleT > CFG.v47.idleWait) { const o = this.idlePost(w, srcs); tx = o.x; ty = o.y; }
-        // v5.1.8: a fullBatch clerk holding a partial load gives up after a
-        // short wait (Jin 2026-11-14: 中间可以等个两三秒，但是不能等半分钟)
-        // — it delivers what it has instead of standing at the stand forever
-        // waiting for a full batch. Full-batch-first, leave-on-timeout: while
-        // a source is available it keeps filling up; this only fires when
-        // there is NO eligible source and the 3 s grace period is over.
+        // If a source actually runs dry mid-trip, the clerk may dispatch its
+        // collected load after a short grace period; a board with usable stock
+        // remains eligible instead of leaving the worker idle there.
         // Scoped to the clerk only — chain/machine specialists keep waiting
         // for their full batch (a machine needs a complete batch).
         // NOTE: standalone `if` AFTER the else-if above — it must NOT sit
@@ -1597,6 +1610,7 @@ export class World {
         if (w.fullBatch && w.clerk && w.stack.length > 0 && w.wait > 3) w.state = 'deliver';
       } else {
         w.idleT = 0; w.wait = 0;
+        if (w.clerk && w.stack.length + w.incoming === 0) w.clerkBatch = bestBatch;
         // v4.9.7: a board-filler (standCarrier) with a fair load leaves when its source is
         // nearly bare — waiting to fill a 150-item basket one sparse pumpkin at a time leaves
         // the board empty and the machine starved between rare big bursts (L29 M2 26% -> 10%,
@@ -1681,7 +1695,7 @@ export class World {
       else if (w.blocked && !w.blocked.hidden) { const z = w.blocked.inZone || w.blocked.zone, k = w.seed | 0; tx = z.cx - 30 + (k % 3) * 8; ty = z.cy + 34 + (k % 2) * 8; w.blocked = null; }   // a blocked sink waits nearby
       else if (w.stack.length) { const o = this.post(w, srcs); tx = o.x; ty = o.y; w.holding = true; w.blocked = null; } // preserve cargo until a compatible sink is available
     }
-    const goal = Math.hypot(tx - w.x, ty - w.y), body = w.loader ? this.loaderCfg(w).body : 9;
+    const goal = Math.hypot(tx - w.x, ty - w.y), body = w.loader ? this.loaderCfg(w).body : w.boat ? 14 : 9;
     // stuck detection: no real progress for a while while trying to move → force a fresh
     // path; still nothing → give up on this target (pick another plant/pile cell / sink spot)
     // v5.0.3: a worker waiting with its load (blocked sink) stands at its post — the
@@ -1716,7 +1730,7 @@ export class World {
     w.lastX = w.x; w.lastY = w.y;
     const k = Math.min(1, dt * 10);
     w.vx += (vx - w.vx) * k; w.vy += (vy - w.vy) * k;
-    this.stepMove(w, dt, w.loader ? this.loaderCfg(w).body : 9);
+    this.stepMove(w, dt, w.loader ? this.loaderCfg(w).body : w.boat ? 14 : 9);
   }
 
   // v4.3 bot / debug walker: the workers' A* path toward the guide target. navigate's straight-line test skips the

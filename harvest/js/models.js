@@ -722,6 +722,23 @@ export function makeMower() {
   }
   return { root: g, wheels };
 }
+// Fishermen keep a small wooden boat, including after the general vehicle upgrade.
+// The blue inner deck and paired oars make the fishing role readable at game scale.
+export function makeFishingBoat() {
+  const root = new THREE.Group();
+  const hull = new THREE.Mesh(merge([
+    P(cyl(14, 11, 50, 8), '#8E5627', [0, 4, 0], [H, 0, 0]),
+    P(box(22, 2.2, 34), '#3B91B5', [0, 8, -1]),
+    P(box(2.2, 4, 36), '#A66A34', [-11, 7, -1]), P(box(2.2, 4, 36), '#A66A34', [11, 7, -1]),
+    P(box(22, 3, 6), '#C8874A', [0, 10, -8]),
+    P(cyl(0.8, 0.8, 34, 6), '#D8C29A', [-15, 8, 0], [H, -0.5, 0]),
+    P(cyl(0.8, 0.8, 34, 6), '#D8C29A', [15, 8, 0], [H, 0.5, 0]),
+    P(box(2, 1.6, 12), '#E7D2A7', [-15, 8, 7]), P(box(2, 1.6, 12), '#E7D2A7', [15, 8, 7]),
+  ]), vcMat());
+  hull.castShadow = true; root.add(hull);
+  return { root, hull };
+}
+
 // 园丁换铲车: a small chunky ride-on loader (same toy palette as the mower). Faces +Z: front bucket,
 // driver seat in the middle, a railed load bed at the back where the harvest stacks up.
 export function makeLoader(kind) {

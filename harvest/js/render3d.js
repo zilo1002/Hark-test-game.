@@ -759,6 +759,13 @@ export class Renderer {
       const pp = M.makePerson(this.heroStyle || HERO), mow = M.makeMower();
       mow.root.add(pp.root); this.levelRoot.add(mow.root);
       o = { c, pp, mow, ang: 0.8, root: mow.root };
+    } else if (c.kind === 'worker' && c.fisher) {
+      // Fishermen work from a boat, not a powered loader; the boat stays visible after upgrades.
+      const pp = M.makePerson(this.wLook(FISHER)), boat = M.makeFishingBoat();
+      pp.root.position.set(0, 6, 0); pp.blob.visible = false; boat.root.add(pp.root);
+      const blob = new THREE.Mesh(M.BLOB_GEO, M.BLOB_MAT); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.25; blob.scale.set(22, 32, 1); boat.root.add(blob);
+      this.levelRoot.add(boat.root);
+      o = { c, pp, boat, ang: 0.8, root: boat.root };
     } else if (c.kind === 'worker' && c.loader) {
       // v4.9.8: two vehicles — harvest workers ride the big shovel loader, machine feeders
       // drive the small forklift. A loader without a kind falls back to the old single loader
@@ -780,8 +787,8 @@ export class Renderer {
     }
     if (o && o.root) {
       o.crate = makeCargoCrateStack();
-      const rear = c.kind === 'player' ? -17 : c.loader ? (c.loaderKind === 'small' ? 20 : c.loaderKind === 'big' ? -24 : -19) : c.cart ? -19 : 12;
-      const y = c.kind === 'player' && c.vehicle ? 5 : c.loader ? (c.loaderKind === 'small' ? 9 : c.loaderKind === 'big' ? 8 : 7) : c.cart ? 2 : 8;
+      const rear = c.kind === 'player' ? -17 : c.fisher ? -20 : c.loader ? (c.loaderKind === 'small' ? 20 : c.loaderKind === 'big' ? -24 : -19) : c.cart ? -19 : 12;
+      const y = c.kind === 'player' && c.vehicle ? 5 : c.fisher ? 12 : c.loader ? (c.loaderKind === 'small' ? 9 : c.loaderKind === 'big' ? 8 : 7) : c.cart ? 2 : 8;
       o.crate.position.set(0, y, rear); o.crate.visible = false;
       o.root.add(o.crate);
     }
@@ -793,7 +800,7 @@ export class Renderer {
     if (sp > 8) o.ang = angLerp(o.ang, Math.atan2(c.vx, c.vy), Math.min(1, dt * 12));
     const app = c.appearT !== undefined ? elastic((this.wt - c.appearT) / 0.6) : 1;
     o.root.visible = app > 0;
-    o.root.position.set(c.x, 0, c.y); o.root.rotation.y = o.ang; o.root.scale.setScalar(Math.max(0.001, app) * 1.15);
+    o.root.position.set(c.x, o.boat ? Math.sin(t * 2.3 + c.seed) * 0.55 : 0, c.y); o.root.rotation.y = o.ang; o.root.scale.setScalar(Math.max(0.001, app) * 1.15);
     const actionAge = this.wt - c.cutT;
     const fishing = c.cutItem === 'fish' && actionAge >= 0 && actionAge < 0.72;
     const cutting = fishing || actionAge < 0.22;
@@ -827,6 +834,8 @@ export class Renderer {
       o.pp.blob.visible = !veh;
       M.posePerson(o.pp, { t, walk: c.walk, moving: c.moving && !veh, carry: carry && !veh, cutting: cutting && !veh, fishing: fishing && !veh, actionProgress, seated: veh, seed: 1, axe: c.cutItem === 'log', net: c.cutItem === 'fish', bend: veh ? 0 : bend });
       if (veh) { o.pp.arms[0].rotation.set(-1.2, 0, 0.3); o.pp.arms[1].rotation.set(-1.2, 0, -0.3); o.pp.tool.visible = false; }
+    } else if (o.boat) {
+      M.posePerson(o.pp, { t, walk: c.walk, moving: false, carry: false, cutting: false, fishing, actionProgress, seated: true, seed: c.seed + 2, net: true, showTool: !carry });
     } else if (o.loader) {
       M.posePerson(o.pp, { t, walk: c.walk, moving: false, carry: false, cutting: false, seated: true, seed: c.seed + 2 });
       o.pp.arms[0].rotation.set(-1.15, 0, 0.3); o.pp.arms[1].rotation.set(-1.15, 0, -0.3); o.pp.tool.visible = false;
@@ -842,6 +851,7 @@ export class Renderer {
     // where the stack sits: in the hands (walking), on the mower's rear deck, or on the cart bed
     const a = o ? o.ang : 0, fx = Math.sin(a), fz = Math.cos(a);
     if (c.kind === 'player' && c.vehicle) return { x: c.x - fx * 17, y: c.y - fz * 17, z: 16, cols: 3, spread: 7.5, fx, fz };
+    if (c.kind === 'worker' && c.fisher) return { x: c.x - fx * 20, y: c.y - fz * 20, z: 10, cols: 2, deep: 3, spread: 6.5, fx, fz };
     if (c.kind === 'worker' && c.loader) {
       // v4.9.8: the big loader's load rides its wide rear bed; the forklift's load rides its
       // front forks, piled full (3x3) — a full pallet on the way to the machine. A loader

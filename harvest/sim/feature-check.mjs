@@ -71,9 +71,10 @@ function buyReady(w, skip = () => false) {
   assert.ok(ordinary.workers.some((w) => !w.cart && !w.porter));
   for (const w of ordinary.workers) if (!w.cart && !w.porter) assert.equal(w.cap, CFG.worker.cap, 'standard hire carries the normal full load');
   assert.ok(loader.visible); ordinary.completeTile(loader, true);
-  // v4.9.8: the upgrade gives each worker the vehicle its job calls for — harvest workers
-  // the big shovel loader, machine feeders the small forklift — each with its own full load.
+  // v4.9.8: harvest workers ride the big loader and machine feeders the small forklift.
+  // Fishermen are the exception: they stay fishermen on boats after a general vehicle upgrade.
   for (const w of ordinary.workers) if (!w.cart && !w.porter) {
+    if (w.fisher) { assert.equal(w.boat, true); assert.equal(w.loader, false); continue; }
     const want = w.loaderKind === 'big' ? CFG.loaderBig : w.loaderKind === 'small' ? CFG.loaderSmall : CFG.loader;
     assert.equal(w.cap, want.cap, `vehicle upgrade raises the full load (loaderKind=${w.loaderKind})`);
     assert.ok(w.loaderKind, 'an upgraded worker has a vehicle kind');

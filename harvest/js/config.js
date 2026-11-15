@@ -25,8 +25,8 @@ export const CFG = {
   worker: { speed: 92, pickR: 28, harvestR: 26, cutRate: 26, cap: 50, pickRate: 30, dropRate: 40 },
   // 园丁换铲车: gardeners ride small loaders (bigger swath, faster, much bigger load on the rear bed)
   loader: { speed: 122, pickR: 40, harvestR: 42, cap: 150, pickRate: 60, dropRate: 90, body: 14 },
-  // v4.9.8 升级分两种车: 收割工人 (gardeners, lumberjacks, fishers) 换超大铲车 (wider swath, bigger
-  // load, bigger body — the big red harvester in Jin's reference); 管加工的工人 (machine feeders)
+  // v4.9.8 升级分两种车: 收割工人换超大铲车 (wider swath, bigger
+  // load, bigger body — the big red harvester in Jin's reference); 渔夫保留渔船、只提升作业数值; 管加工的工人 (machine feeders)
   // 换小铲车 (same full load, nimbler body for tight machine rows). loader stays as the fallback
   // for a loader without a kind (e.g. a check that flips w.loader by hand).
   loaderBig: { speed: 122, pickR: 48, harvestR: 50, cap: 180, pickRate: 60, dropRate: 90, body: 18 },

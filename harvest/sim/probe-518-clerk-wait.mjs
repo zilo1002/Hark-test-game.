@@ -1,35 +1,23 @@
 // v5.1.8 售货员不等满批 — Jin 反馈 (2026-11-14 11:54, 附 67 关实拍):
 // "普通理货员就拿一点有时候还等着 就不能像我一样一次性拿满吗？
 // 中间可以等个两三秒 但是不能等半分钟啊".
-// Root cause (confirmed in code + sim, see below): two waits, both from the
-// clerk's fullBatch + 300 reserve (v5.1.2/v5.1.4):
-//   (a) the clerk only STARTS picking from a stand with >= 300 items
-//       (w.cap + 5x base cap). Some food lines run shallow (L67 pumpkin
-//       hovers 0-230), so the clerk stands idle empty-handed waiting for a
-//       stand that never reaches 300. Realistic-bot sim: empty-handed waits
-//       of 7.7-10.9 s right after the clerk is hired.
-//   (b) once it holds a partial load and the stand drops below the reserve,
-//       best becomes null and the clerk waits FOREVER — fullBatch workers
-//       are excluded from the collectWait -> deliver transition, so there is
-//       no timeout at all. It holds a partial load and stands at the stand.
-// Fix (world.js, clerk only — chain/machine specialists untouched):
-//   (a) reserve 300 -> 100 (cap + 1x base cap). One batch still leaves a
-//       full feeder load behind after the clerk takes its 50, so machine
-//       feeders are not starved.
-//   (b) wait cap: a fullBatch clerk holding a partial load with NO eligible
-//       source delivers after 3 s (Jin: 等两三秒可以，不能等半分钟).
+// Root cause (confirmed in code + sim): a blanket 100-item stand gate kept
+// ordinary clerks waiting even when a smaller usable batch was available; the
+// 3-second dry-source fallback already handles a stand that empties mid-trip.
+// Current fix (world.js, clerk only — chain/machine specialists untouched):
+//   (a) remove the blanket gate for ordinary sales boards, but reserve one
+//       full feeder load when a live machine specialist shares the stand.
+//       Size each clerk trip to available goods and safe counter headroom.
+//   (b) keep the existing 3 s dry-source fallback for a partial load when no
+//       eligible source remains (Jin: 等两三秒可以，不能等半分钟).
 //       Full-batch-first, leave-on-timeout — while a source is available it
 //       keeps filling up; the cap only fires when best is null.
 // Checks:
 //   1. tile structure: food_clerk still fullBatch (raw stands -> C1);
 //      machine x_rc still cashier-only.
-//   2. wait cap + reserve (the core test): L54, hire ONLY the clerk (no
-//      farmhand, no feeder — no refill). Seed the raw stand with 120 items
-//      (< old 300 reserve, >= new 100). The clerk must pick from it at all
-//      (proves the reserve was lowered — old code never picks below 300)
-//      and must deliver a partial load within a bounded time (proves the
-//      3 s cap — old code waits forever with a partial load). Its longest
-//      partial-load wait must be <= 4 s.
+//   2. L54, hire only the clerk and seed its board with 25 items, below the
+//      former blanket 100-item gate. Confirm it picks and delivers.
+//   3. Drain a stand mid-trip and confirm the partial load leaves after ~3 s.
 //   3. full batch still preferred: L54 buyAll, every clerk batch is a full
 //      load (50) — the cap/reserve change must not turn it back into
 //      partial dribbles.
@@ -94,17 +82,10 @@ check('machine levels: x_rc still cashier-only (no carrying)', () => {
   console.log(`  (machine levels with cashier-only x_rc: ${count})`);
 });
 
-// ---- 2a. reserve lowered (300 -> 100): clerk picks from a shallow stand ----
-// L54 has one raw stand (R_wheat). Hire ONLY the clerk (its req chain pulls
-// in the first machine tile, which shows M1 — but no feeder and no farmhand
-// are hired, so the stand gets no refill). Seed the stand with 120 items:
-// below the OLD 300 reserve (old code would never pick from it at all) and
-// above the NEW 100 reserve (new code picks from it). The clerk must deliver
-// to C1 within a bounded time. (Note: once the clerk is standing at the stand
-// it keeps picking from nearby pile cells even after the total drops below
-// the reserve — the pickup loop only checks its sources, not best — so it
-// may fill to a full 50 here. The partial-load case is check 2b.)
-check('reserve lowered: clerk picks from a 120-item stand (old code never would)', () => {
+// ---- 2a. a usable batch below the former blanket 100-item gate ----
+// L54 has one raw stand (R_wheat). Hire only the clerk; no feeder/farmhand
+// refills the stand. With 25 items, the clerk should still pick and deliver.
+check('clerk delivers a usable batch below the former 100-item gate', () => {
   const w = new World(53, { quiet: true, seed: 7 }); // L54
   buyTile(w, 'food_clerk');
   const clerk = clerkOf(w);
@@ -113,8 +94,8 @@ check('reserve lowered: clerk picks from a 120-item stand (old code never would)
   assert.ok(clerk.clerk, 'L54 clerk must be flagged clerk');
   const stand = w.objs[clerk.from[0]];
   assert.ok(stand && stand.kind === 'stand', 'clerk source must be a raw stand');
-  for (let k = 0; k < 120; k++) stand.pile.add(stand.x, stand.y, w.rnd);
-  assert.ok(stand.pile.total >= 100 && stand.pile.total < 300, `seeded stand total ${stand.pile.total} must be in [100, 300)`);
+  for (let k = 0; k < 25; k++) stand.pile.add(stand.x, stand.y, w.rnd);
+  assert.ok(stand.pile.total > 0 && stand.pile.total < 100, `seeded stand total ${stand.pile.total} must be in (0, 100)`);
   let delivered = 0, firstDeliverAt = -1;
   let prevState = clerk.state;
   for (let i = 0; i < 45 * 30; i++) {
@@ -124,12 +105,12 @@ check('reserve lowered: clerk picks from a 120-item stand (old code never would)
     delivered = (clerk.drops && (clerk.drops.C1 || 0)) || 0;
     if (delivered > 0) break;
   }
-  assert.ok(delivered > 0, `L54 clerk delivered ${delivered} to C1 in 45 s — old code never delivers from a 120 stand (below the 300 reserve)`);
+  assert.ok(delivered > 0, `L54 clerk delivered ${delivered} to C1 in 45 s — a usable 25-item board batch must not be blocked by the former 100-item gate`);
   assert.ok(firstDeliverAt < 20, `L54 first delivery took ${firstDeliverAt.toFixed(1)} s, expected < 20 s`);
-  console.log(`  (clerk picked from a 120-item stand and delivered ${delivered} to C1 at ${firstDeliverAt.toFixed(1)} s)`);
+  console.log(`  (clerk picked from a 25-item stand and delivered ${delivered} to C1 at ${firstDeliverAt.toFixed(1)} s)`);
 });
 
-// ---- 2b. wait cap (core): partial load + dry stand -> delivers in <= 3 s ----
+// ---- 2b. partial load + dry stand -> delivers in <= 3 s ----
 // Same L54 setup, but once the clerk has started picking (a partial load),
 // drain the stand completely — simulating the stand running dry mid-pickup
 // (feeder drained it / farmhand is slow), which is exactly Jin's "拿一点
