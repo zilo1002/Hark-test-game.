@@ -8,7 +8,7 @@ import { Input } from './input.js';
 import { Sound, Haptics } from './audio.js';
 import * as Save from './save.js';
 import { saveRun } from './run-save.js';
-import { drawHome, hitSpot, homeLayout, setWalkTarget, updateWalk } from './home.js';
+import { drawHome, hitSpot, hitDeco, homePoint, homeLayout, setWalkTarget, updateWalk } from './home.js';
 import { UI } from './ui.js';
 import * as Shop from './shop.js';
 import { Preview } from './preview3d.js';
@@ -33,6 +33,7 @@ let mode = 'home', world = null, guide = null, guideT = 0, saveT = 0, hudT = 0, 
 let feverFxT = 0, fullFxT = -9, goldFxT = -9, catchFxT = -9, scatFxT = -9;
 let modalOpen = false, cashFxT = 0, winDone = false, harvestFxT = 0, saleHapT = 0, dustT = 0;
 const restoredAt = {};            // session-only animation stamps for the home screen
+let decoEdit = null;
 
 const ITEM_BITS = { wheat: ['#F6CB4A', '#FFE07A', '#C9962A'], potato: ['#5DBB3A', '#9C6331', '#C98A4B'], egg: ['#FFF3D6', '#FFFFFF'], tomato: ['#EE4630', '#5DBB3A'],
                     tulip: ['#F2486E', '#FF8FB0', '#FFB3C8', '#5DBB3A'], rose: ['#E0283C', '#FF5A78', '#8E0E1E', '#3E8F25'], gold: ['#FFC21A', '#FFE16B', '#F29C0E', '#5DBB3A'],
@@ -136,6 +137,8 @@ const ui = new UI({
   locked: () => { snd.play('full'); hap.tick(30, 0); },
   save: () => saveRun(data, world, { credit, persist: Save.save }),
   shopToggle: (id) => { const r = Shop.toggle(data, id); Save.save(data); applyLook(); snd.play(r === 'on' ? 'appear' : 'tap'); hap.tick(14, 0); return r; },
+  clearDecoSelection: () => { decoEdit=null; },
+  decoAction: (action, uid) => { let ok=false; if(action==='store') ok=Shop.storeDeco(data,uid); else if(action==='place') ok=Shop.placeDeco(data,uid); else if(action==='sell'){const r=Shop.sellStoredDeco(data,uid);ok=r.ok;if(ok)ui.toast(`已出售，获得${r.amount}金币`);} if(ok){Save.save(data);applyLook();}return ok; },
 });
 
 // 商店 look: the farmer's outfit (3D in levels) and the decorations (estate + level scenery)
@@ -177,7 +180,19 @@ window.addEventListener('resize', relayout);
 relayout(); applyQualitySetting();
 // tap a dashed ring on the estate (装扮 mode) to build that spot with stars
 cv.addEventListener('pointerup', (e) => {
-  if (mode !== 'home' || modalOpen || !ui.build) return;
+  if (mode !== 'home' || modalOpen) return;
+  if (!ui.build) { const hit=hitDeco(R.W,R.H,areaRect(),data,e.clientX,e.clientY); if(hit){decoEdit=hit;ui.setBuild(true);return;} return; }
+  const pt=homePoint(R.W,R.H,areaRect(),e.clientX,e.clientY);
+  if(decoEdit){
+    const dx=pt.x-decoEdit.x, dy=pt.y-(decoEdit.y-43);
+    if(Math.hypot(dx-18,dy)<13){Shop.moveDeco(data,decoEdit.uid,decoEdit.x,decoEdit.y);Save.save(data);applyLook();decoEdit=null;return;}
+    if(Math.hypot(dx+18,dy)<13){Shop.storeDeco(data,decoEdit.uid);Save.save(data);applyLook();decoEdit=null;return;}
+    const hit=hitDeco(R.W,R.H,areaRect(),data,e.clientX,e.clientY);
+    if(hit && hit.uid!==decoEdit.uid) decoEdit=hit; else {decoEdit.x=Math.max(8,Math.min(352,pt.x));decoEdit.y=Math.max(90,Math.min(430,pt.y));}
+    return;
+  }
+  const hit=hitDeco(R.W,R.H,areaRect(),data,e.clientX,e.clientY);
+  if(hit){decoEdit=hit;return;}
   const id = hitSpot(R.W, R.H, areaRect(), ui.page || 1, data, e.clientX, e.clientY);
   if (id) restore(id);
 });
@@ -432,7 +447,7 @@ function frame(now) {
     const homeFestival = hm.mode === 'festival' ? hm.festival : (hm.mode === 'calendar' ? Fest.currentFestival() : null);
     const homeNight = hm.mode === 'map' && hm.map === 'night';
     updateWalk(dt, ui.page || 1, data, homeNight);   // v5.1.7 庄园散步
-    drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: homeSeason, fest: homeFestival, night: homeNight, build: ui.build }, time, R.dpr, areaRect(), ui.page || 1);
+    drawHome(R.g, R.W, R.H, { ...data, restoredAt, season: homeSeason, fest: homeFestival, night: homeNight, build: ui.build, selectedDeco: decoEdit }, time, R.dpr, areaRect(), ui.page || 1);
     R.g.setTransform(R.dpr, 0, 0, R.dpr, 0, 0); R.fxScreen(fx);
     if (preview && ui.shopOpenNow()) {   // turntable preview inside the shop
       const c = preview.cv, w = c.clientWidth, h = c.clientHeight;

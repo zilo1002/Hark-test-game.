@@ -290,6 +290,8 @@ const ITEM_PARTS = {
   ],
   bill: () => [P(box(11, 0.9, 6), '#57C35A'), P(box(3, 1.1, 3), '#E9FFE0', [0, 0.05, 0])],
   cash: () => [P(box(12, 2.6, 7), '#57C35A'), P(box(12.3, 2.8, 2), '#2F8F3A'), P(box(2.6, 2.9, 2.2), '#E9FFE0')],
+  rainboots: () => [P(box(12, 2, 8), '#7C3924', [0, -2, 0]), P(box(4.2, 9, 7), '#D44335', [-3.2, 2, 0]), P(box(4.2, 9, 7), '#E6533D', [3.2, 2, 0]), P(box(5, 2, 8), '#F3C848', [-3.2, -3.8, 0]), P(box(5, 2, 8), '#F3C848', [3.2, -3.8, 0])],
+  fishballs: () => [P(box(10, 1.2, 9), '#8E5627', [0, -3, 0]), ...[-3, 0, 3].map((x) => P(sph(2.8, 7, 5), '#F4E8CD', [x, 1, 0])), P(cyl(0.45, 0.45, 9, 5), '#8E5627', [0, 1, 2], [H, 0, 0])],
 };
 const ITEM_GEO = {};
 export function itemGeo(type) { return ITEM_GEO[type] || (ITEM_GEO[type] = merge((ITEM_PARTS[type] || ITEM_PARTS.egg)())); }
@@ -297,7 +299,7 @@ export const ITEM_TYPES = Object.keys(ITEM_PARTS);
 // half height of each item, so stacks and piles rest items on their bottom face
 export const ITEM_HALF = { wheat: 2.6, tulip: 2.2, gold: 1.7, rose: 2.2, egg: 2.2, potato: 2.4, tomato: 2.8, crate: 3.3, ketchup: 4.4, bouquet: 3.4, basket: 3.4, perfume: 4.0, bill: 0.45, cash: 1.4,
   log: 2.8, plank: 1.3, chair: 5.9, milk: 4.6, cheese: 2.7, icecream: 6, corn: 2.2, popcorn: 4.4, pumpkin: 3.7, pie: 1.9, berry: 3.4, jam: 3.8, wool: 3.6, yarn: 4, honey: 3.8, apple: 3.3, juice: 4.9, xiaolongbao: 3.0, teasnack: 3.2,
-  flour: 2.9, bread: 2.4, fish: 2.4, smoked: 2.4, grape: 1.6, gjuice: 4.9, pepper: 3.4, wine: 5.1, chips: 4.4 };
+  flour: 2.9, bread: 2.4, fish: 2.4, smoked: 2.4, grape: 1.6, gjuice: 4.9, pepper: 3.4, wine: 5.1, chips: 4.4, rubber: 3.5, rainboots: 4.4, fishballs: 2.4 };
 // Solid top of each item above its centre, for carried stacks: the next item rests on this.
 // Default is ITEM_HALF (compact blob); only items whose bulk top is not the half height are listed:
 // a crate's eggs sit on top (+5.3), a basket's rim is its top (+1.4, the handle is garnish).
@@ -306,6 +308,7 @@ export const ITEM_TOP = { crate: 5.3, basket: 1.4 };
 // ------------------------------------------------------------------ crops (field plants)
 // Plants stand on y=0 and are ~11-14 units tall; scaled by growth. Stubble is what stays after a cut.
 const CROP_PARTS = {
+  rubber: () => [P(cyl(1.2, 1.5, 13, 7), '#75502F', [0, 6.5, 0]), P(cone(5.6, 6.8, 7), '#3A8D3D', [0, 13, 0]), P(cone(4.3, 5.5, 7), '#54A84D', [0, 16, 0]), P(box(3.4, 1.3, 3), '#C9D6D2', [2.2, 4, 1.2]), P(cyl(0.65, 0.65, 2.2, 6), '#E9F0E9', [2.2, 3, 1.2])],
   wheat: () => [
     P(cyl(0.6, 0.7, 7, 4), '#C99A35', [0, 3.5, 0]),
     P(cyl(2.0, 1.3, 6.2, 6), '#F6C640', [0, 9.6, 0]),
@@ -417,7 +420,7 @@ Object.assign(CROP_PARTS, {
   ],
 });
 // tint colours for the white parts of each crop (applied with instance colour = whole plant tint is avoided)
-const CROP_TINT = { fish: ['#FF8A3D', '#4FA8F0', '#FFC21A', '#C8D4E0'], grape: ['#7A3EA8', '#8E4EC0', '#6A2E98'], tomato: ['#EE4630', '#E8302C', '#FF6A3A'], pepper: ['#E8302C', '#FFC21A', '#5DBB3A', '#FF8A1E'], log: ['#3FA236', '#4FB233', '#2F9A2E'], corn: ['#FFD23F', '#FFC21A'], pumpkin: ['#F2871E', '#FF9F38', '#E8771A'], berry: ['#E8243C', '#F03A50'], tulip: ['#F2486E', '#FF6F92', '#E8365E', '#FF4F7A'], gold: ['#FFC21A', '#FFB10A', '#FFD23F', '#FFC21A'], rose: ['#E0283C', '#C8102E', '#F03A50', '#D81E36'], potato: ['#FFFFFF'], wheat: ['#FFFFFF'], apple: ['#E8243C', '#D81E36', '#F03A50'] };
+const CROP_TINT = { rubber: ['#3FA236'], fish: ['#FF8A3D', '#4FA8F0', '#FFC21A', '#C8D4E0'], grape: ['#7A3EA8', '#8E4EC0', '#6A2E98'], tomato: ['#EE4630', '#E8302C', '#FF6A3A'], pepper: ['#E8302C', '#FFC21A', '#5DBB3A', '#FF8A1E'], log: ['#3FA236', '#4FB233', '#2F9A2E'], corn: ['#FFD23F', '#FFC21A'], pumpkin: ['#F2871E', '#FF9F38', '#E8771A'], berry: ['#E8243C', '#F03A50'], tulip: ['#F2486E', '#FF6F92', '#E8365E', '#FF4F7A'], gold: ['#FFC21A', '#FFB10A', '#FFD23F', '#FFC21A'], rose: ['#E0283C', '#C8102E', '#F03A50', '#D81E36'], potato: ['#FFFFFF'], wheat: ['#FFFFFF'], apple: ['#E8243C', '#D81E36', '#F03A50'] };
 const CROP_GEO = {};
 export function cropGeo(crop, variant = 0) {
   const k = crop + variant;

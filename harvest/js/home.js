@@ -587,7 +587,7 @@ function dog2d(g, t, col) {
 export const DECO_SPOTS = {
   rainbow: [180, 80], statue: [22, 72], balloon: [352, 64], lanterns: [18, 196], scarecrow: [350, 178], arch: [130, 214],
   fountain: [116, 262], bench: [250, 266], windmill: [-2, 292], flowerbed: [350, 300], pond: [22, 408], swing: [334, 410],
-  starLamp: [290, 130], moonGate: [70, 330],
+  starLamp: [290, 130], moonGate: [70, 330], jackLamp: [48, 110], xmasTree: [310, 105], redLamps: [28, 350],
 };
 const DECO2D = {
   jackLamp(g, t) { jack(g, 1.1, t); g.save(); g.translate(13, 3); jack(g, 0.8, t + 1); g.restore(); },
@@ -782,6 +782,14 @@ function groundLayer(W, H, dpr, L, page) {
   return cv;
 }
 // which empty spot (of this page) a tap at screen (px, py) lands on, in 装扮 mode
+export function homePoint(W, H, area, px, py) { const { s, ox, oy } = homeLayout(W, H, area); return { x: (px - ox) / s, y: (py - oy) / s }; }
+export function hitDeco(W, H, area, save, px, py) {
+  const { x, y } = homePoint(W, H, area, px, py), arr = save.shop && save.shop.decoInstances || [];
+  let best = null, bd = 1;
+  for (let i=0;i<arr.length;i++) { const o=arr[i]; if (!o || o.stored || !DECO_SPOTS[o.id]) continue; const base=DECO_SPOTS[o.id]; const dx=(o.x==null?base[0]:o.x)-x, dy=(o.y==null?base[1]:o.y)-y; const d=(dx/28)**2+(dy/24)**2; if(d<bd){bd=d;best=o;} }
+  if (best) return { uid: best.uid, id: best.id, x: best.x == null ? DECO_SPOTS[best.id][0] : best.x, y: best.y == null ? DECO_SPOTS[best.id][1] : best.y };
+  return null;
+}
 export function hitSpot(W, H, area, page, save, px, py) {
   const { s, ox, oy } = homeLayout(W, H, area), x = (px - ox) / s, y = (py - oy) / s;
   const spots = page === 3 ? SPOTS3 : page === 2 ? SPOTS2 : SPOTS, center = page === 3 ? 'winery' : page === 2 ? 'lodge' : 'manor';
@@ -913,11 +921,13 @@ export function drawHome(g, W, H, save, t, dpr, area, page = 1) {
   if (P3) {   // the lake, and a cobbled lane up to the winery
     lake(g, t);
   }
-  const decos = (save.shop && save.shop.deco) || [];
-  const items = [...Object.entries(spots), ...decos.filter((id) => DECO_SPOTS[id]).map((id) => ['deco:' + id, DECO_SPOTS[id]])]
+  const decoRows = (save.shop && Array.isArray(save.shop.decoInstances) ? save.shop.decoInstances : ((save.shop && save.shop.deco) || []).map((id,i)=>({uid:`legacy-${id}-${i}`,id,x:null,y:null,stored:false})))
+    .filter((o)=>o && !o.stored && DECO_SPOTS[o.id]).map((o,i)=>{const b=DECO_SPOTS[o.id], preview=save.selectedDeco && save.selectedDeco.uid===o.uid ? save.selectedDeco : null; return {uid:o.uid,id:o.id,x:preview ? preview.x : (o.x==null?b[0]+(i%3-1)*3:o.x),y:preview ? preview.y : (o.y==null?b[1]+Math.floor(i/3)*4:o.y)};});
+  const decos = decoRows.map((o)=>o.id);
+  const items = [...Object.entries(spots), ...decoRows.map((o) => ['deco:' + o.id, [o.x,o.y], o.uid])]
     .sort((a, b) => (flat.includes(b[0]) - flat.includes(a[0])) || ((b[0] === 'deco:pond') - (a[0] === 'deco:pond')) || a[1][1] - b[1][1]);
-  for (const [id, [x, y]] of items) {
-    if (id.startsWith('deco:')) { g.save(); g.translate(x, y); g.scale(1.12, 1.12); DECO2D[id.slice(5)](g, t); g.restore(); continue; }
+  for (const [id, [x, y], uid] of items) {
+    if (id.startsWith('deco:')) { g.save(); g.translate(x, y); g.scale(1.12, 1.12); DECO2D[id.slice(5)](g, t); if(save.selectedDeco && save.selectedDeco.uid===uid){ g.setTransform(dpr,0,0,dpr,0,0); g.save(); g.translate(ox,oy); g.scale(s,s); g.fillStyle='#F2FFF2';g.strokeStyle='#287A35';g.lineWidth=1.5; for(const [bx,txt,col] of [[x-18,'×','#D94A3D'],[x+18,'✓','#33994B']]){g.beginPath();g.arc(bx,y-43,9,0,TAU);g.fill();g.stroke();g.fillStyle=col;g.font='bold 12px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(txt,bx,y-43);g.fillStyle='#F2FFF2';} g.restore(); } g.restore(); continue; }
     g.save(); g.translate(x, y);
     const done = restored.has(id), a = done ? elastic((t - (save.restoredAt?.[id] || -9)) / 0.7) : 1;
     if (id === center) { g.scale(0.92 + 0.08 * a, 0.92 + 0.08 * a); if (P3) winery(g, done, t); else if (P2) lodge(g, done, t); else manor(g, done); }

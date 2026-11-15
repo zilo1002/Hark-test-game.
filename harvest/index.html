@@ -78,6 +78,7 @@
     </section>
     <section class="bk bk-coll"><h3>收藏</h3>
       <button class="tile" id="mBook"><b>图鉴</b><small id="mBookSub"></small><em class="dot hidden" id="bookDot"></em></button>
+      <button class="tile" id="mWarehouse"><b>装饰仓库</b><small id="mWarehouseSub">庄园装饰收纳、摆放与出售</small></button>
       <button class="tile" id="mCrew"><b>雇工</b><small id="mCrewSub"></small></button>
     </section>
     <section class="bk bk-farm"><h3>庄园</h3>
@@ -173,6 +174,11 @@
   <div class="mhead"><h2>图鉴</h2><div class="htabs" id="bookTabs"><button data-p="crops">作物</button><button data-p="animal">动物</button><button data-p="golden">金色</button><button data-p="crew">工人</button></div><div class="bookTot" id="bookTot"></div><button class="xclose" data-close aria-label="关闭">✕</button></div>
   <div class="mbody bgrid" id="bookGrid"></div>
   <div class="mfoot"><span class="fnote" id="bookReward"></span><button class="small warm" id="bookClaim">领取</button></div>
+</div></div>
+
+<div id="warehouse" class="modal hidden"><div class="card sheet wide ordCard">
+  <div class="mhead"><h2>装饰仓库</h2><button class="xclose" data-close aria-label="关闭">✕</button></div>
+  <div class="mbody"><p class="note">点击地图装饰可用 ✓ 确认新位置，× 收进仓库；仓库内的金币装饰可按原价一半出售。</p><div id="warehouseList" class="rows"></div></div>
 </div></div>
 
 <div id="daily" class="modal hidden"><div class="card sheet dailyCard">

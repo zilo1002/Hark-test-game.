@@ -6,8 +6,9 @@ import { splitSales } from '../js/sales.js';
 import { World } from '../js/world.js';
 import { isPackableCargo, packageCapacity, packageKind } from '../js/cargo-crate.js';
 
-assert.equal(CFG.levels.length, 67);
-assert.equal(CFG.valley.n, 22);
+assert.equal(CFG.levels.length, 75);
+assert.equal(CFG.valley.n, 30);
+assert.ok(CFG.crops.rubber && CFG.crops.rubber.grow > 0, 'rubber field has a growth configuration');
 for (const item of ['apple', 'berry', 'grape']) assert.ok(isPackableCargo(item), `${item} fruit must be packed`);
 for (const item of ['potato', 'tomato', 'corn', 'pumpkin', 'pepper']) assert.ok(!isPackableCargo(item), `${item} vegetables stay unboxed`);
 assert.equal(packageKind('fish'), 'fish-crate');
@@ -22,6 +23,12 @@ const expected = new Map([
   [63, ['烤鱼夜市', ['smoked', 'bread']]], [64, ['果汁冰饮摊', ['juice', 'jam', 'icecream']]],
   [65, ['葡萄酒夜市', ['gjuice', 'wine']]], [66, ['丰收夜市大排档', ['xiaolongbao', 'chips', 'teasnack']]],
   [67, ['丰收夜市盛宴', ['xiaolongbao', 'pie', 'gjuice']]],
+  [68, ['雨靴作坊', ['rainboots']]], [69, ['鲜鱼丸摊', ['fishballs']]],
+  [70, ['果香雨具集市', ['rainboots', 'juice']]], [71, ['海风鱼丸厨房', ['fishballs', 'popcorn']]],
+  [72, ['雨林早点铺', ['rainboots', 'bread', 'teasnack']]],
+  [73, ['橡胶与鱼丸大集', ['rainboots', 'fishballs', 'pie']]],
+  [74, ['晨市胶靴鱼丸铺', ['rainboots', 'fishballs']]],
+  [75, ['雨夜丰收新品展', ['rainboots', 'fishballs', 'xiaolongbao']]],
 ]);
 const buyAll = (w, skip = () => false) => {
   let changed = true, loops = 0;
@@ -156,4 +163,4 @@ for (const [lv, expectedOut] of [[54, 'bread'], [57, 'juice'], [60, 'pie'], [64,
   const proc = L.objects.find(p => p.type === 'proc' && p.out === expectedOut);
   assert.ok(proc && proc.outTo.startsWith('P_'), `level ${lv} retains the designed ${expectedOut} process and its own stand`);
 }
-console.log('food level checks: PASS · levels 54–67 · four seasons · at most three food lines · separate wooden stands · full-batch staff routes · raw+processed player-to-cashier loops');
+console.log('food level checks: PASS · levels 54–75 · four seasons · at most three food lines · separate wooden stands · full-batch staff routes · raw+processed player-to-cashier loops');

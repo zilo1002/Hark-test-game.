@@ -197,7 +197,7 @@ export const itemById = (id) => OUTFITS.find((o) => o.id === id) || STAR_OUTFITS
 export const onSale = (it) => !!it && !it.book && (!it.fest || currentFestival() === it.fest);
 export const festName = (it) => (it && it.fest && FESTIVALS[it.fest] ? FESTIVALS[it.fest].name : '');
 
-export function shopDefaults() { return { owned: [], eq: { hat: null, top: null, neck: null, feet: null }, deco: [], uni: null, pet: { dog: null, cat: null }, maps: [] }; }
+export function shopDefaults() { return { owned: [], eq: { hat: null, top: null, neck: null, feet: null }, deco: [], decoInstances: [], uni: null, pet: { dog: null, cat: null }, maps: [] }; }
 
 // normalise whatever is in the save (old saves have nothing; drop unknown ids).
 // Maps are tracked ONLY in `maps` (never in owned/deco): a map id that leaked into
@@ -208,6 +208,10 @@ export function normShop(s) {
   d.owned = Array.isArray(s.owned) ? s.owned.filter((id) => { const it = itemById(id); return it && !it.map; }) : [];
   for (const [k] of SLOTS) { const id = s.eq && s.eq[k]; const it = itemById(id); d.eq[k] = it && it.slot === k && d.owned.includes(id) ? id : null; }
   d.deco = Array.isArray(s.deco) ? s.deco.filter((id) => { const it = itemById(id); return it && !it.map && !it.slot && !it.uni && !it.pet && d.owned.includes(id); }) : [];
+  const validDeco = (id) => { const it = itemById(id); return it && !it.map && !it.slot && !it.uni && !it.pet && d.owned.includes(id); };
+  d.decoInstances = Array.isArray(s.decoInstances) ? s.decoInstances.filter((o) => o && typeof o.uid === 'string' && validDeco(o.id)).map((o) => ({ uid: o.uid, id: o.id, x: Number.isFinite(o.x) ? Math.max(8, Math.min(352, o.x)) : null, y: Number.isFinite(o.y) ? Math.max(90, Math.min(430, o.y)) : null, stored: !!o.stored })) : [];
+  if (!Array.isArray(s.decoInstances) || (!s.decoInstances.length && d.deco.length)) d.decoInstances = d.deco.map((id, i) => ({ uid: `legacy-${id}-${i}`, id, x: null, y: null, stored: false }));
+  d.deco = d.decoInstances.filter((o) => !o.stored).map((o) => o.id);
   d.uni = (() => { const u = itemById(s.uni); return u && u.uni && d.owned.includes(s.uni) ? s.uni : null; })();
   for (const k of ['dog', 'cat']) { const id = s.pet && s.pet[k], p = petById(id); d.pet[k] = p && p.pet === k && d.owned.includes(id) ? id : null; }
   d.maps = Array.isArray(s.maps) ? [...new Set(s.maps.filter((id) => MAP_IDS.includes(id)))] : [];
@@ -241,7 +245,8 @@ export function buy(data, id) {
     data.shop.maps.push(it.map);
     return 'ok';
   }
-  if (data.shop.owned.includes(id)) return 'owned';
+  const repeatDeco = DECOS.some((d) => d.id === id);
+  if (data.shop.owned.includes(id) && !repeatDeco) return 'owned';
   if (it.book) return 'reward';
   if (!onSale(it)) return 'closed';
   // validate first, mutate once: a failed buy never touches either wallet (atomic in
@@ -254,20 +259,41 @@ export function buy(data, id) {
     if ((data.coins || 0) < it.price) return 'poor';
     data.coins -= it.price;
   }
-  data.shop.owned.push(id);
+  if (!data.shop.owned.includes(id)) data.shop.owned.push(id);
   if (it.pet) data.shop.pet[it.pet] = id;
-  else if (it.uni) data.shop.uni = id; else if (it.slot) data.shop.eq[it.slot] = id; else if (!data.shop.deco.includes(id)) data.shop.deco.push(id);   // new things go straight on
+  else if (it.uni) data.shop.uni = id; else if (it.slot) data.shop.eq[it.slot] = id; else if (!it.book && !it.map) { const uid = `deco-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`; data.shop.decoInstances ||= []; data.shop.decoInstances.push({ uid, id, x: null, y: null, stored: false }); data.shop.deco.push(id); }   // decorations go straight on
   return 'ok';
 }
+export function moveDeco(data, uid, x, y) {
+  const o = data.shop.decoInstances && data.shop.decoInstances.find((q) => q.uid === uid);
+  if (!o || o.stored || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+  o.x = Math.max(8, Math.min(352, x)); o.y = Math.max(90, Math.min(430, y)); return true;
+}
+export function placeDeco(data, uid) { const o = data.shop.decoInstances && data.shop.decoInstances.find((q) => q.uid === uid); if (!o || !o.stored) return false; o.stored = false; data.shop.deco = data.shop.decoInstances.filter((q) => !q.stored).map((q) => q.id); return true; }
+export function storeDeco(data, uid) {
+  const o = data.shop.decoInstances && data.shop.decoInstances.find((q) => q.uid === uid);
+  if (!o || o.stored) return false; o.stored = true; data.shop.deco = data.shop.decoInstances.filter((q) => !q.stored).map((q) => q.id); return true;
+}
+export function sellStoredDeco(data, uid) {
+  const a = data.shop.decoInstances || [], i = a.findIndex((q) => q.uid === uid && q.stored);
+  if (i < 0) return { ok: false, amount: 0 };
+  const o = a[i], it = DECOS.find((q) => q.id === o.id); if (!it) return { ok: false, amount: 0 };
+  const amount = Math.floor((it.price || 0) * 0.5); a.splice(i, 1);
+  data.shop.deco = a.filter((q) => !q.stored).map((q) => q.id);
+  if (!a.some((q) => q.id === o.id)) data.shop.owned = data.shop.owned.filter((id) => id !== o.id);
+  data.coins = (data.coins || 0) + amount; return { ok: true, amount };
+}
+
 export function toggle(data, id) {
   const it = itemById(id); if (!it || !data.shop.owned.includes(id)) return 'locked';
   if (it.map) return 'locked';   // maps are switched on the home screen, never placed / worn
   if (it.pet) { data.shop.pet[it.pet] = data.shop.pet[it.pet] === id ? null : id; return data.shop.pet[it.pet] ? 'on' : 'off'; }
   if (it.uni) { data.shop.uni = data.shop.uni === id ? null : id; return data.shop.uni ? 'on' : 'off'; }
   if (it.slot) { data.shop.eq[it.slot] = data.shop.eq[it.slot] === id ? null : id; return data.shop.eq[it.slot] ? 'on' : 'off'; }
-  const i = data.shop.deco.indexOf(id);
-  if (i >= 0) { data.shop.deco.splice(i, 1); return 'off'; }
-  data.shop.deco.push(id); return 'on';
+  const inst = data.shop.decoInstances || []; const o = inst.find((q) => q.id === id && !q.stored);
+  if (o) { o.stored = true; data.shop.deco = inst.filter((q) => !q.stored).map((q) => q.id); return 'off'; }
+  const stored = inst.find((q) => q.id === id && q.stored); if (stored) stored.stored = false; else inst.push({ uid: `deco-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`, id, x: null, y: null, stored: false });
+  data.shop.deco = inst.filter((q) => !q.stored).map((q) => q.id); return 'on';
 }
 export const isOn = (data, id) => { const it = itemById(id); if (!it || it.map) return false; return it.pet ? data.shop.pet[it.pet] === id : it.uni ? data.shop.uni === id : it.slot ? data.shop.eq[it.slot] === id : data.shop.deco.includes(id); };
 export const levelsTotal = () => CFG.levels.length;

@@ -61,6 +61,7 @@ export class UI {
     $('mDaily').onclick = () => this.openDaily();
     $('mOrders').onclick = () => this.openOrders();
     $('mBook').onclick = () => this.openBook();
+    $('mWarehouse').onclick = () => this.openWarehouse();
     $('mCrew').onclick = () => this.openCrew();
     $('mBuild').onclick = tapped(() => { this.closeAll(); this.setBuild(true); });
     $('mEnv').onclick = tapped(() => this.openEnv());
@@ -103,6 +104,7 @@ export class UI {
     // 订单板 / 雇工 / 图鉴 / 每日挑战
     this.el.orders = $('orders'); this.el.crew = $('crew');
     this.el.book = $('book'); this.bookPage = 'crops';
+    this.el.warehouse = $('warehouse');
     for (const b of $('bookTabs').children) b.onclick = () => { this.bookPage = b.dataset.p; h.tap(); this.renderBook(); };
     $('bookClaim').onclick = () => { const r = h.bookClaim(this.bookPage); if (r) this.renderBook(); };
     this.el.daily = $('daily'); this.el.dres = $('dailyRes');
@@ -111,7 +113,7 @@ export class UI {
     $('btnDrHome').onclick = () => { this.el.dres.classList.add('hidden'); h.home(); };
     this.el.play.onclick = () => h.play();
     $('btnNext').onclick = () => { this.el.win.classList.add('hidden'); h.next(); };
-    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop, this.el.orders, this.el.crew, this.el.daily, this.el.book, this.el.menu, this.el.env, this.el.about]) {
+    for (const m of [this.el.levels, this.el.settings, this.el.pause, this.el.shop, this.el.orders, this.el.crew, this.el.daily, this.el.book, this.el.warehouse, this.el.menu, this.el.env, this.el.about]) {
       m.addEventListener('click', (e) => { if ((e.target === m && !m.classList.contains('dock')) || (e.target.closest && e.target.closest('[data-close]'))) this.closeModal(m); });
     }
     $('optSound').onchange = (e) => { h.setting('sound', e.target.checked); this.renderSound(); };
@@ -130,6 +132,7 @@ export class UI {
   // ★ 装扮庄园: build spots with stars, place / store decorations, switch the three estates
   setBuild(on, quiet) {
     this.build = !!on;
+    if (!on && this.h.clearDecoSelection) this.h.clearDecoSelection();
     this.el.buildUI.classList.toggle('hidden', !on || this.el.home.classList.contains('hidden'));
     this.el.home.classList.toggle('building', !!on);
     document.body.classList.toggle('inbuild', !!on);
@@ -497,6 +500,19 @@ export class UI {
     });
   }
   // ---------------------------------------------------------------- 图鉴
+  openWarehouse() { this.h.tap(); this.openModal(this.el.warehouse); this.renderWarehouse(); }
+  renderWarehouse() {
+    const d=this.h.data(), list=$('warehouseList'); list.innerHTML='';
+    const instances=d.shop.decoInstances||[];
+    if(!instances.length){list.innerHTML='<div class="note">仓库还是空的，去商店买些装饰吧。</div>';return;}
+    for(const o of instances){const it=itemById(o.id); if(!it) continue; const row=document.createElement('div'); row.className='ord';
+      const state=o.stored?'仓库中':'庄园已摆放'; const buttons=o.stored?`<button class="small warm" data-place="${o.uid}">摆出来</button>${DECOS.some(x=>x.id===o.id)?`<button class="small off" data-sell="${o.uid}">出售 +${Math.floor((it.price||0)*.5)} 金币</button>`:''}`:`<button class="small off" data-store="${o.uid}">收进仓库</button>`;
+      row.innerHTML=`<div><b>${it.name}</b><small>${state}${o.stored&&DECOS.some(x=>x.id===o.id)?' · 可按半价出售':''}</small></div><div class="rowActions">${buttons}</div>`; list.appendChild(row);
+    }
+    for(const b of list.querySelectorAll('[data-place]')) b.onclick=()=>{this.h.decoAction('place',b.dataset.place);this.renderWarehouse();};
+    for(const b of list.querySelectorAll('[data-store]')) b.onclick=()=>{this.h.decoAction('store',b.dataset.store);this.renderWarehouse();};
+    for(const b of list.querySelectorAll('[data-sell]')) b.onclick=()=>{this.h.decoAction('sell',b.dataset.sell);this.renderWarehouse();};
+  }
   openBook(page) { if (page) this.bookPage = page; this.h.bookOpen(); this.openModal(this.el.book); this.renderBook(); }
   renderBook() {
     const d = this.h.data(), P = this.bookPage, cols = ['#3B8FE0', '#E8452C', '#4CB24E', '#F29C0E', '#B07ACC', '#FF6F92'];

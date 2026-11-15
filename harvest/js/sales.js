@@ -149,6 +149,10 @@ const FOOD_OUTPUTS = {
   // WITHOUT an entry here splitFoodLevel deletes the whole level (the L59 empty-level bug).
   15: ['chips'], 16: ['popcorn', 'ketchup'], 17: ['smoked', 'bread'], 18: ['juice', 'jam', 'icecream'],
   19: ['wine'], 20: ['xiaolongbao', 'chips', 'teasnack'], 21: ['xiaolongbao', 'pie', 'gjuice'],
+  // v5.2.0 night-market expansion (68–75): new rubber and fish-ball chains.
+  22: ['rainboots'], 23: ['fishballs'], 24: ['rainboots', 'juice'], 25: ['fishballs', 'popcorn'],
+  26: ['rainboots', 'bread', 'teasnack'], 27: ['rainboots', 'fishballs', 'pie'],
+  28: ['rainboots', 'fishballs'], 29: ['rainboots', 'fishballs', 'xiaolongbao'],
 };
 function splitFoodLevel(L0) {
   const L = { ...L0, objects: L0.objects.map((o) => ({ ...o, items: o.items?.slice() })),
