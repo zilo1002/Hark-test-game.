@@ -58,7 +58,8 @@ export class Preview {
   }
   render(t) {
     if (!this.obj) return;
-    this.stage.rotation.y = 0.5 + Math.sin(t * 0.6) * 0.65;
+    // Keep the face readable from the shop's fixed front camera; subtle turntable motion avoids profile-only snapshots.
+    this.stage.rotation.y = 0.10 + Math.sin(t * 0.32) * 0.16;
     if (this.pp) M.posePerson(this.pp, { t, walk: 0, moving: false, carry: false, seed: 1 });
     if (this.pet) M.posePet(this.pet, { t, walk: 0, moving: false, sit: this.pet.kind === 'dog' });
     if (this.sails) this.sails.rotation.z = t * 1.4;
@@ -75,18 +76,18 @@ export class Preview {
     if (item.pet || item.book3d) {
       this.show(item.book3d || { kind: 'pet', id: item.id });
       if (this.pet) M.posePet(this.pet, { t: 0.4, walk: 0, moving: false, sit: this.pet.kind === 'dog' });
-      const v = this.view; this.stage.rotation.y = 0.6; this.disc.visible = false;
+      const v = this.view; this.stage.rotation.y = 0.10; this.disc.visible = false;
       this.cam.position.set(0, v.look + v.dist * 0.3, v.dist * 0.85); this.cam.lookAt(0, v.look, 0);
     } else if (item.uni) {
       this.show({ kind: 'person', uni: item.id, style: item.style });
       M.posePerson(this.pp, { t: 0, walk: 0, moving: false, carry: false, seed: 1 });
-      this.stage.rotation.y = 0.45; this.disc.visible = true;
+      this.stage.rotation.y = 0.10; this.disc.visible = true;
       this.cam.position.set(0, 17 + 78 * 0.22, 78); this.cam.lookAt(0, 17, 0);
     } else if (item.slot) {
       this.show({ kind: 'person', eq: { [item.slot]: item.id } });
       M.posePerson(this.pp, { t: 0, walk: 0, moving: false, carry: false, seed: 1 });
       const close = item.slot !== 'top', look = { hat: 31, neck: 24, feet: 5, top: 17 }[item.slot], dist = { hat: 62, neck: 54, feet: 50, top: 78 }[item.slot];
-      this.stage.rotation.y = 0.45; this.disc.visible = !close;
+      this.stage.rotation.y = 0.10; this.disc.visible = !close;
       this.cam.position.set(0, look + dist * 0.22, dist); this.cam.lookAt(0, look, 0);
     } else {
       this.show({ kind: 'deco', id: item.thumb || item.id });   // v5.0.9: a map previews its representative deco (a map has no 3D model)

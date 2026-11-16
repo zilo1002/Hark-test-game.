@@ -23,6 +23,7 @@ function checkBounds(root, label) {
 for (const item of outfits) {
   const style = heroStyle({ [item.slot]: item.id });
   const pp = M.makePerson(style);
+  assert.ok(pp.head.scale.x >= 1.3 && pp.head.scale.y >= 1.3, `${item.id}: shared chibi head proportions are applied`);
   const b = checkBounds(pp.root, `outfit ${item.id}`);
   assert.ok(b.max.y - b.min.y > 30 && b.max.y - b.min.y < 65, `${item.id}: person stays within expected silhouette`);
   M.posePerson(pp, { t: 1, walk: 0.7, moving: true, carry: false, seed: 1 });
