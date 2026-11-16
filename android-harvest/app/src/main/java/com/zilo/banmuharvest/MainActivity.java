@@ -98,7 +98,7 @@ public class MainActivity extends Activity {
     static {
         MIME.put("html", "text/html"); MIME.put("js", "text/javascript"); MIME.put("mjs", "text/javascript");
         MIME.put("css", "text/css"); MIME.put("png", "image/png"); MIME.put("jpg", "image/jpeg");
-        MIME.put("svg", "image/svg+xml"); MIME.put("json", "application/json"); MIME.put("txt", "text/plain");
+        MIME.put("svg", "image/svg+xml"); MIME.put("webp", "image/webp"); MIME.put("json", "application/json"); MIME.put("txt", "text/plain");
         MIME.put("wav", "audio/wav"); MIME.put("mp3", "audio/mpeg"); MIME.put("woff2", "font/woff2");
         MIME.put("glb", "model/gltf-binary");
     }
