@@ -4,9 +4,8 @@ import * as M from '../js/models.js';
 import * as THREE from '../vendor/three.module.min.js';
 import {
   OUTFITS, STAR_OUTFITS, UNIFORMS, STAR_UNIFORMS, PETS, STAR_PETS,
-  HERO_BASE, WORKER_BASE, heroStyle, shopDefaults, buy, toggle,
+  HERO_BASE, WORKER_BASE, heroStyle, shopDefaults, buy, toggle, normShop, petById, itemById, equippedPets,
 } from '../js/shop.js';
-import { petDollRole } from '../js/doll-art.js';
 import { World } from '../js/world.js';
 
 const outfits = [...OUTFITS, ...STAR_OUTFITS];
@@ -53,36 +52,75 @@ for (const item of pets) {
   assert.equal(buy(data, item.id), 'ok', `${item.id}: remains purchasable`);
   assert.equal(data.coins, beforeCoins - (item.price || 0), `${item.id}: coin redemption unchanged`);
   assert.equal(data.spent, beforeSpent + (item.starPrice || 0), `${item.id}: star redemption unchanged`);
-  assert.equal(data.shop.pet[item.pet], item.id, `${item.id}: equips into its existing pet slot`);
+  assert.equal(data.shop.pet.active, item.id, `${item.id}: equips as the single active pet`);
+  assert.equal(data.shop.pet[item.pet], item.id, `${item.id}: compatibility alias matches active species`);
+  assert.equal(data.shop.pet[item.pet === 'dog' ? 'cat' : 'dog'], null, `${item.id}: cannot equip a second pet`);
   assert.equal(toggle(data, item.id), 'off', `${item.id}: existing equip toggle still works`);
-  assert.equal(data.shop.pet[item.pet], null, `${item.id}: existing unequip behavior still works`);
+  assert.equal(data.shop.pet.active, null, `${item.id}: toggle off clears the single active pet`);
 }
 
-// Every plush pet has an explicit art role; an unrecognized kind must never silently become a cat.
-const plushRoles = new Set();
-for (const item of pets) {
-  const role = petDollRole(item.pet, item.col);
-  assert.ok(role, `${item.id}: has an explicit visual mapping`);
-  if (item.col.dollRole) assert.equal(role, item.col.dollRole, `${item.id}: retains its requested sprite`);
-  plushRoles.add(role);
+// Every visible character/pet must be a volumetric mesh, never a sprite, textured billboard or cutout.
+function assertTrue3D(root, label) {
+  const bounds = checkBounds(root, label), size = bounds.getSize(new THREE.Vector3());
+  assert.ok(size.x > 1 && size.y > 1 && size.z > 1, `${label}: nonzero depth as well as width/height`);
+  let meshes = 0;
+  root.traverse(node => {
+    assert.equal(node.isSprite, undefined, `${label}: no sprite billboard`);
+    if (node.isMesh) {
+      meshes++;
+      for (const mat of (Array.isArray(node.material) ? node.material : [node.material])) {
+        assert.equal(mat?.map || null, null, `${label}: mesh material has no image texture`);
+      }
+      assert.ok(node.geometry?.attributes?.position?.count > 0, `${label}: real geometry vertices`);
+    }
+  });
+  assert.ok(meshes > 5, `${label}: composed from multiple 3D meshes`);
 }
-for (const role of ['dog_plush', 'cat_tortoise_plush', 'penguin', 'hedgehog', 'rabbit', 'fox', 'owl']) assert.ok(plushRoles.has(role), `${role}: requested plush species is mapped`);
-assert.equal(petDollRole('unlisted-species', {}), null, 'unknown pet does not fall back to a cat');
+const person3d = M.makePerson(heroStyle({}, 'girl'));
+assertTrue3D(person3d.root, 'girl character');
+const owl3d = M.makePerson({ ...heroStyle({}, 'girl'), owlCompanion: true });
+assertTrue3D(owl3d.root, 'shoulder owl and farmer');
+for (const item of pets) assertTrue3D(M.makePet(item.pet, item.col).root, `pet ${item.id}`);
+
+// The former catPlush and catMottled shared the same cutout role, so only one stays in the catalog.
+assert.equal(PETS.some(x => x.id === 'catPlush'), false, 'duplicate tortoiseshell cat removed from shop catalogue');
+assert.equal(itemById('catPlush')?.legacy, true, 'old catPlush save remains readable');
+assert.equal(buy({ coins: 10000, stars: {}, spent: 0, unlocked: 0, shop: shopDefaults() }, 'catPlush'), 'retired', 'legacy duplicate cannot be rebought');
+assert.equal(PETS.some(x => x.id === 'dogPlush'), false, 'duplicate white-dog SKU removed from catalogue');
+assert.equal(itemById('dogPlush')?.legacy, true, 'old dogPlush save remains readable');
+assert.equal(buy({ coins: 10000, stars: {}, spent: 0, unlocked: 0, shop: shopDefaults() }, 'dogPlush'), 'retired', 'legacy dog duplicate cannot be rebought');
+const legacy = normShop({ owned: ['dogPlush'], pet: { dog: 'dogPlush' } });
+assert.deepEqual(legacy.pet, { active: 'dogPlush', dog: 'dogPlush', cat: null }, 'legacy dog equip migrates into single active selection');
+assert.equal(petById(legacy.pet.active)?.pet, 'dog', 'legacy equipped dog retains dog behavior');
+const legacyCat = normShop({ owned: ['catPlush'], pet: { cat: 'catPlush' } });
+assert.equal(equippedPets({ shop: legacyCat }).active?.id, 'catPlush', 'legacy cat equip remains loadable');
+
 assert.equal(heroStyle({}, 'boy').dollRole, 'boy', 'boy farmer uses the matching doll template');
 assert.equal(heroStyle({}, 'girl').dollRole, 'farmer', 'girl farmer template remains the default');
 
-// The equipped cat slot routes each non-shoulder species into the level companion follower;
-// the owl stays composited on the farmer, and the fetching dog remains an independent feature.
-for (const item of pets.filter((x) => x.pet === 'cat')) {
-  const companion = item.col.shoulder ? null : { kind: 'cat', id: item.id, col: item.col };
-  const world = new World(0, { pet: 'dog', companion, quiet: true, seed: 19 });
-  if (item.col.shoulder) assert.equal(world.companion, null, `${item.id}: shoulder owl is not duplicated as a follower`);
-  else {
-    assert.equal(world.companion.id, item.id, `${item.id}: equipped species is wired to the gameplay follower`);
-    assert.equal(world.companion.col.dollRole, item.col.dollRole, `${item.id}: gameplay follower retains its species artwork mapping`);
-    assert.equal('fetchT' in world.companion, false, `${item.id}: non-dog companion does not gain dog fetch behavior`);
-  }
-  assert.equal(world.dog.state, 'follow', `${item.id}: dog follow/fetch system remains independently active`);
+// A newly selected cat replaces the dog, and the single normalized selection drives the farm.
+const switching = { coins: 99999, stars: { test: 100 }, spent: 0, unlocked: 80, shop: { ...shopDefaults(), owned: pets.map(p => p.id) } };
+assert.equal(toggle(switching, 'dogWhite'), 'on');
+assert.equal(equippedPets(switching).dog?.id, 'dogWhite');
+assert.equal(toggle(switching, 'catMottled'), 'on');
+const reloaded = normShop(JSON.parse(JSON.stringify(switching.shop)));
+const active = equippedPets({ shop: reloaded });
+assert.equal(active.active?.id, 'catMottled');
+assert.equal(active.dog, null, 'cat selection removes old dog from the active state');
+assert.equal(active.cat?.id, 'catMottled');
+const farm = new World(0, { pet: active.dog ? 'dog' : null, companion: { kind: active.active.pet, id: active.active.id, col: active.active.col }, quiet: true, seed: 19 });
+assert.equal(farm.dog, null, 'farm does not spawn the replaced dog');
+assert.equal(farm.companion?.id, 'catMottled', 'farm uses the newly equipped cat');
+
+for (const item of pets) {
+  const one = { shop: { ...shopDefaults(), owned: pets.map(p => p.id), pet: { active: item.id, dog: item.pet === 'dog' ? item.id : null, cat: item.pet === 'cat' ? item.id : null } } };
+  const selected = equippedPets({ shop: normShop(JSON.parse(JSON.stringify(one.shop))) });
+  const companion = selected.active && selected.active.pet !== 'dog' && !selected.active.col.shoulder
+    ? { kind: selected.active.pet, id: selected.active.id, col: selected.active.col } : null;
+  const world = new World(0, { pet: selected.active?.pet === 'dog' ? 'dog' : null, companion, quiet: true, seed: 19 });
+  if (item.pet === 'dog') assert.equal(world.dog?.state, 'follow', `${item.id}: dog retains follow/fetch behavior`);
+  else if (item.col.shoulder) assert.equal(world.companion, null, `${item.id}: shoulder owl is not duplicated as a follower`);
+  else assert.equal(world.companion?.id, item.id, `${item.id}: farm uses selected species`);
 }
 
 // Simultaneous equipped slots remain composable (shop preview and live player use this exact style).
@@ -90,4 +128,4 @@ const combo = heroStyle({ hat: outfits.find((x) => x.slot === 'hat')?.id, top: o
   neck: outfits.find((x) => x.slot === 'neck')?.id, feet: outfits.find((x) => x.slot === 'feet')?.id });
 checkBounds(M.makePerson(combo).root, 'combined equipped outfit');
 assert.deepEqual(heroStyle({}), HERO_BASE, 'base style remains available');
-console.log(`PASS shared character redesign: ${count.outfits} outfits, ${count.uniforms} uniforms, ${count.pets} pets; purchase/equip behavior preserved`);
+console.log(`PASS shared character redesign: ${count.outfits} outfits, ${count.uniforms} uniforms, ${count.pets} listed pets; purchase/equip behavior preserved`);

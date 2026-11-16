@@ -159,9 +159,7 @@ export const PETS = [
   { id: 'catTux',    pet: 'cat', name: '奶牛猫', price: 420, col: { body: '#2E2E36', belly: '#FFFFFF', ear: '#2E2E36', nose: '#FF8FA0' }, sw: ['#2E2E36', '#FFFFFF'] },
   // v5.2.4: mottled dark cat, based on the owner's two appearance references; ordinary coin exchange.
   { id: 'catMottled', pet: 'cat', name: '花斑猫', price: 520, col: { body: '#302A29', belly: '#5B4942', ear: '#514039', nose: '#D98B9A', patch: '#8B6248', patch2: '#B49A7B', patch3: '#D2B8A2', closedEyes: true, dollRole: 'cat_tortoise_plush', fluffy: true, patch2d: [['#8B6248', -1.8, -8.5, 4.6, 2.3, -0.2], ['#B49A7B', 5.2, -7.2, 3.3, 1.8, 0.3], ['#E4D9C9', -11, -8, 2.1, 2.0, 0]] }, sw: ['#302A29', '#B49A7B', '#D9CDBE'] },
-  // v5.3.3 plush-doll collection: one cat slot, so each pet can be swapped using the existing equip flow.
-  { id: 'dogPlush', pet: 'dog', name: '绒绒小白狗', price: 680, col: { body: '#F7F5EE', belly: '#FFFFFF', ear: '#D9B88A', nose: '#2A1A10', spot: '#5A3A22', dollRole: 'dog_plush', fluffy: true }, sw: ['#F7F5EE', '#D9B88A'] },
-  { id: 'catPlush', pet: 'cat', name: '软绒猫咪', price: 620, col: { body: '#493F3D', belly: '#B49A7B', ear: '#493F3D', nose: '#D98B9A', dollRole: 'cat_tortoise_plush', fluffy: true }, sw: ['#493F3D', '#B49A7B'] },
+  // dogPlush is kept below as a hidden legacy save alias: it was visually identical to dogWhite.
   { id: 'penguinPlush', pet: 'cat', name: '小企鹅', price: 720, col: { body: '#34343B', belly: '#F5F0E8', ear: '#26262D', nose: '#F5A12B', dollRole: 'penguin', fluffy: true }, sw: ['#34343B', '#F5F0E8'] },
   { id: 'hedgehogPlush', pet: 'cat', name: '刺猬宝宝', price: 760, col: { body: '#73604F', belly: '#D9C4A8', ear: '#8F725C', nose: '#31221B', dollRole: 'hedgehog', fluffy: true }, sw: ['#73604F', '#D9C4A8'] },
   { id: 'rabbitPlush', pet: 'cat', name: '绒绒兔', price: 700, col: { body: '#F5F0E8', belly: '#FFFFFF', ear: '#E6B7B3', nose: '#D98B9A', dollRole: 'rabbit', fluffy: true }, sw: ['#F5F0E8', '#E6B7B3'] },
@@ -169,12 +167,27 @@ export const PETS = [
   { id: 'owlShoulder', pet: 'cat', name: '白绒肩头猫头鹰', price: 900, col: { body: '#F4F1E8', belly: '#FFFFFF', ear: '#E4D7C4', nose: '#D79A49', dollRole: 'owl', fluffy: true, shoulder: true }, sw: ['#F4F1E8', '#D79A49'] },
 ];
 
-// ---- 星星宠物 (v5.0.7): colour variants only, no new models; one dog / one cat at a time
+// ---- 星星宠物 (v5.0.7): colour variants only, no new models; one active pet at a time
 export const STAR_PETS = [
   { id: 'dogStar', pet: 'dog', name: '星空柴犬', starPrice: 10, col: { body: '#2A2A5A', belly: '#FFFFFF', ear: '#1A1A3A', nose: '#2A1A10', spot: '#FFD23F' }, sw: ['#2A2A5A', '#FFD23F'] },
   { id: 'catStar', pet: 'cat', name: '玄猫',     starPrice: 8,  col: { body: '#1A1A22', belly: '#2E2E36', ear: '#1A1A22', nose: '#FF8FA0', stripe: '#FFD23F' },            sw: ['#1A1A22', '#FFD23F'] },
 ];
-export const petById = (id) => PETS.find((p) => p.id === id) || STAR_PETS.find((p) => p.id === id) || null;
+// Keep old dogPlush saves/equips readable, but don't sell or list this duplicate again.
+const LEGACY_PETS = [
+  { id: 'catPlush', pet: 'cat', name: '软绒猫咪', legacy: true, col: { body: '#493F3D', belly: '#B49A7B', ear: '#493F3D', nose: '#D98B9A', dollRole: 'cat_tortoise_plush', fluffy: true }, sw: ['#493F3D', '#B49A7B'] },
+  { id: 'dogPlush', pet: 'dog', name: '绒绒小白狗', legacy: true,
+    col: { body: '#F7F5EE', belly: '#FFFFFF', ear: '#D9B88A', nose: '#2A1A10', spot: '#5A3A22', dollRole: 'dog_plush', fluffy: true }, sw: ['#F7F5EE', '#D9B88A'] },
+];
+export const petById = (id) => PETS.find((p) => p.id === id) || STAR_PETS.find((p) => p.id === id) || LEGACY_PETS.find((p) => p.id === id) || null;
+// The home estate, shop and farm all derive their current visuals from these exact saved slots.
+export const equippedPets = (data) => {
+  const slots = data && data.shop && data.shop.pet || {};
+  const selected = Object.prototype.hasOwnProperty.call(slots, 'active')
+    ? petById(slots.active)
+    : (petById(slots.cat) || petById(slots.dog)); // legacy two-slot saves: newest cat pick wins
+  const active = selected && data.shop.owned?.includes(selected.id) ? selected : null;
+  return { active, dog: active?.pet === 'dog' ? active : null, cat: active?.pet === 'cat' ? active : null };
+};
 
 // ---- 制服 (v3.6): one set at a time, worn by every hired worker in levels -----------------------
 // style overrides the worker's own look (gardener / carter / lumberjack / milker); beards stay.
@@ -202,12 +215,12 @@ export const isStar = (it) => !!it && typeof it.starPrice === 'number';
 export const WORKER_BASE = { dollRole: 'farmer', shirt: '#FFF4E2', overalls: '#4F79A9', pants: '#4F79A9', hair: '#D3934F', hat: 'straw', sleeve: '#FFF4E2', braids: true, basket: true, braidTie: '#E8A97C' };
 export const uniformStyle = (id) => { const u = UNIFORMS.find((x) => x.id === id) || STAR_UNIFORMS.find((x) => x.id === id); return u ? u.style : null; };
 
-export const itemById = (id) => OUTFITS.find((o) => o.id === id) || STAR_OUTFITS.find((o) => o.id === id) || DECOS.find((d) => d.id === id) || STAR_DECOS.find((d) => d.id === id) || MAPS.find((m) => m.id === id) || UNIFORMS.find((u) => u.id === id) || STAR_UNIFORMS.find((u) => u.id === id) || PETS.find((p) => p.id === id) || STAR_PETS.find((p) => p.id === id);
+export const itemById = (id) => OUTFITS.find((o) => o.id === id) || STAR_OUTFITS.find((o) => o.id === id) || DECOS.find((d) => d.id === id) || STAR_DECOS.find((d) => d.id === id) || MAPS.find((m) => m.id === id) || UNIFORMS.find((u) => u.id === id) || STAR_UNIFORMS.find((u) => u.id === id) || PETS.find((p) => p.id === id) || STAR_PETS.find((p) => p.id === id) || LEGACY_PETS.find((p) => p.id === id);
 // a limited item can be bought only while its festival is on; a 图鉴 reward is never sold
 export const onSale = (it) => !!it && !it.book && (!it.fest || currentFestival() === it.fest);
 export const festName = (it) => (it && it.fest && FESTIVALS[it.fest] ? FESTIVALS[it.fest].name : '');
 
-export function shopDefaults() { return { owned: [], eq: { hat: null, top: null, neck: null, feet: null }, deco: [], decoInstances: [], uni: null, pet: { dog: null, cat: null }, maps: [] }; }
+export function shopDefaults() { return { owned: [], eq: { hat: null, top: null, neck: null, feet: null }, deco: [], decoInstances: [], uni: null, pet: { active: null, dog: null, cat: null }, maps: [] }; }
 
 // normalise whatever is in the save (old saves have nothing; drop unknown ids).
 // Maps are tracked ONLY in `maps` (never in owned/deco): a map id that leaked into
@@ -223,7 +236,16 @@ export function normShop(s) {
   if (!Array.isArray(s.decoInstances) || (!s.decoInstances.length && d.deco.length)) d.decoInstances = d.deco.map((id, i) => ({ uid: `legacy-${id}-${i}`, id, x: null, y: null, stored: false }));
   d.deco = d.decoInstances.filter((o) => !o.stored).map((o) => o.id);
   d.uni = (() => { const u = itemById(s.uni); return u && u.uni && d.owned.includes(s.uni) ? s.uni : null; })();
-  for (const k of ['dog', 'cat']) { const id = s.pet && s.pet[k], p = petById(id); d.pet[k] = p && p.pet === k && d.owned.includes(id) ? id : null; }
+  const rawPet = s.pet && typeof s.pet === 'object' ? s.pet : {};
+  const validPet = (id) => { const p = petById(id); return p && d.owned.includes(id) ? p : null; };
+  // New saves store one `active` pet. Older saves had dog/cat slots; resolve their
+  // impossible dual-equipped state once (cat wins because that was the later selection).
+  const active = Object.prototype.hasOwnProperty.call(rawPet, 'active')
+    ? validPet(rawPet.active)
+    : (validPet(rawPet.cat) || validPet(rawPet.dog));
+  d.pet.active = active ? active.id : null;
+  d.pet.dog = active?.pet === 'dog' ? active.id : null;
+  d.pet.cat = active?.pet === 'cat' ? active.id : null;
   d.maps = Array.isArray(s.maps) ? [...new Set(s.maps.filter((id) => MAP_IDS.includes(id)))] : [];
   return d;
 }
@@ -248,6 +270,7 @@ export const starBalance = (data) => Object.values(data.stars || {}).reduce((a, 
 // buy / equip (pure: mutate the save object, return a result code)
 export function buy(data, id) {
   const it = itemById(id); if (!it) return 'unknown';
+  if (it.legacy) return 'retired';
   if (it.map) {
     // maps: owned in data.shop.maps only (never owned/deco); one purchase, atomic star deduction.
     // The caller Save.saves immediately after 'ok', so a re-entered game can never see a
@@ -275,7 +298,7 @@ export function buy(data, id) {
     data.coins -= it.price;
   }
   if (!data.shop.owned.includes(id)) data.shop.owned.push(id);
-  if (it.pet) data.shop.pet[it.pet] = id;
+  if (it.pet) { data.shop.pet.active = id; data.shop.pet.dog = it.pet === 'dog' ? id : null; data.shop.pet.cat = it.pet === 'cat' ? id : null; }
   else if (it.uni) data.shop.uni = id; else if (it.slot) data.shop.eq[it.slot] = id; else if (!it.book && !it.map) { const uid = `deco-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`; data.shop.decoInstances ||= []; data.shop.decoInstances.push({ uid, id, x: null, y: null, stored: false }); data.shop.deco.push(id); }   // decorations go straight on
   return 'ok';
 }
@@ -302,7 +325,7 @@ export function sellStoredDeco(data, uid) {
 export function toggle(data, id) {
   const it = itemById(id); if (!it || !data.shop.owned.includes(id)) return 'locked';
   if (it.map) return 'locked';   // maps are switched on the home screen, never placed / worn
-  if (it.pet) { data.shop.pet[it.pet] = data.shop.pet[it.pet] === id ? null : id; return data.shop.pet[it.pet] ? 'on' : 'off'; }
+  if (it.pet) { const next = data.shop.pet.active === id ? null : id; data.shop.pet.active = next; data.shop.pet.dog = next && it.pet === 'dog' ? next : null; data.shop.pet.cat = next && it.pet === 'cat' ? next : null; return next ? 'on' : 'off'; }
   if (it.uni) { data.shop.uni = data.shop.uni === id ? null : id; return data.shop.uni ? 'on' : 'off'; }
   if (it.slot) { data.shop.eq[it.slot] = data.shop.eq[it.slot] === id ? null : id; return data.shop.eq[it.slot] ? 'on' : 'off'; }
   const inst = data.shop.decoInstances || []; const o = inst.find((q) => q.id === id && !q.stored);
@@ -310,5 +333,5 @@ export function toggle(data, id) {
   const stored = inst.find((q) => q.id === id && q.stored); if (stored) stored.stored = false; else inst.push({ uid: `deco-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`, id, x: null, y: null, stored: false });
   data.shop.deco = inst.filter((q) => !q.stored).map((q) => q.id); return 'on';
 }
-export const isOn = (data, id) => { const it = itemById(id); if (!it || it.map) return false; return it.pet ? data.shop.pet[it.pet] === id : it.uni ? data.shop.uni === id : it.slot ? data.shop.eq[it.slot] === id : data.shop.deco.includes(id); };
+export const isOn = (data, id) => { const it = itemById(id); if (!it || it.map) return false; return it.pet ? data.shop.pet.active === id : it.uni ? data.shop.uni === id : it.slot ? data.shop.eq[it.slot] === id : data.shop.deco.includes(id); };
 export const levelsTotal = () => CFG.levels.length;

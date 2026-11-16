@@ -5,6 +5,8 @@ body {
   color: #fff; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 #gl { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; pointer-events: none; }
+#home3d { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; pointer-events: none; }
+body.inplay #home3d { display: none; }
 #cv { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; touch-action: none; }
 .hidden { display: none !important; }
 button { font: inherit; cursor: pointer; border: 0; }

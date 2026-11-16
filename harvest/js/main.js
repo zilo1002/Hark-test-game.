@@ -82,9 +82,10 @@ const ui = new UI({
   // 商店
   shopOpen: () => { snd.unlock(); snd.play('tap'); ensurePreview(); },
   thumb: (it) => { try { return ensurePreview().thumb(it, data.character, data.shop.eq); } catch (_) { return ''; } },
+  shopPreview: (what) => { try { const p = ensurePreview(), c = p.cv, w = c.clientWidth, h = c.clientHeight; if (w > 0 && h > 0) p.size(w, h); p.key = ''; p.show(what); p.render(performance.now() / 1000); } catch (_) {} },
   shopBuy: (id) => {
     const r = Shop.buy(data, id);
-    if (r === 'ok') { Save.save(data); applyLook(); snd.play('restore'); hap.pattern([30, 40, 30], [200, 255]); fx.confetti(R.W, R.H, 60); }
+    if (r === 'ok') { Save.save(data); applyLook(); if (mode === 'home') ui.renderHome(data); snd.play('restore'); hap.pattern([30, 40, 30], [200, 255]); fx.confetti(R.W, R.H, 60); }
     else { snd.play('full'); hap.tick(30, 0); }
     return r;
   },
@@ -136,7 +137,7 @@ const ui = new UI({
   dailyStart: () => { snd.unlock(); snd.play('tap'); startDaily(); },
   locked: () => { snd.play('full'); hap.tick(30, 0); },
   save: () => saveRun(data, world, { credit, persist: Save.save }),
-  shopToggle: (id) => { const r = Shop.toggle(data, id); Save.save(data); applyLook(); snd.play(r === 'on' ? 'appear' : 'tap'); hap.tick(14, 0); return r; },
+  shopToggle: (id) => { const r = Shop.toggle(data, id); Save.save(data); applyLook(); if (mode === 'home') ui.renderHome(data); snd.play(r === 'on' ? 'appear' : 'tap'); hap.tick(14, 0); return r; },
   setCharacter: (character) => { data.character = Shop.CHARACTER_IDS.includes(character) ? character : 'girl'; Save.save(data); applyLook(); if (preview) preview.thumbs = {}; if (mode === 'home') ui.renderHome(data); },
   clearDecoSelection: () => { decoEdit=null; },
   decoAction: (action, uid) => { let ok=false; if(action==='store') ok=Shop.storeDeco(data,uid); else if(action==='place') ok=Shop.placeDeco(data,uid); else if(action==='sell'){const r=Shop.sellStoredDeco(data,uid);ok=r.ok;if(ok)ui.toast(`已出售，获得${r.amount}金币`);} if(ok){Save.save(data);applyLook();}return ok; },
@@ -153,10 +154,11 @@ window.addEventListener('doll-art-ready', () => {
 });
 function ensurePreview() { if (!preview) { preview = new Preview(document.getElementById('shopPrev')); } return preview; }
 function applyLook() {
-  const hero = Shop.heroStyle(data.shop.eq, data.character), shoulderPet = Shop.petById(data.shop.pet.cat);
+  const equipped = Shop.equippedPets(data);
+  const hero = Shop.heroStyle(data.shop.eq, data.character), shoulderPet = equipped.active;
   if (shoulderPet && shoulderPet.col && shoulderPet.col.shoulder) hero.owlCompanion = true;
   R.setOutfit(hero); R.setDecos(data.shop.deco); R.setUniform(Shop.uniformStyle(data.shop.uni));
-  const dog = Shop.petById(data.shop.pet.dog); R.setPet(dog ? dog.col : null); R.setFestival(Fest.currentFestival());
+  R.setPet(equipped.dog ? equipped.dog.col : null); R.setFestival(Fest.currentFestival());
 }
 function rememberFestivalMap() {
   const id = Fest.currentFestival();
@@ -164,10 +166,10 @@ function rememberFestivalMap() {
   if (!Array.isArray(data.festivalMaps)) data.festivalMaps = [];
   if (!data.festivalMaps.includes(id)) { data.festivalMaps.push(id); Save.save(data); }
 }
-const petOpt = () => (data.shop.pet.dog ? 'dog' : null);
+const petOpt = () => (Shop.equippedPets(data).active?.pet === 'dog' ? 'dog' : null);
 const companionOpt = () => {
-  const pet = Shop.petById(data.shop.pet.cat);
-  return pet && pet.col && !pet.col.shoulder ? { kind: 'cat', id: pet.id, col: pet.col } : null;
+  const pet = Shop.equippedPets(data).active;
+  return pet && pet.pet !== 'dog' && !(pet.col && pet.col.shoulder) ? { kind: pet.pet, id: pet.id, col: pet.col } : null;
 };
 applyLook();
 

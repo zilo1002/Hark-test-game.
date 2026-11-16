@@ -1,7 +1,7 @@
 // DOM layer: HUD, banners, pause menu, home panel, level select, settings, win card.
 import { CFG, goalText } from './config.js';
 import { starsLeft, storageAvailable } from './save.js';
-import { OUTFITS, DECOS, UNIFORMS, PETS, SLOTS, itemById, isOn, onSale, festName, STAR_ITEMS, isStar, MAPS, mapOwned, mapUnlocked, mapLabel, mapIcon, currentMapKey, homeSeasonFor, CHARACTER_IDS, isBoyCharacter } from './shop.js';
+import { OUTFITS, DECOS, UNIFORMS, PETS, SLOTS, itemById, isOn, onSale, festName, STAR_ITEMS, isStar, MAPS, mapOwned, mapUnlocked, mapLabel, mapIcon, currentMapKey, homeSeasonFor, CHARACTER_IDS, isBoyCharacter, equippedPets } from './shop.js';
 import { PAGES, pageEntries, pageProgress, pageDone, claimable, bookTotals } from './book.js';
 import { festivalInfo, nextFestival, FESTIVALS, FEST_IDS } from './festival.js';
 import { ROSTER, TRAITS, traitBonus, xpNeed, CREW } from './crew.js';
@@ -155,6 +155,7 @@ export class UI {
   note(text, now) { this._note = text; this._noteT = now; }
 
   showHUD(world) {
+    document.body.classList.add('inplay');
     this.el.home.classList.add('hidden'); this.el.hud.classList.remove('hidden'); $('hudBottom').classList.remove('hidden');
     this.el.buildUI.classList.add('hidden'); this.dock();
     this._earn = []; this._note = ''; this._hudAt = -1e9; this._earnS = null; this._stackS = null; this._noteS = null;
@@ -234,6 +235,7 @@ export class UI {
   }
 
   showHome(data) {
+    document.body.classList.remove('inplay');
     this.el.hud.classList.add('hidden'); $('hudBottom').classList.add('hidden'); this.tip(''); this.el.home.classList.remove('hidden');
     this.el.buildUI.classList.toggle('hidden', !this.build);
     this.renderHome(data); this.dock();
@@ -401,7 +403,7 @@ export class UI {
     const d = this.h.data();
     if (!this.shopSel) {
       const eq = d.shop.eq, starOn = STAR_ITEMS.find((x) => d.shop.owned.includes(x.id) && isOn(d, x.id));
-      this.shopSel = this.shopTab === 'star' ? (starOn ? starOn.id : STAR_ITEMS[0].id) : this.shopTab === 'outfit' ? (eq.hat || eq.top || OUTFITS[0].id) : this.shopTab === 'uni' ? (d.shop.uni || UNIFORMS[0].id) : this.shopTab === 'pet' ? (d.shop.pet.dog || d.shop.pet.cat || PETS[0].id) : (d.shop.deco[0] || DECOS[0].id);
+      this.shopSel = this.shopTab === 'star' ? (starOn ? starOn.id : STAR_ITEMS[0].id) : this.shopTab === 'outfit' ? (eq.hat || eq.top || OUTFITS[0].id) : this.shopTab === 'uni' ? (d.shop.uni || UNIFORMS[0].id) : this.shopTab === 'pet' ? (equippedPets(d).active?.id || PETS[0].id) : (d.shop.deco[0] || DECOS[0].id);
     }
     this.openModal(this.el.shop);
     this.h.shopOpen();
@@ -446,8 +448,11 @@ export class UI {
     a.innerHTML = own ? (it.map ? '已拥有' : (it.slot || it.uni ? (on ? '脱下' : '穿上') : it.pet ? (on ? '让它休息' : '带上它') : (on ? '收起来' : '摆出来'))) : `购买 ${priceHtml(it)}`;
     const nf = nextFestival(), fi = festivalInfo();
     $('shopHow').textContent = this.shopTab === 'star' ? '星星是过关拿到的（每关 1–3 颗）。庄园和星星商店共用一个星星钱包，买了衣服就少了修庄园的星。买不全没关系：回去把老关刷到 3★，星星就回来了。'
-      : this.shopTab === 'pet' ? '小狗会跟着你并偶尔叼回成熟作物；猫、企鹅、刺猬、兔子和狐狸会跟随但不捡东西。每个位置可带一只；白猫头鹰会停在农夫肩上。'
+      : this.shopTab === 'pet' ? '一次只装备一只宠物；选新的会替换当前宠物。小狗会跟随并偶尔叼回成熟作物，其它宠物跟随但不捡东西；白猫头鹰停在农夫肩上。'
       : fi ? `${fi.name}限定商品只在活动期间（还剩 ${fi.left} 天）出售，买下的永久保留。` : `过关就能拿金币：每关保底 10 + 本关收入的 2% + 每颗星 10；第一次拿到的星星每颗再 +20。${nf ? `下一个节日：${nf.name}（${nf.inDays} 天后）。` : ''}`;
+    // Building thumbnails temporarily reuses and clears the same WebGL scene. Restore the exact
+    // selected item after the grid is complete, so the large preview cannot stay on the last thumb.
+    this.h.shopPreview?.(this.shopView());
   }
   // what the preview shows: the farmer trying the selected piece on, or the selected decoration
   shopView() {
@@ -468,9 +473,9 @@ export class UI {
       return { kind: 'pet', id: pet.id };
     }
     if (this.shopTab === 'deco') return { kind: 'deco', id: it && !it.slot && !it.uni && !it.pet ? it.id : DECOS[0].id };
-    if (this.shopTab === 'uni') { const u = it && it.uni ? it : UNIFORMS[0]; return { kind: 'person', uni: u.id, style: u.style, character: d.character, owlCompanion: !!(d.shop.pet.cat && (itemById(d.shop.pet.cat)?.col?.shoulder)) }; }
+    if (this.shopTab === 'uni') { const u = it && it.uni ? it : UNIFORMS[0]; return { kind: 'person', uni: u.id, style: u.style, character: d.character, owlCompanion: !!(equippedPets(d).active?.col?.shoulder) }; }
     const eq = { ...d.shop.eq }; if (it && it.slot) eq[it.slot] = it.id;
-    return { kind: 'person', eq, character: d.character, owlCompanion: !!(d.shop.pet.cat && (itemById(d.shop.pet.cat)?.col?.shoulder)) };
+    return { kind: 'person', eq, character: d.character, owlCompanion: !!(equippedPets(d).active?.col?.shoulder) };
   }
   // ---------------------------------------------------------------- 订单板
   openOrders() { this.h.orders(); this.openModal(this.el.orders); this.renderOrders(); }

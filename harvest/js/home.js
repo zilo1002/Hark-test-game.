@@ -4,8 +4,8 @@ import { CFG } from './config.js';
 import { COL } from './sprites.js';
 import { person, HERO } from './chars.js';
 import { elastic, FONT } from './util.js';
-import { heroStyle, petById } from './shop.js';
-import { dollCanvas, petCanvas } from './doll-art.js';
+import { heroStyle, petById, equippedPets } from './shop.js';
+import { renderHome3d } from './home3d.js';
 
 const TAU = Math.PI * 2;
 export const SPOTS = {
@@ -951,30 +951,15 @@ export function drawHome(g, W, H, save, t, dpr, area, page = 1) {
   if (fest === 'halloween') for (const [x, y, k] of [[44, 262, 1.2], [318, 270, 1.1], [92, 430, 1.0], [272, 432, 1.1], [150, 214, 0.9], [246, 214, 0.9]]) { g.save(); g.translate(x, y); jack(g, k, t + x); g.restore(); }
   if (fest === 'xmas') { g.save(); g.translate(-6, 252); xtree(g, t, 1.0); g.restore(); }
   if (fest === 'cny') for (const [x, y, L] of [[86, 184, 78], [196, 184, 78], [120, 476, 120]]) { g.save(); g.translate(x, y); lampString(g, t, L); g.restore(); }
-  // v4.0 B 宠物: the cat lounges in front of the house, the dog sits by the farmer
-  const pets = save.shop && save.shop.pet;
-  if (pets && pets.cat && petById(pets.cat) && !(petById(pets.cat).col && petById(pets.cat).col.shoulder)) {
-    const pet = petById(pets.cat), art = petCanvas('cat', pet.col);
-    g.save(); g.translate(150, 238); shadow(g, 0, 0, 15, 4); g.drawImage(art, -12, -24, 24, 24); g.restore();
-  }
-  // v5.1.7 庄园散步: the dog walks with the farmer (a little trot bounce while moving)
-  if (pets && pets.dog && petById(pets.dog)) {
-    g.save();
-    g.translate(WALK.dx, WALK.dy - (WALK.dmoving ? Math.abs(Math.sin(WALK.dphase)) * 1.5 : 0));
-    const pet = petById(pets.dog), art = petCanvas('dog', pet.col);
-    shadow(g, 0, 0, 9, 3); g.drawImage(art, -10, -29, 20, 25);
-    g.restore();
+  // Ground contact shadows stay on the 2D map; every visible character/pet is a live 3D mesh overlay.
+  const pets = equippedPets(save);
+  if (pets.active && !(pets.active.col && pets.active.col.shoulder)) {
+    const x = pets.active.pet === 'dog' ? WALK.dx : 150, y = pets.active.pet === 'dog' ? WALK.dy : 238;
+    g.save(); g.translate(x, y); shadow(g, 0, 0, pets.active.pet === 'dog' ? 9 : 15, 4); g.restore();
   }
   const look = save.shop ? heroStyle(save.shop.eq, save.character) : HERO;
-  const shoulderPet = save.shop && save.shop.pet && petById(save.shop.pet.cat);
-  if (shoulderPet && shoulderPet.col && shoulderPet.col.shoulder) look.owlCompanion = true;
-  // v5.1.7 庄园散步: the farmer walks where you tap (face flips with the direction)
-  g.save(); g.translate(WALK.fx, WALK.fy); g.scale(1.05 * WALK.face, 1.05);
-  shadow(g, 0, 0, 10, 3.4);
-  const doll = dollCanvas(look);
-  // Crop the same doll sprite used by the 3D game/shop model to remove its transparent margins.
-  g.drawImage(doll, 0, 180, 256, 332, -16, -42, 32, 42);
-  g.restore();
+  if (pets.active && pets.active.col && pets.active.col.shoulder) look.owlCompanion = true;
+  g.save(); g.translate(WALK.fx, WALK.fy); shadow(g, 0, 0, 10, 3.4); g.restore();
   g.restore();
   // v5.0.9 夜市地图: a dark-blue tint over the whole estate (the global colour filter the
   // night look needs — it dims the daytime-bright walls and roofs so they sit with the
@@ -1016,4 +1001,7 @@ export function drawHome(g, W, H, save, t, dpr, area, page = 1) {
     }
     g.globalAlpha = 1;
   }
+  const active = pets.active;
+  renderHome3d({ W, H, dpr, layout: L, t, look, personX: WALK.fx, personY: WALK.fy, facing: WALK.face, moving: WALK.moving, walk: WALK.phase,
+    pet: active, petX: WALK.dx, petY: WALK.dy - (WALK.dmoving ? Math.abs(Math.sin(WALK.dphase)) * 1.5 : 0), dogMoving: WALK.dmoving });
 }
