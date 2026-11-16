@@ -292,6 +292,10 @@ function makeCollector(kind, x, y) {
            stack: [], incoming: 0, incomingItems: {}, packPulse: 0, pickAcc: 0, dropAcc: 0, cutAcc: 0, cutT: -9, sway: 0, fullFlag: false, vehicle: false,
            sources: null, canPick: true, canDrop: true, only: null };
 }
+function makePetFollower(x, y) {
+  return { x, y, vx: 0, vy: 0, moving: false, walk: 0, face: 1, dirY: 0, sway: 0,
+    path: null, pathI: 0, pathT: 0, pathGoal: { x: 0, y: 0 }, prog: null, unstick: 0, dodge: null, dodgeT: 0 };
+}
 const itemPrice = (t) => CFG.items[t].price;
 
 export class World {
@@ -341,8 +345,12 @@ export class World {
       this.tiles.push({ ...t, price, order: i, paid: 0, bought: t.prebuilt ? 1 : 0, done: !!t.prebuilt, visible: false, price0: price, payFx: 0, appearT: -9, cool: 0 });
     });
     this.player = makeCollector('player', this.L.start[0], this.L.start[1]);
-    // v4.0 B 宠物狗 (opts.pet = 'dog'); the sims never pass it, so their results are unchanged
-    this.dog = opts.pet === 'dog' ? { x: this.player.x - 30, y: this.player.y + 20, vx: 0, vy: 0, moving: false, walk: 0, face: 1, dirY: 0, sway: 0, state: 'follow', fetchT: CFG.pet.every * 0.6, carry: null, n: 0, tgt: null, fetched: 0, wag: 0, path: null, pathI: 0, pathT: 0, pathGoal: { x: 0, y: 0 }, prog: null, unstick: 0, dodge: null, dodgeT: 0 } : null;
+    // The dog keeps its established fetch behavior. The separately equipped cat-slot
+    // companion follows in levels; the shoulder owl is already composited into the farmer.
+    this.dog = opts.pet === 'dog' ? { ...makePetFollower(this.player.x - 30, this.player.y + 20), state: 'follow', fetchT: CFG.pet.every * 0.6, carry: null, n: 0, tgt: null, fetched: 0, wag: 0 } : null;
+    this.companion = opts.companion && opts.companion.col && !opts.companion.col.shoulder
+      ? { ...makePetFollower(this.player.x + 30, this.player.y + 20), kind: opts.companion.kind || 'cat', id: opts.companion.id || null, col: opts.companion.col }
+      : null;
     this.applyEnv();
     if (opts.money) this.money = opts.money;
     if (opts.speedUp) this.upg.speed += opts.speedUp;
@@ -820,6 +828,7 @@ export class World {
     this.updateFever(dt);
     this.playerExtras(dt);
     if (this.dog) this.updateDog(dt);
+    if (this.companion) this.updateCompanion(dt);
     // counters & customers
     for (const c of this.counters) if (!c.hidden) this.updateCounter(c, dt);
     this.updateCustomers(dt);
@@ -1889,8 +1898,7 @@ export class World {
     }
     return { x, y };
   }
-  dogMove(dt, tx, ty, sp) {
-    const d = this.dog;
+  dogMove(dt, tx, ty, sp, d = this.dog) {
     // v4.9.8: the dog walked with the old corner-steer, the one the workers' A* replaced:
     // two fences meeting in an L made it pick the corner it was already standing on, forever
     // (speed 0 when the waypoint is < 2 away). The dog now plans the same A* path the workers
@@ -1924,6 +1932,16 @@ export class World {
     this.stepMove(d, dt, 7);
     return Math.hypot(tx - d.x, ty - d.y);
   }
+  updateCompanion(dt) {
+    const d = this.companion, p = this.player;
+    const sp = Math.hypot(p.vx, p.vy), ax = sp > 8 ? -p.vx / sp : -0.7, ay = sp > 8 ? -p.vy / sp : 0.7;
+    // Keep a non-fetching companion on the other side of the farmer from the dog.
+    const tx = p.x + ax * 30 + ay * 16, ty = p.y + ay * 30 - ax * 16;
+    const far = Math.hypot(tx - d.x, ty - d.y);
+    this.dogMove(dt, tx, ty, far > 70 ? CFG.pet.speed * CFG.pet.run : Math.max(CFG.pet.speed * 0.7, sp), d);
+    if (far > 600) { d.x = tx; d.y = ty; }
+  }
+
   updateDog(dt) {
     const d = this.dog, p = this.player, P = CFG.pet, room = p.cap - p.stack.length - p.incoming;
     d.wag += dt;

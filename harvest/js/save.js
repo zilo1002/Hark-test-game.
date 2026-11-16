@@ -1,6 +1,6 @@
 // localStorage save with a graceful in-memory fallback (private mode, blocked storage, file://).
 import { CFG } from './config.js';
-import { shopDefaults, normShop, migrateCoins, effectiveHomeMap } from './shop.js';
+import { shopDefaults, normShop, migrateCoins, effectiveHomeMap, CHARACTER_IDS } from './shop.js';
 import { crewDefaults, normCrew } from './crew.js';
 import { ordersDefaults, normOrders } from './orders.js';
 import { dailyDefaults, normDaily } from './daily.js';
@@ -16,7 +16,7 @@ try {
 export const storageAvailable = () => !!storage;
 
 export function defaults() {
-  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true, mode: 'auto', quality: 'auto' }, cur: null, played: false, coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults(), daily: dailyDefaults(), book: { ...bookDefaults(), filled: true }, valley: { season: null }, homeMap: { mode: 'calendar', season: null, festival: null, map: null }, festivalMaps: [] };
+  return { v: CFG.version, stars: {}, unlocked: 0, spent: 0, restored: [], restoredAt: {}, settings: { sound: true, vib: true, mode: 'auto', quality: 'auto' }, cur: null, played: false, character: 'girl', coins: 0, shop: shopDefaults(), crew: crewDefaults(), orders: ordersDefaults(), daily: dailyDefaults(), book: { ...bookDefaults(), filled: true }, valley: { season: null }, homeMap: { mode: 'calendar', season: null, festival: null, map: null }, festivalMaps: [] };
 }
 
 export function load() {
@@ -27,7 +27,7 @@ export function load() {
     const d = JSON.parse(raw);
     const base = defaults();
     if (!d || typeof d !== 'object') return base;
-    const out = { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) }, stars: d.stars || {}, restored: Array.isArray(d.restored) ? d.restored : [] };
+    const out = { ...base, ...d, character: CHARACTER_IDS.includes(d.character) ? d.character : 'girl', settings: { ...base.settings, ...(d.settings || {}) }, stars: d.stars || {}, restored: Array.isArray(d.restored) ? d.restored : [] };
     // v3.4 商店: saves from before the shop get 金币 for the stars and levels they already have;
     // everything else in the save is kept as it was
     if (typeof d.coins !== 'number' || !isFinite(d.coins)) out.coins = migrateCoins(totalStars(out), Math.min(out.unlocked || 0, CFG.levels.length));

@@ -21,16 +21,16 @@ const QUALITY = [
   { name: 'mid', pr: 1.5, shadow: 1024, plantShadow: false, aa: true },
   { name: 'high', pr: 2, shadow: 2048, plantShadow: true, aa: true },
 ];
-const HERO = { shirt: '#FFFFFF', vest: '#C8352A', bowtie: true, pants: '#2D3A5A', hair: '#7A3E1D', sleeve: '#FFFFFF' };
-const GARDENER = { shirt: '#F7F5EE', overalls: '#3567C8', pants: '#3567C8', hair: '#5A3414', hat: 'straw', sleeve: '#F7F5EE' };
+const HERO = { shirt: '#FFF4E2', overalls: '#4F79A9', pants: '#4F79A9', hair: '#D3934F', hat: 'straw', sleeve: '#FFF4E2', braids: true, basket: true, braidTie: '#E8A97C' };
+const GARDENER = { shirt: '#FFF4E2', overalls: '#4F79A9', pants: '#4F79A9', hair: '#D3934F', hat: 'straw', sleeve: '#FFF4E2', braids: true, basket: true, braidTie: '#E8A97C' };
 const CARTER = { shirt: '#FFD23F', pants: '#4A5A8A', hair: '#3A2210', hat: 'cap', capColor: '#E8452C', sleeve: '#FFD23F' };
 const VIP = { shirt: '#FFD23F', vest: '#E8B21E', pants: '#7A3E9D', hair: '#3A2210', sleeve: '#FFD23F', crown: true };
 const GOLD_MAT = new THREE.MeshLambertMaterial({ color: 0xFFE46A, emissive: 0xB07800 });
 const LUMBERJACK = { shirt: '#D9382A', vest: '#2D3A5A', pants: '#4A5A8A', hair: '#6B3A1E', hat: 'beanie', capColor: '#F29C0E', beard: '#7A3E1D', sleeve: '#D9382A' };
 const MILKER = { shirt: '#FFFFFF', overalls: '#3BA7FF', pants: '#3BA7FF', hair: '#3A2210', hat: 'cap', capColor: '#FFFFFF', sleeve: '#FFFFFF' };
-const FISHER = { shirt: '#FFC21A', overalls: '#3567C8', pants: '#3567C8', hair: '#3A2210', hat: 'rain', capColor: '#FFC21A', sleeve: '#FFC21A', boots: '#2F8F3A' };
-const CASHIER = { shirt: '#4CD08A', vest: '#2E8A5A', hair: '#3A2210', pants: '#2D3A5A', sleeve: '#4CD08A' };
-const CASHIER2 = { shirt: '#FFFFFF', vest: '#E8452C', hair: '#6B3A1E', pants: '#2D3A5A', sleeve: '#FFFFFF', pigtails: true };
+const FISHER = { shirt: '#FFC21A', overalls: '#4F79A9', pants: '#4F79A9', hair: '#344B72', hat: 'rain', capColor: '#FFC21A', sleeve: '#FFC21A', boots: '#2F8F3A', pigtails: true, eyeColor: '#6586B9' };
+const CASHIER = { shirt: '#4CD08A', vest: '#2E8A5A', hair: '#8A5543', pants: '#2D3A5A', sleeve: '#4CD08A', pigtails: true, eyeColor: '#795A8B' };
+const CASHIER2 = { shirt: '#FFF5E8', vest: '#D74D52', hair: '#D77B76', pants: '#7B4B5B', sleeve: '#FFF5E8', pigtails: true, eyeColor: '#8D5A78' };
 // v4.2 搬运工: carry machine goods from the output tray to the second counter
 const PORTER = { shirt: '#FFFFFF', overalls: '#E8452C', pants: '#E8452C', hair: '#3A2210', hat: 'cap', capColor: '#FFD23F', sleeve: '#FFFFFF' };
 const KOI_GOLD_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x8A5A00 });
@@ -171,6 +171,8 @@ export class Renderer {
     this.player = this.makeChar(w.player);
     this.dogObj = null;
     if (w.dog) { const pp = M.makePet('dog', this.petCol || { body: '#E89A44', belly: '#FFF3DC', ear: '#C8752A', nose: '#2A1A10' }); this.levelRoot.add(pp.root); this.dogObj = { pp, ang: 0.8 }; }
+    this.companionObj = null;
+    if (w.companion) { const pp = M.makePet(w.companion.kind || 'cat', w.companion.col || {}); this.levelRoot.add(pp.root); this.companionObj = { pp, ang: 0.8 }; }
     const t = this.camTarget(w); this.cam.x = t.x; this.cam.y = t.y; this.clampCam();
     this.applyQuality();
     this.groundDirty = false;
@@ -1114,6 +1116,13 @@ export class Renderer {
       o.pp.root.position.set(d.x, 0, d.y); o.pp.root.rotation.y = o.ang; o.pp.root.scale.setScalar(1.4);
       M.posePet(o.pp, { t: time, walk: d.walk, moving: sp > 6, sit: sp <= 6 && !world.player.moving });
       if (d.carry) { const fx = Math.sin(o.ang), fz = Math.cos(o.ang); this.item(d.carry, d.x + fx * 14.5, d.y + fz * 14.5, 15, o.ang, 0.85); }
+    }
+    if (this.companionObj && world.companion) {
+      const d = world.companion, o = this.companionObj, sp = Math.hypot(d.vx, d.vy);
+      if (sp > 6) o.ang = angLerp(o.ang, Math.atan2(d.vx, d.vy), Math.min(1, dt * 10));
+      else { const p = world.player; o.ang = angLerp(o.ang, Math.atan2(p.x - d.x, p.y - d.y), Math.min(1, dt * 3)); }
+      o.pp.root.position.set(d.x, 0, d.y); o.pp.root.rotation.y = o.ang; o.pp.root.scale.setScalar(1.4);
+      M.posePet(o.pp, { t: time, walk: d.walk, moving: sp > 6, sit: sp <= 6 && !world.player.moving });
     }
     // customers (pooled figures)
     const pool = this.custPool, used = this._used || (this._used = {});

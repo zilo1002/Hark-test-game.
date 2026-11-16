@@ -1,7 +1,7 @@
 // DOM layer: HUD, banners, pause menu, home panel, level select, settings, win card.
 import { CFG, goalText } from './config.js';
 import { starsLeft, storageAvailable } from './save.js';
-import { OUTFITS, DECOS, UNIFORMS, PETS, SLOTS, itemById, isOn, onSale, festName, STAR_ITEMS, isStar, MAPS, mapOwned, mapUnlocked, mapLabel, mapIcon, currentMapKey, homeSeasonFor } from './shop.js';
+import { OUTFITS, DECOS, UNIFORMS, PETS, SLOTS, itemById, isOn, onSale, festName, STAR_ITEMS, isStar, MAPS, mapOwned, mapUnlocked, mapLabel, mapIcon, currentMapKey, homeSeasonFor, CHARACTER_IDS, isBoyCharacter } from './shop.js';
 import { PAGES, pageEntries, pageProgress, pageDone, claimable, bookTotals } from './book.js';
 import { festivalInfo, nextFestival, FESTIVALS, FEST_IDS } from './festival.js';
 import { ROSTER, TRAITS, traitBonus, xpNeed, CREW } from './crew.js';
@@ -93,6 +93,7 @@ export class UI {
     // 商店
     this.el.shop = $('shop'); this.shopTab = 'outfit'; this.shopSel = null;
     for (const b of $('shopTabs').children) b.onclick = () => { this.shopTab = b.dataset.t; this.shopSel = null; this.renderShop(); h.tap(); };
+    $('characterSwitch').onclick = () => { const d=h.data(), i=CHARACTER_IDS.indexOf(d.character); h.setCharacter(CHARACTER_IDS[(i+1+CHARACTER_IDS.length)%CHARACTER_IDS.length]); this.renderShop(); h.tap(); };
     $('shopAct').onclick = () => {
       const it = this.shopSel && itemById(this.shopSel); if (!it) return;
       const d = h.data();
@@ -416,6 +417,9 @@ export class UI {
   }
   renderShop() {
     const d = this.h.data(), list = this.shopList();
+    const characterSwitch = $('characterSwitch');
+    characterSwitch.classList.toggle('hidden', !['outfit', 'uni'].includes(this.shopTab));
+    characterSwitch.textContent = d.character === 'girl' ? '切换为男孩' : (isBoyCharacter(d.character) && CHARACTER_IDS.indexOf(d.character) < CHARACTER_IDS.length - 1 ? '换个男孩' : '切换为女孩');
     for (const b of $('shopTabs').children) b.classList.toggle('on', b.dataset.t === this.shopTab);
     if (!this.shopSel || !list.some((x) => x.id === this.shopSel)) this.shopSel = list[0].id;
     $('shopCoins').textContent = d.coins.toLocaleString('en-US'); $('coinCount').textContent = d.coins.toLocaleString('en-US'); $('shopStars').textContent = starsLeft(d);
@@ -435,13 +439,14 @@ export class UI {
     }
     const it = itemById(this.shopSel), own = it.map ? mapOwned(d, it.map) : d.shop.owned.includes(it.id), on = isOn(d, it.id), a = $('shopAct');
     $('shopName').textContent = it.name;
-    const petSub = it.pet === 'dog' ? (own ? (on ? '关卡里跟着你，偶尔叼来作物' : '在家休息') : '关卡里跟着你跑，偶尔叼来附近的作物放进背篓') : it.pet === 'cat' ? (own ? (on ? '在庄园里晒太阳' : '在家休息') : '在庄园门前懒洋洋地晒太阳') : '';
+    const petSub = it.pet === 'dog' ? (own ? (on ? '关卡里跟着你，偶尔叼来作物' : '在家休息') : '关卡里跟着你跑，偶尔叼来附近的作物放进背篓') : it.pet === 'cat' ? (it.col && it.col.shoulder ? (own ? (on ? '已停在农夫肩头' : '在家休息') : '带上后会停在农夫肩头') : (own ? (on ? '关卡里跟着你走' : '在家休息') : '关卡里会跟着你走')) : '';
+
     $('shopSub').textContent = it.map ? (own ? '已拥有 · 在主页“四季山谷”按钮切换' : `${it.desc} · 买了就能在主页切换`) : it.pet ? petSub : (it.fest && !own ? `${festName(it)}限定 · 活动结束就买不到了 · ` : '') + (it.uni ? (own ? (on ? '所有雇工都穿着' : '一次只能穿一套') : '买了雇工们马上换上') : it.slot ? `${SLOTS.find((x) => x[0] === it.slot)[1]}${own ? '' : ' · 买了自动穿上'}` : own ? (on ? '庄园和关卡里都看得到' : '收在仓库里') : '摆在庄园，关卡围栏外也有');
     a.className = 'small ' + (own ? (it.map ? 'off' : (on ? 'off' : 'warm')) : afford(it) ? 'warm' : 'poor');
     a.innerHTML = own ? (it.map ? '已拥有' : (it.slot || it.uni ? (on ? '脱下' : '穿上') : it.pet ? (on ? '让它休息' : '带上它') : (on ? '收起来' : '摆出来'))) : `购买 ${priceHtml(it)}`;
     const nf = nextFestival(), fi = festivalInfo();
     $('shopHow').textContent = this.shopTab === 'star' ? '星星是过关拿到的（每关 1–3 颗）。庄园和星星商店共用一个星星钱包，买了衣服就少了修庄园的星。买不全没关系：回去把老关刷到 3★，星星就回来了。'
-      : this.shopTab === 'pet' ? '小狗：关卡里跟着你，大约每 9 秒叼回 1–2 个附近成熟的作物（背篓满了就只跟着）。小猫：庄园里的装饰伙伴。各一只，可以随时换。'
+      : this.shopTab === 'pet' ? '小狗会跟着你并偶尔叼回成熟作物；猫、企鹅、刺猬、兔子和狐狸会跟随但不捡东西。每个位置可带一只；白猫头鹰会停在农夫肩上。'
       : fi ? `${fi.name}限定商品只在活动期间（还剩 ${fi.left} 天）出售，买下的永久保留。` : `过关就能拿金币：每关保底 10 + 本关收入的 2% + 每颗星 10；第一次拿到的星星每颗再 +20。${nf ? `下一个节日：${nf.name}（${nf.inDays} 天后）。` : ''}`;
   }
   // what the preview shows: the farmer trying the selected piece on, or the selected decoration
@@ -449,16 +454,23 @@ export class UI {
     const d = this.h.data(), it = itemById(this.shopSel || '');
     if (it && isStar(it)) {   // v5.0.7 星星 tab: dispatch by the item's own kind, not the tab
       if (it.map) return { kind: 'deco', id: it.thumb || 'lanterns' };   // v5.0.9: a map has no 3D model — preview its representative deco
-      if (it.pet) return { kind: 'pet', id: it.id };
-      if (it.uni) return { kind: 'person', uni: it.id, style: it.style };
-      if (it.slot) { const eq = { ...d.shop.eq }; eq[it.slot] = it.id; return { kind: 'person', eq }; }
+      if (it.pet) {
+        if (it.col && it.col.shoulder) return { kind: 'person', eq: { ...d.shop.eq }, character: d.character, owlCompanion: true };
+        return { kind: 'pet', id: it.id };
+      }
+      if (it.uni) return { kind: 'person', uni: it.id, style: it.style, character: d.character };
+      if (it.slot) { const eq = { ...d.shop.eq }; eq[it.slot] = it.id; return { kind: 'person', eq, character: d.character }; }
       return { kind: 'deco', id: it.id };
     }
-    if (this.shopTab === 'pet') return { kind: 'pet', id: it && it.pet ? it.id : PETS[0].id };
+    if (this.shopTab === 'pet') {
+      const pet = it && it.pet ? it : PETS[0];
+      if (pet.col && pet.col.shoulder) return { kind: 'person', eq: { ...d.shop.eq }, character: d.character, owlCompanion: true };
+      return { kind: 'pet', id: pet.id };
+    }
     if (this.shopTab === 'deco') return { kind: 'deco', id: it && !it.slot && !it.uni && !it.pet ? it.id : DECOS[0].id };
-    if (this.shopTab === 'uni') { const u = it && it.uni ? it : UNIFORMS[0]; return { kind: 'person', uni: u.id, style: u.style }; }
+    if (this.shopTab === 'uni') { const u = it && it.uni ? it : UNIFORMS[0]; return { kind: 'person', uni: u.id, style: u.style, character: d.character, owlCompanion: !!(d.shop.pet.cat && (itemById(d.shop.pet.cat)?.col?.shoulder)) }; }
     const eq = { ...d.shop.eq }; if (it && it.slot) eq[it.slot] = it.id;
-    return { kind: 'person', eq };
+    return { kind: 'person', eq, character: d.character, owlCompanion: !!(d.shop.pet.cat && (itemById(d.shop.pet.cat)?.col?.shoulder)) };
   }
   // ---------------------------------------------------------------- 订单板
   openOrders() { this.h.orders(); this.openModal(this.el.orders); this.renderOrders(); }

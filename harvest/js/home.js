@@ -5,6 +5,7 @@ import { COL } from './sprites.js';
 import { person, HERO } from './chars.js';
 import { elastic, FONT } from './util.js';
 import { heroStyle, petById } from './shop.js';
+import { dollCanvas, petCanvas } from './doll-art.js';
 
 const TAU = Math.PI * 2;
 export const SPOTS = {
@@ -952,19 +953,27 @@ export function drawHome(g, W, H, save, t, dpr, area, page = 1) {
   if (fest === 'cny') for (const [x, y, L] of [[86, 184, 78], [196, 184, 78], [120, 476, 120]]) { g.save(); g.translate(x, y); lampString(g, t, L); g.restore(); }
   // v4.0 B 宠物: the cat lounges in front of the house, the dog sits by the farmer
   const pets = save.shop && save.shop.pet;
-  if (pets && pets.cat && petById(pets.cat)) { g.save(); g.translate(150, 238); cat2d(g, t, petById(pets.cat).col); g.restore(); }
+  if (pets && pets.cat && petById(pets.cat) && !(petById(pets.cat).col && petById(pets.cat).col.shoulder)) {
+    const pet = petById(pets.cat), art = petCanvas('cat', pet.col);
+    g.save(); g.translate(150, 238); shadow(g, 0, 0, 15, 4); g.drawImage(art, -12, -24, 24, 24); g.restore();
+  }
   // v5.1.7 庄园散步: the dog walks with the farmer (a little trot bounce while moving)
   if (pets && pets.dog && petById(pets.dog)) {
     g.save();
     g.translate(WALK.dx, WALK.dy - (WALK.dmoving ? Math.abs(Math.sin(WALK.dphase)) * 1.5 : 0));
-    dog2d(g, t, petById(pets.dog).col);
+    const pet = petById(pets.dog), art = petCanvas('dog', pet.col);
+    shadow(g, 0, 0, 9, 3); g.drawImage(art, -10, -29, 20, 25);
     g.restore();
   }
-  const look = save.shop ? heroStyle(save.shop.eq) : HERO, hat = look.hat;
+  const look = save.shop ? heroStyle(save.shop.eq, save.character) : HERO;
+  const shoulderPet = save.shop && save.shop.pet && petById(save.shop.pet.cat);
+  if (shoulderPet && shoulderPet.col && shoulderPet.col.shoulder) look.owlCompanion = true;
   // v5.1.7 庄园散步: the farmer walks where you tap (face flips with the direction)
   g.save(); g.translate(WALK.fx, WALK.fy); g.scale(1.05 * WALK.face, 1.05);
-  person(g, t, WALK.phase, WALK.moving, { ...look, hat: hat === 'straw', sleeve: undefined, carry: Math.sin(t * 3) > 0.3 });
-  if (hat && hat !== 'straw') decoHat(g, look); else if (look.scarf) decoHat(g, { scarf: look.scarf });
+  shadow(g, 0, 0, 10, 3.4);
+  const doll = dollCanvas(look);
+  // Crop the same doll sprite used by the 3D game/shop model to remove its transparent margins.
+  g.drawImage(doll, 0, 180, 256, 332, -16, -42, 32, 42);
   g.restore();
   g.restore();
   // v5.0.9 夜市地图: a dark-blue tint over the whole estate (the global colour filter the

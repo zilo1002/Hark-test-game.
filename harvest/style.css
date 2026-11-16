@@ -536,3 +536,5 @@ button { font: inherit; cursor: pointer; border: 0; }
 .seaRow .fnote { flex: 1; min-width: 140px; font-size: 12px; font-weight: 800; color: #6A5A3A; }
 .lvb.soon { opacity: .6; }
 .valleyBtn { background: linear-gradient(90deg, #FF8FB0, #4CB24E, #E8871E, #6FA8DC); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+
+#characterSwitch { margin-top: 6px; min-height: 30px; padding: 3px 12px; border-radius: 12px; background: linear-gradient(#FFF2C7, #E7BE67); box-shadow: 0 3px 0 #B58837; color: #5A3A10; font-weight: 900; }

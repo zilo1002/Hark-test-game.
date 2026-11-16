@@ -158,7 +158,15 @@ export const PETS = [
   { id: 'catOrange', pet: 'cat', name: '橘猫',  price: 300, col: { body: '#F2A040', belly: '#FFF3DC', ear: '#E8823A', nose: '#FF8FA0', stripe: '#D9762A' }, sw: ['#F2A040', '#FFF3DC'] },
   { id: 'catTux',    pet: 'cat', name: '奶牛猫', price: 420, col: { body: '#2E2E36', belly: '#FFFFFF', ear: '#2E2E36', nose: '#FF8FA0' }, sw: ['#2E2E36', '#FFFFFF'] },
   // v5.2.4: mottled dark cat, based on the owner's two appearance references; ordinary coin exchange.
-  { id: 'catMottled', pet: 'cat', name: '花斑猫', price: 520, col: { body: '#302A29', belly: '#D9CDBE', ear: '#514039', nose: '#D98B9A', patch: '#8B6248', patch2: '#B49A7B', patch3: '#E4D9C9', patch2d: [['#8B6248', -1.8, -8.5, 4.6, 2.3, -0.2], ['#B49A7B', 5.2, -7.2, 3.3, 1.8, 0.3], ['#E4D9C9', -11, -8, 2.1, 2.0, 0]] }, sw: ['#302A29', '#B49A7B', '#D9CDBE'] },
+  { id: 'catMottled', pet: 'cat', name: '花斑猫', price: 520, col: { body: '#302A29', belly: '#5B4942', ear: '#514039', nose: '#D98B9A', patch: '#8B6248', patch2: '#B49A7B', patch3: '#D2B8A2', closedEyes: true, dollRole: 'cat_tortoise_plush', fluffy: true, patch2d: [['#8B6248', -1.8, -8.5, 4.6, 2.3, -0.2], ['#B49A7B', 5.2, -7.2, 3.3, 1.8, 0.3], ['#E4D9C9', -11, -8, 2.1, 2.0, 0]] }, sw: ['#302A29', '#B49A7B', '#D9CDBE'] },
+  // v5.3.3 plush-doll collection: one cat slot, so each pet can be swapped using the existing equip flow.
+  { id: 'dogPlush', pet: 'dog', name: '绒绒小白狗', price: 680, col: { body: '#F7F5EE', belly: '#FFFFFF', ear: '#D9B88A', nose: '#2A1A10', spot: '#5A3A22', dollRole: 'dog_plush', fluffy: true }, sw: ['#F7F5EE', '#D9B88A'] },
+  { id: 'catPlush', pet: 'cat', name: '软绒猫咪', price: 620, col: { body: '#493F3D', belly: '#B49A7B', ear: '#493F3D', nose: '#D98B9A', dollRole: 'cat_tortoise_plush', fluffy: true }, sw: ['#493F3D', '#B49A7B'] },
+  { id: 'penguinPlush', pet: 'cat', name: '小企鹅', price: 720, col: { body: '#34343B', belly: '#F5F0E8', ear: '#26262D', nose: '#F5A12B', dollRole: 'penguin', fluffy: true }, sw: ['#34343B', '#F5F0E8'] },
+  { id: 'hedgehogPlush', pet: 'cat', name: '刺猬宝宝', price: 760, col: { body: '#73604F', belly: '#D9C4A8', ear: '#8F725C', nose: '#31221B', dollRole: 'hedgehog', fluffy: true }, sw: ['#73604F', '#D9C4A8'] },
+  { id: 'rabbitPlush', pet: 'cat', name: '绒绒兔', price: 700, col: { body: '#F5F0E8', belly: '#FFFFFF', ear: '#E6B7B3', nose: '#D98B9A', dollRole: 'rabbit', fluffy: true }, sw: ['#F5F0E8', '#E6B7B3'] },
+  { id: 'foxPlush', pet: 'cat', name: '小狐狸', price: 820, col: { body: '#E47735', belly: '#F7E8D6', ear: '#A94122', nose: '#2A1A10', dollRole: 'fox', fluffy: true }, sw: ['#E47735', '#F7E8D6'] },
+  { id: 'owlShoulder', pet: 'cat', name: '白绒肩头猫头鹰', price: 900, col: { body: '#F4F1E8', belly: '#FFFFFF', ear: '#E4D7C4', nose: '#D79A49', dollRole: 'owl', fluffy: true, shoulder: true }, sw: ['#F4F1E8', '#D79A49'] },
 ];
 
 // ---- 星星宠物 (v5.0.7): colour variants only, no new models; one dog / one cat at a time
@@ -191,7 +199,7 @@ export const STAR_ITEMS = [...STAR_OUTFITS, ...STAR_PETS, ...STAR_UNIFORMS, ...S
 // a star-shop item is one with a starPrice (and no coin price); everything else is a coin item
 export const isStar = (it) => !!it && typeof it.starPrice === 'number';
 // the default hired-hand look (the gardener) used for the 制服 preview
-export const WORKER_BASE = { shirt: '#F7F5EE', overalls: '#3567C8', pants: '#3567C8', hair: '#5A3414', hat: 'straw', sleeve: '#F7F5EE' };
+export const WORKER_BASE = { dollRole: 'farmer', shirt: '#FFF4E2', overalls: '#4F79A9', pants: '#4F79A9', hair: '#D3934F', hat: 'straw', sleeve: '#FFF4E2', braids: true, basket: true, braidTie: '#E8A97C' };
 export const uniformStyle = (id) => { const u = UNIFORMS.find((x) => x.id === id) || STAR_UNIFORMS.find((x) => x.id === id); return u ? u.style : null; };
 
 export const itemById = (id) => OUTFITS.find((o) => o.id === id) || STAR_OUTFITS.find((o) => o.id === id) || DECOS.find((d) => d.id === id) || STAR_DECOS.find((d) => d.id === id) || MAPS.find((m) => m.id === id) || UNIFORMS.find((u) => u.id === id) || STAR_UNIFORMS.find((u) => u.id === id) || PETS.find((p) => p.id === id) || STAR_PETS.find((p) => p.id === id);
@@ -220,10 +228,15 @@ export function normShop(s) {
   return d;
 }
 
+// Switchable doll templates share one fit, camera and outfit pipeline.
+export const CHARACTER_IDS = ['girl', 'boy', 'boy_sage', 'boy_navy'];
+export const isBoyCharacter = (id) => String(id || '').startsWith('boy');
+
 // the farmer's look with the equipped outfit pieces applied
-export const HERO_BASE = { shirt: '#FFFFFF', vest: '#C8352A', bowtie: true, pants: '#2D3A5A', hair: '#7A3E1D', sleeve: '#FFFFFF' };
-export function heroStyle(eq) {
-  const st = { ...HERO_BASE };
+export const HERO_BASE = { dollRole: 'farmer', character: 'girl', shirt: '#FFF4E2', overalls: '#4F79A9', pants: '#4F79A9', hair: '#D3934F', hat: 'straw', sleeve: '#FFF4E2', braids: true, basket: true, braidTie: '#E8A97C' };
+export function heroStyle(eq, character = 'girl') {
+  const selected = CHARACTER_IDS.includes(character) ? character : 'girl';
+  const st = { ...HERO_BASE, character: selected, dollRole: isBoyCharacter(selected) ? selected : 'farmer' };
   for (const [k] of SLOTS) { const it = eq && itemById(eq[k]); if (it && it.slot === k) Object.assign(st, it.style); }
   return st;
 }

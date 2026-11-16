@@ -471,7 +471,26 @@ export function stubbleGeo(crop) {
 // ------------------------------------------------------------------ people
 // Chunky cartoon figure: big head, round body, stubby limbs. Returns { root, parts } where
 // parts.* are pivot groups the animator rotates. Facing +Z. Total height ≈ 40 units.
+// The production character is one camera-facing doll silhouette. Using one silhouette avoids
+// overlapping body/cloth/hair meshes and keeps the home/farm/shop art on the same model path.
+import { dollCanvas, dollRole, onDollCanvas, petCanvas } from './doll-art.js';
+function makeDollPerson(o = {}) {
+  const root = new THREE.Group(), body = new THREE.Group(), torso = new THREE.Group(), head = new THREE.Group();
+  root.add(body); body.add(torso, head);
+  const canvas = dollCanvas(o, dollRole(o));
+  const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true;
+  onDollCanvas(canvas, () => { tex.needsUpdate = true; });
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.035, depthWrite: false });
+  const doll = new THREE.Sprite(mat); doll.scale.set(32, 64, 1); doll.position.set(0, 32, 0); body.add(doll);
+  const legs = [new THREE.Group(), new THREE.Group()], arms = [new THREE.Group(), new THREE.Group()];
+  arms.forEach(a => torso.add(a));
+  const tool = new THREE.Group(), axe = new THREE.Group(), net = new THREE.Group(); arms[1].add(tool, axe, net);
+  const blob = new THREE.Mesh(BLOB_GEO, BLOB_MAT); blob.rotation.x = -H; blob.position.y = 0.3; blob.scale.set(10, 8, 1); root.add(blob);
+  return { root, body, legs, arms, torso, head, tool, axe, net, blob, o, doll, dollArt: true };
+}
+
 export function makePerson(o = {}) {
+  if (typeof document !== 'undefined') return makeDollPerson(o);
   const skin = o.skin || '#FFCFA0';
   const root = new THREE.Group(), body = new THREE.Group();
   root.add(body);
@@ -480,21 +499,21 @@ export function makePerson(o = {}) {
   // legs: pivot at the hip (leg = capsule r 2.5 from hip y −10.7 to +0.3; hips at x ±3.1)
   const legs = [];
   for (const s of [-1, 1]) {
-    const hip = new THREE.Group(); hip.position.set(s * 3.0, 11.0, 0); hip.scale.y = 0.72;
-    hip.add(mesh(cap(2.5, 6, 4, 12), o.pants || '#3A4A78', 0, -5.2, 0));
+    const hip = new THREE.Group(); hip.position.set(s * 2.7, 9.1, 0); hip.scale.y = 0.68;
+    hip.add(mesh(cap(2.65, 4.6, 5, 16), o.pants || '#3A4A78', 0, -4.2, 0, 1.08, 0.92, 1.05));
     if (o.boots) {   // 商店 boots (v4.1 fitted): a round shaft just outside the leg, the shoe replaced by a boot foot, a slim cuff
       hip.add(mesh(cyl(2.85, 2.8, 5.8, 10), o.boots, 0, -8.0, 0));
       hip.add(mesh(box(4.8, 2.6, 6.6), o.boots, 0, -10.6, 1.1));
       hip.add(mesh(cyl(2.95, 2.95, 1.1, 10), o.bootGold ? '#FFF2A0' : '#FFFFFF', 0, -5.0, 0));
       if (o.bootGold) hip.add(mesh(cyl(2.9, 2.9, 0.6, 10), '#FFF2A0', 0, -9.0, 0));
-    } else hip.add(mesh(box(4.6, 2.6, 6.4), o.shoes || '#5A3414', 0, -10.6, 1.0));
+    } else hip.add(mesh(sph(1, 18, 12), o.shoes || '#5A3414', 0, -8.3, 1.15, 2.8, 1.25, 3.3));
     body.add(hip); legs.push(hip);
   }
   // torso (capsule r 6.4, z ×0.86, local y −2.7…15.5; the head sphere covers it above y ≈ 10)
-  const torso = new THREE.Group(); torso.position.set(0, 12, 0); body.add(torso);
+  const torso = new THREE.Group(); torso.position.set(0, 10.2, 0); body.add(torso);
   // v4.1: a vest / 礼服 replaces the shirt colour of the body itself (no layered shell), with the shirt as a front panel
-  if (o.dress) torso.add(mesh(cyl(5.2, 7.6, 12, 9), o.dress, 0, 5.5, 0));
-  else torso.add(mesh(cap(6.4, 5.4, 5, 14), o.vest || o.shirt || '#FFFFFF', 0, 6.4, 0, 1, 1, 0.86));
+  if (o.dress) torso.add(mesh(sph(1, 24, 18), o.dress, 0, 4.4, 0, 7.0, 5.8, 5.3));
+  else torso.add(mesh(cap(6.4, 4.0, 6, 18), o.vest || o.shirt || '#FFFFFF', 0, 5.2, 0, 1.05, 1.05, 0.92));
   const front = (geo, c, y, zs = 0.9) => mesh(geo, c, 0, y, 0, 1, 1, zs);
   if (o.vest) {
     torso.add(front(panel(6.6, 6.75, 7.2, 0.9), o.shirt || '#FFFFFF', 7.6));
@@ -503,7 +522,10 @@ export function makePerson(o = {}) {
   if (o.overalls) {   // trousers part round the hips + a fitted bib + two buttons
     torso.add(mesh(cyl(6.55, 6.9, 6.2, 12), o.overalls, 0, 3.4, 0, 1, 1, 0.9));
     torso.add(front(panel(6.62, 6.62, 4.6, 1.15), o.overalls, 8.6));
-    for (const sx of [-1, 1]) torso.add(mesh(sph(0.7, 5, 4), '#FFD23F', sx * 2.6, 10.2, 5.95));
+    for (const sx of [-1, 1]) {
+      torso.add(mesh(sph(0.7, 10, 8), o.overallButton || '#E8B96A', sx * 2.6, 10.2, 5.95));
+      torso.add(mesh(cap(0.58, 4.1, 5, 10), o.overalls, sx * 3.1, 10.3, 5.25, 1, 1, 0.78));
+    }
   }
   if (o.apron) {   // 碎花围裙: a skirt panel and a bib that follow the curve of the body, dots on its surface
     torso.add(front(panel(6.7, 7.3, 8.2, 1.5), o.apron, 3.5));
@@ -514,6 +536,14 @@ export function makePerson(o = {}) {
     }
   }
   if (o.bowtie) torso.add(mesh(box(4.2, 1.8, 1.2), o.bowColor || '#C8352A', 0, 10.6, 6.0));
+  if (o.basket) {
+    // Little woven harvest basket, carried at the farmer's hip and shared by the shop model.
+    const bg = new THREE.Group(); bg.position.set(8.0, -0.2, 2.6); torso.add(bg);
+    bg.add(mesh(cyl(3.1, 2.5, 4.2, 12), o.basketColor || '#B77A42', 0, 0.2, 0));
+    bg.add(mesh(tor(2.8, 0.28, 5, 16), '#E6B978', 0, 2.3, 0));
+    const h = new THREE.Mesh(tor(2.1, 0.22, 5, 18, Math.PI), M('#8E5627')); h.position.set(0, 3.0, -0.1); h.rotation.x = H; bg.add(h);
+    for (const [x,z,c] of [[-1.1,0.2,'#E8452C'],[0.8,0.5,'#FFC21A'],[0,-1.2,'#4FAE32']]) bg.add(mesh(sph(1.25,12,9), c, x, 2.3, z, 1, 0.9, 1));
+  }
   if (o.scarf) {   // 围巾 (v4.1 fitted): rings on the shoulders just outside the neck (they tuck under the sleeves),
     // tail hanging down the chest centre, clear of the arms even when they hug the stack
     const cols = o.scarf === 'rainbow' ? ['#FF4D4D', '#FFD23F', '#3BA7FF'] : [o.scarf, o.scarf];
@@ -525,41 +555,49 @@ export function makePerson(o = {}) {
   // arms: pivot at the shoulder
   const arms = [];
   for (const s of [-1, 1]) {
-    const sh = new THREE.Group(); sh.position.set(s * 6.8, 10.2, 0); sh.scale.y = 0.78;
-    sh.add(mesh(cap(2.1, 5.4, 4, 12), o.sleeve || o.dress || o.shirt || '#FFFFFF', 0, -3.8, 0));
-    sh.add(mesh(sph(2.2, 7, 5), skin, 0, -8.2, 0));
+    const sh = new THREE.Group(); sh.position.set(s * 6.2, 7.5, 0); sh.scale.y = 0.72;
+    sh.add(mesh(cap(2.5, 3.8, 5, 16), o.sleeve || o.dress || o.shirt || '#FFFFFF', 0, -2.8, 0, 1.05, 1, 1.05));
+    sh.add(mesh(sph(2.4, 18, 12), skin, 0, -6.1, 0, 1.08, 0.92, 1.05));
     torso.add(sh); arms.push(sh);
   }
   // head
-  const head = new THREE.Group(); head.position.set(0, 26.6, 0); body.add(head);
-  head.add(mesh(sph(7.7, 32, 20), skin, 0, 0, 0, 1, 1.04, 0.96));
+  const head = new THREE.Group(); head.position.set(0, 25.6, 0); body.add(head);
+  // Full doll-series silhouette: oversized rounded head over a compact, plush body.
+  head.add(mesh(sph(7.7, 40, 28), skin, 0, 0, 0, 1.08, 1.04, 0.98));
   const hair = o.hair || '#6B3A1E';
   const hm = new THREE.Mesh(HAIR_GEO, M(hair)); hm.position.set(0, 0.8, -0.4); hm.rotation.x = -0.42; hm.castShadow = true; head.add(hm);
   head.add(mesh(sph(6.6, 10, 7), hair, 0, -0.4, -2.6, 1.05, 1, 0.8));
   // Soft inset doll eyes: flatter layers sit on the face instead of protruding like beads.
   for (const s of [-1, 1]) {
-    const eyeWhite = new THREE.Mesh(sph(1.78, 20, 14), M('#FFF8F1'));
-    eyeWhite.position.set(s * 2.55, 0.15, 6.75); eyeWhite.scale.set(1.0, 1.12, 0.22); eyeWhite.visible = o.hat !== 'pumpkin'; head.add(eyeWhite);
-    const iris = new THREE.Mesh(sph(1.34, 20, 14), M(o.eyeColor || '#79533D'));
-    iris.position.set(s * 2.55, 0.02, 6.98); iris.scale.set(0.94, 1.08, 0.22); iris.visible = o.hat !== 'pumpkin'; head.add(iris);
-    const pupil = new THREE.Mesh(sph(0.72, 16, 12), M('#241B19'));
-    pupil.position.set(s * 2.55, -0.10, 7.17); pupil.scale.set(0.9, 1.0, 0.18); pupil.visible = o.hat !== 'pumpkin'; head.add(pupil);
-    const glint = new THREE.Mesh(sph(0.42, 12, 9), M('#FFFFFF'));
-    glint.position.set(s * 2.86, 0.48, 7.34); glint.scale.set(1, 1, 0.4); glint.visible = o.hat !== 'pumpkin'; head.add(glint);
+    const eyeWhite = new THREE.Mesh(sph(2.2, 24, 18), M('#FFF8F1'));
+    eyeWhite.position.set(s * 2.85, 0.35, 7.05); eyeWhite.scale.set(1.0, 1.10, 0.20); eyeWhite.visible = o.hat !== 'pumpkin'; head.add(eyeWhite);
+    const iris = new THREE.Mesh(sph(1.72, 24, 18), M(o.eyeColor || '#79533D'));
+    iris.position.set(s * 2.85, 0.18, 7.26); iris.scale.set(0.94, 1.08, 0.22); iris.visible = o.hat !== 'pumpkin'; head.add(iris);
+    const pupil = new THREE.Mesh(sph(0.92, 20, 16), M('#241B19'));
+    pupil.position.set(s * 2.85, 0.02, 7.48); pupil.scale.set(0.9, 1.0, 0.18); pupil.visible = o.hat !== 'pumpkin'; head.add(pupil);
+    const glint = new THREE.Mesh(sph(0.50, 16, 12), M('#FFFFFF'));
+    glint.position.set(s * 3.22, 0.58, 7.62); glint.scale.set(1, 1, 0.4); glint.visible = o.hat !== 'pumpkin'; head.add(glint);
     const glint2 = new THREE.Mesh(sph(0.18, 10, 8), M('#FFFDF7'));
     glint2.position.set(s * 2.24, -0.43, 7.35); glint2.scale.z = 0.4; glint2.visible = o.hat !== 'pumpkin'; head.add(glint2);
-    const cheek = new THREE.Mesh(sph(1.42, 16, 10), M('#F2A09A'));
-    cheek.position.set(s * 4.05, -2.32, 6.1); cheek.scale.set(1.0, 0.36, 0.08); cheek.visible = o.hat !== 'pumpkin'; head.add(cheek);
+    const cheek = new THREE.Mesh(sph(1.65, 20, 14), M('#F2A09A'));
+    cheek.position.set(s * 4.35, -2.18, 6.45); cheek.scale.set(1.0, 0.36, 0.08); cheek.visible = o.hat !== 'pumpkin'; head.add(cheek);
   }
-  const nose = new THREE.Mesh(sph(0.38, 12, 9), M('#E99A85')); nose.position.set(0, -1.46, 7.05); nose.scale.set(1, 0.65, 0.4); nose.visible = o.hat !== 'pumpkin'; head.add(nose);
-  const mouth = new THREE.Mesh(sph(0.72, 12, 9), M('#A45B59'));
-  mouth.position.set(0, -2.92, 6.88); mouth.scale.set(0.95, 0.28, 0.12); mouth.visible = o.hat !== 'pumpkin'; head.add(mouth);
+  const nose = new THREE.Mesh(sph(0.48, 16, 12), M('#E99A85')); nose.position.set(0, -1.52, 7.36); nose.scale.set(1, 0.65, 0.4); nose.visible = o.hat !== 'pumpkin'; head.add(nose);
+  const mouth = new THREE.Mesh(sph(0.84, 16, 12), M('#A45B59'));
+  mouth.position.set(0, -3.02, 7.12); mouth.scale.set(0.95, 0.28, 0.12); mouth.visible = o.hat !== 'pumpkin'; head.add(mouth);
   // Rounded fringe and side locks give the head a toy-like silhouette at phone scale.
   if (o.hat !== 'pumpkin') {
-    for (const [x, y, rz] of [[-4.2, 2.3, -0.22], [-2.3, 2.8, -0.1], [0, 3.0, 0], [2.3, 2.8, 0.1], [4.2, 2.3, 0.22]]) {
-      const lock = mesh(cap(1.55, 2.0, 5, 14), hair, x, y, 5.9, 1, 1.0, 0.5); lock.rotation.z = rz; head.add(lock);
+    for (const [x, y, rz] of [[-4.0, 2.3, -0.20], [-2.1, 2.9, -0.09], [0, 3.0, 0], [2.1, 2.9, 0.09], [4.0, 2.3, 0.20]]) {
+      const lock = mesh(sph(1, 20, 16), hair, x, y, 6.2, 1.55, 2.45, 0.48); lock.rotation.z = rz; head.add(lock);
     }
-    for (const side of [-1, 1]) head.add(mesh(sph(2.1, 18, 12), hair, side * 6.0, -1.4, 3.0, 0.82, 1.15, 0.55));
+    for (const side of [-1, 1]) head.add(mesh(sph(2.3, 24, 18), hair, side * 5.8, -1.3, 2.8, 0.82, 1.15, 0.54));
+    if (o.braids || o.pigtails) for (const side of [-1, 1]) {
+      const braid = new THREE.Group(); braid.position.set(side * 6.4, -1.3, 0.4); head.add(braid);
+      const n = o.braids ? 6 : 3;
+      for (let i = 0; i < n; i++) { const t = i / Math.max(1,n-1); mesh(sph(1, 20, 16), hair, side * (0.18 + (i % 2) * 0.08), -1.0 - i * 1.8, 0.3 + (i % 2) * 0.2, 1.25 - t * 0.15, 1.35, 1.18, braid); }
+      braid.rotation.z = side * -0.08;
+      if (o.braidTie || o.pigtails) head.add(mesh(sph(0.9, 16, 12), o.braidTie || o.hairTie || '#D86B87', side * 6.5, -1.65, 0.8, 1, 1, 0.65));
+    }
   }
   if (o.beard) head.add(mesh(sph(5, 8, 6), o.beard, 0, -4.4, 4.2, 1.1, 0.7, 0.6));
   if (o.hat === 'beanie') {
@@ -567,9 +605,14 @@ export function makePerson(o = {}) {
     head.add(mesh(cyl(8.6, 8.6, 2, 12), '#FFFFFF', 0, 2.6, -0.4));
     head.add(mesh(sph(2.2, 6, 5), '#FFFFFF', 0, 10.4, -0.6));
   } else if (o.hat === 'straw') {
-    head.add(mesh(cyl(11, 11, 0.9, 12), '#F2CF6B', 0, 5.2, 0));
-    head.add(mesh(cyl(6.2, 7.2, 4.6, 10), '#E8BE4E', 0, 7.6, 0));
-    head.add(mesh(cyl(7.25, 7.25, 1.2, 10), '#C8352A', 0, 6.0, 0));
+    head.add(mesh(cyl(8.4, 8.4, 0.9, 40), '#D2A85B', 0, 4.7, 0));
+    head.add(mesh(cyl(5.0, 5.9, 4.2, 32), '#EBCB82', 0, 6.9, -0.2));
+    head.add(mesh(tor(6.6, 0.28, 6, 40), '#F5D996', 0, 5.0, 0));
+    head.add(mesh(cyl(5.8, 5.8, 0.68, 32), o.hatBand || '#C58D4E', 0, 6.0, 0));
+    if (o.daisy !== false) {
+      for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; head.add(mesh(sph(0.62, 18, 12), '#FFF8E8', Math.sin(a) * 1.55 + 4.3, 6.45 + Math.cos(a) * 1.55, Math.cos(a) * 0.8 + 5.35, 1, 1, 0.65)); }
+      head.add(mesh(sph(0.72, 18, 12), '#F4C542', 4.3, 6.45, 5.45, 1, 1, 0.7));
+    }
   } else if (o.hat === 'cap') {
     head.add(mesh(dome(8.35, 12, 6), o.capColor || '#3B7FE0', 0, 2.4, -0.4, 1, 0.82, 1));
     head.add(mesh(box(8, 0.9, 6), o.capColor || '#3B7FE0', 0, 2.6, 8.4));
@@ -580,11 +623,11 @@ export function makePerson(o = {}) {
     head.add(mesh(cyl(8.45, 8.45, 1.1, 12), '#E8A20E', 0, 4.6, -0.4));
   }
   else if (o.hat === 'cowboy') {
-    head.add(mesh(cyl(12.5, 12.5, 0.9, 14), '#A0622D', 0, 5.0, 0, 1, 1, 0.82));
-    for (const s of [-1, 1]) head.add(mesh(box(3, 0.9, 16), '#A0622D', s * 11.2, 6.3, 0, 1, 1, 0.8));
-    head.add(mesh(cyl(5.6, 7.2, 6.4, 12), '#B87436', 0, 8.6, -0.4));
-    head.add(mesh(cyl(7.3, 7.3, 1.4, 12), '#5A3414', 0, 6.4, -0.4));
-    head.add(mesh(box(6, 1.2, 9), '#9A5A28', 0, 11.6, 0));
+    head.add(mesh(cyl(9.1, 9.1, 0.9, 24), '#A0622D', 0, 4.9, 0, 1, 1, 0.82));
+    for (const side of [-1, 1]) head.add(mesh(sph(1.3, 16, 12), '#A0622D', side * 8.0, 5.2, 0, 1.5, 0.75, 2.5));
+    head.add(mesh(cyl(4.6, 5.7, 5.0, 20), '#B87436', 0, 7.4, -0.4));
+    head.add(mesh(cyl(5.8, 5.8, 1.1, 24), '#5A3414', 0, 5.7, -0.4));
+    head.add(mesh(box(4.6, 0.9, 7), '#9A5A28', 0, 9.9, 0));
   } else if (o.hat === 'chef') {
     head.add(mesh(cyl(7.7, 7.7, 3.6, 14), '#FFFFFF', 0, 6.0, -0.4));
     head.add(mesh(sph(7.2, 10, 7), '#FFFFFF', 0, 12.2, -0.4, 1.15, 0.8, 1.1));
@@ -641,7 +684,7 @@ export function makePerson(o = {}) {
   }
   // A modest chibi proportion pass is shared by in-level people and every shop costume;
   // it keeps job silhouettes/props intact while making faces softer and more readable.
-  head.scale.set(1.68, 1.58, 1.30);
+  head.scale.set(1.72, 1.62, 1.42);
   // tool in the right hand (sickle), hidden unless cutting
   const tool = new THREE.Group();
   tool.add(mesh(cyl(0.6, 0.6, 6, 5), '#8E5627', 0, 0, 0));
@@ -967,12 +1010,45 @@ export function appleTreeGeo() {   // round orchard tree full of red apples
 
 // ------------------------------------------------------------------ v4.0 B 宠物 (low-poly dog / cat)
 // returns { root, body, head, legs[4], tail, kind }; posePet animates it (walk / idle / sit / lounge)
+const PET_FUR_MATS = {};
+function petFurMat(body, patches = []) {
+  if (typeof document === 'undefined') return softMat(body);
+  const key = [body, ...patches].join('|'); if (PET_FUR_MATS[key]) return PET_FUR_MATS[key];
+  const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256;
+  const ctx = canvas.getContext('2d'); ctx.fillStyle = body; ctx.fillRect(0, 0, 512, 256);
+  let seed = 8141; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  // Irregular mottled islands and short directional fur marks make the coat read plush, not flat.
+  for (let i = 0; i < 24; i++) { const c = patches[i % Math.max(1, patches.length)]; if (!c) break;
+    ctx.fillStyle = c; const x = rnd()*512, y = rnd()*256, rx = 13 + rnd()*32, ry = 9 + rnd()*26;
+    ctx.beginPath(); for (let j = 0; j < 11; j++) { const a = j*Math.PI*2/11, wob = 0.78+rnd()*0.42, px=x+Math.cos(a)*rx*wob, py=y+Math.sin(a)*ry*wob; j ? ctx.lineTo(px,py) : ctx.moveTo(px,py); } ctx.closePath(); ctx.fill();
+  }
+  for (let i = 0; i < 4500; i++) { const x=rnd()*512, y=rnd()*256, light=rnd()<0.5; ctx.strokeStyle=light?'rgba(255,238,216,.10)':'rgba(14,10,9,.10)'; ctx.lineWidth=0.6+rnd()*1.3; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+(rnd()-.5)*4,y+2+rnd()*5); ctx.stroke(); }
+  const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  return PET_FUR_MATS[key] = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92, metalness: 0 });
+}
+
+function makeDollPet(kind, col = {}) {
+  const root = new THREE.Group(), body = new THREE.Group(), head = new THREE.Group(), tail = new THREE.Group(); root.add(body); body.add(head, tail);
+  const canvas = petCanvas(kind, col), tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true;
+  onDollCanvas(canvas, () => { tex.needsUpdate = true; });
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.035, depthWrite: false });
+  const doll = new THREE.Sprite(mat); doll.scale.set(12, 16, 1); doll.position.set(0, 8, 0); body.add(doll);
+  const legs = [new THREE.Group(),new THREE.Group(),new THREE.Group(),new THREE.Group()];
+  const blob = new THREE.Mesh(BLOB_GEO, BLOB_MAT); blob.rotation.x = -H; blob.position.y = 0.25; blob.scale.set(8, 6, 1); root.add(blob);
+  return { root, body, head, tail, legs, blob, kind, o: col, doll, dollArt: true };
+}
+
 export function makePet(kind, col) {
+  if (typeof document !== 'undefined') return makeDollPet(kind, col);
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
-  const mesh = (geo, c, x, y, z, sx = 1, sy = 1, sz = 1, par = body) => { const m = new THREE.Mesh(geo, softMat(c)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; par.add(m); return m; };
   const dog = kind === 'dog', B = col.body, W = col.belly || '#FFFFFF';
-  const trunk = new THREE.Mesh(sph(dog ? 5.0 : 4.6, 24, 16), softMat(B)); trunk.rotation.x = H; trunk.position.set(0, dog ? 8 : 6.6, 0); trunk.scale.set(0.88, 0.8, 1.28); trunk.castShadow = true; body.add(trunk);
-  mesh(sph(dog ? 3.0 : 2.6, 8, 6), W, 0, dog ? 6.4 : 5.2, 2.6, 1, 0.8, 1.6);
+  const coat = (!dog && (col.patch || col.fluffy || kind === 'cat')) ? petFurMat(B, [col.patch, col.patch2, col.patch3].filter(Boolean)) : null;
+  const mesh = (geo, c, x, y, z, sx = 1, sy = 1, sz = 1, par = body) => { const m = new THREE.Mesh(geo, c === B && coat ? coat : softMat(c)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; par.add(m); return m; };
+  const trunk = new THREE.Mesh(sph(dog ? 5.2 : 6.1, 40, 28), coat || softMat(B)); trunk.position.set(0, dog ? 8.2 : 6.5, -0.8); trunk.scale.set(dog ? 1.04 : 1.22, dog ? 0.92 : 0.84, dog ? 1.16 : 1.08); trunk.castShadow = true; body.add(trunk);
+  if (!dog) body.rotation.y = 0.48;
+  mesh(sph(dog ? 3.0 : 3.1, 20, 14), W, 0, dog ? 6.5 : 5.8, 3.2, 1.0, 0.78, 0.55);
+  // Soft toy-like coat tufts around the silhouette; low-count rounded clumps stay light enough for gameplay.
+  if (kind === 'cat' || col.fluffy) for (const [x,y,z,r] of [[-4.2,8.2,-2.6,1.65],[4.2,8.2,-2.5,1.65],[-3.5,10.0,1.1,1.45],[3.5,10.0,1.2,1.45],[-2.2,5.3,-3.4,1.25],[2.2,5.4,-3.5,1.25],[0,11.0,-3.8,1.5]]) mesh(sph(r, 16, 12), B, x, y, z, 1.1, 0.9, 1.0);
   if (col.spot) { mesh(sph(2.2, 6, 5), col.spot, 2.2, 10.4, -2, 1, 0.5, 1.2); mesh(sph(1.6, 6, 5), col.spot, -2.4, 9.8, 3, 1, 0.5, 1); }
   // v5.2.4: extra low-poly coat patches for the mottled exchange cat. They sit on the
   // trunk/head surface, so other pet palettes stay unchanged.
@@ -991,29 +1067,36 @@ export function makePet(kind, col) {
   if (col.stripe) for (const z of [-3, 0, 3]) mesh(box(6.6, 1, 1.1), col.stripe, 0, 10.6 + (dog ? 1 : 0) - (kind === 'cat' ? 0.8 : 0), z);
   const legs = [];
   for (const [x, z] of [[-2.2, 4.6], [2.2, 4.6], [-2.2, -4.6], [2.2, -4.6]]) {
-    const hip = new THREE.Group(); hip.position.set(x, dog ? 6.4 : 5.2, z);
-    mesh(cap(1.35, dog ? 6.2 : 5.0, 12, 12), B, 0, dog ? -3.1 : -2.5, 0, 1, 1, 1, hip);
-    mesh(sph(1.3, 6, 4), W, 0, dog ? -6.2 : -5.0, 0.4, 1, 0.6, 1.3, hip);
+    const hip = new THREE.Group(); hip.position.set(x * (dog ? 1 : 0.94), dog ? 6.3 : 6.1, z * (dog ? 1 : 0.94));
+    mesh(cap(1.55, dog ? 4.0 : 3.4, 7, 16), B, 0, dog ? -2.4 : -2.0, 0, 1.05, 1.0, 1.05, hip);
+    mesh(sph(1.55, 16, 12), W, 0, dog ? -4.6 : -4.0, 0.5, 1.05, 0.68, 1.1, hip);
     body.add(hip); legs.push(hip);
   }
-  const head = new THREE.Group(); head.position.set(0, dog ? 13.6 : 11.8, dog ? 7.4 : 6.6); body.add(head);
-  head.scale.set(1.12, 1.12, 1.08);
-  mesh(sph(dog ? 4.8 : 4.7, 28, 20), B, 0, 0, 0, 1.05, 1.02, 1, head);
+  const head = new THREE.Group(); head.position.set(0, dog ? 14.1 : 12.8, dog ? 7.6 : 7.8); body.add(head);
+  head.scale.set(dog ? 1.15 : 1.16, dog ? 1.14 : 1.16, dog ? 1.08 : 1.04);
+  if (!dog) head.rotation.y = -0.48;
+  mesh(sph(dog ? 5.3 : 6.0, 44, 32), B, 0, 0, 0, 1.08, 1.0, 0.98, head);
+  if (kind === 'cat' || col.fluffy) for (const [sx,sy,sz,r] of [[-4,0.6,0.5,1.6],[4,0.8,0.4,1.55],[-2.6,-3.4,0.4,1.2],[2.5,-3.4,0.4,1.2],[0,3.8,-0.2,1.3]]) mesh(sph(r, 16, 12), B, sx, sy, sz, 1.05, 1.0, 0.78, head);
   if (dog) { mesh(box(3.6, 2.8, 4.2), W, 0, -1.4, 3.8, 1, 1, 1, head); mesh(sph(1.0, 6, 4), col.nose, 0, -0.4, 6.0, 1.2, 0.9, 0.8, head); mesh(box(1.6, 0.5, 1.6), '#E8586A', 0, -3.0, 4.6, 1, 1, 1, head); }
   else { mesh(sph(2.0, 16, 12), W, 0, -1.2, 4.0, 1.3, 0.8, 0.65, head); mesh(sph(0.72, 12, 9), col.nose, 0, -0.4, 4.75, 1.2, 0.8, 0.48, head);
-    if (col.patch) mesh(sph(1.2, 16, 10), col.patch2 || col.patch, -2.5, 2.4, 2.2, 1.0, 0.42, 0.7, head);
+    if (col.patch) { mesh(sph(2.1, 20, 14), col.patch2 || col.patch, -3.0, 2.8, 2.5, 1.0, 0.38, 0.75, head); mesh(sph(1.6, 18, 12), col.patch3 || col.patch, 3.2, -2.4, 2.6, 1.0, 0.36, 0.72, head); }
     for (const sx of [-1, 1]) for (const k of [0, 1]) { const w = new THREE.Mesh(box(4, 0.25, 0.25), colMat('#FFFFFF')); w.position.set(sx * 3.2, -1.2 - k * 0.7, 3.2); w.rotation.z = sx * (0.1 - k * 0.2); head.add(w); } }
   for (const sx of [-1, 1]) {
     // Large warm eyes and tiny highlights keep every pet variant readable as one
     // coherent, soft-chibi family at the shop and gameplay camera scales.
-    mesh(sph(dog ? 1.22 : 1.28, 16, 12), '#FFF8F1', sx * 1.7, 1.0, dog ? 4.8 : 4.65, 1.0, 1.1, 0.45, head);
-    mesh(sph(dog ? 0.84 : 0.9, 14, 10), col.eye || '#594239', sx * 1.7, 0.95, dog ? 5.18 : 5.05, 1, 1.08, 0.4, head);
-    mesh(sph(0.5, 12, 9), '#211A19', sx * 1.7, 0.91, dog ? 5.5 : 5.35, 1, 1.05, 0.38, head);
-    mesh(sph(0.28, 10, 8), '#FFFFFF', sx * 1.94, 1.29, dog ? 5.78 : 5.63, 1, 1, 0.3, head);
+    if (col.closedEyes && !dog) {
+      const lash = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(sx*1.1,0.45,5.1),new THREE.Vector3(sx*1.7,0.12,5.45),new THREE.Vector3(sx*2.3,0.45,5.1)]), 12, 0.16, 8, false), softMat('#332829')); head.add(lash);
+      for (let k=0;k<2;k++) mesh(cone(0.12,0.55,6), '#332829', sx*(1.3+k*0.34),0.36,5.22,1,1,0.7,head);
+    } else {
+      mesh(sph(dog ? 1.35 : 1.55, 24, 18), '#FFF8F1', sx * 1.85, 0.8, dog ? 4.8 : 4.65, 1.0, 1.12, 0.45, head);
+      mesh(sph(dog ? 0.94 : 1.14, 22, 16), col.eye || '#594239', sx * 1.85, 0.76, dog ? 5.18 : 5.05, 1, 1.08, 0.4, head);
+      mesh(sph(0.5, 14, 10), '#211A19', sx * 1.85, 0.72, dog ? 5.5 : 5.35, 1, 1.05, 0.38, head);
+      mesh(sph(0.30, 12, 9), '#FFFFFF', sx * 2.10, 1.12, dog ? 5.78 : 5.63, 1, 1, 0.3, head);
+    }
     if (dog) { const ear = new THREE.Mesh(sph(2.0, 8, 6), colMat(col.ear)); ear.position.set(sx * 3.4, 1.4, -0.4); ear.scale.set(0.78, 1.2, 0.55); ear.rotation.z = sx * 0.42; ear.castShadow = true; head.add(ear); }
     else {
-      mesh(sph(1.75, 18, 14), col.ear, sx * 2.35, 3.0, -0.05, 0.86, 1.24, 0.55, head);
-      mesh(sph(0.86, 14, 10), '#F3A6AF', sx * 2.35, 3.1, 0.45, 0.74, 1.15, 0.26, head);
+      const ear = mesh(cone(2.5, 5.6, 28), col.ear, sx * 3.65, 4.1, -0.05, 0.9, 1.0, 0.65, head); ear.rotation.z = sx * -0.12;
+      mesh(cone(1.25, 3.0, 24), '#D6A0A0', sx * 3.65, 4.1, 0.55, 0.78, 0.82, 0.22, head);
     }
   }
   // Tiny warm mouth; muzzle stays small so the face keeps the plush reference's simple read.
@@ -1022,7 +1105,8 @@ export function makePet(kind, col) {
   const tail = new THREE.Group(); tail.position.set(0, dog ? 10 : 8, dog ? -6.6 : -6.0); body.add(tail);
   if (dog) { const tm = new THREE.Mesh(cap(1.1, 3.6, 10, 14), softMat(B)); tm.position.set(0, 2.4, -0.6); tm.rotation.x = -0.5; tail.add(tm); mesh(sph(1.2, 6, 4), W, 0, 4.6, -1.8, 1, 1, 1, tail); }
   else {
-    const tm = new THREE.Mesh(cap(1.2, 8.4, 12, 16), softMat(B)); tm.position.set(0, 4.4, -1.6); tm.rotation.x = -0.35; tail.add(tm);
+    const tm = new THREE.Mesh(cap(1.8, 8.4, 14, 20), softMat(B)); tm.position.set(0, 4.5, -1.6); tm.rotation.x = -0.72; tm.scale.set(1.15, 1.08, 1.2); tail.add(tm);
+    for (const [y,x] of [[1.4,-0.3],[3.2,0.35],[5.1,-0.35],[7,0.2]]) { const tuft = new THREE.Mesh(sph(1.3,16,12),softMat(B)); tuft.position.set(x,y,-1.9); tuft.scale.set(1.0,1.15,0.85); tail.add(tuft); }
     if (col.patch) {
       for (const [y, c, x] of [[2.5, col.patch, -0.75], [5.2, col.patch2 || col.patch, 0.8], [7.2, col.patch3 || col.patch, -0.55]]) {
         const mark = new THREE.Mesh(sph(1.0, 14, 10), softMat(c)); mark.position.set(x, y, -1.7); mark.scale.set(0.9, 0.38, 0.65); tail.add(mark);
@@ -1037,7 +1121,7 @@ export function posePet(pp, s) {
   const { legs, body, head, tail } = pp, t = s.t, sw = s.moving ? Math.sin(s.walk * 1.4) : 0;
   legs[0].rotation.x = sw * 0.7; legs[3].rotation.x = sw * 0.7; legs[1].rotation.x = -sw * 0.7; legs[2].rotation.x = -sw * 0.7;
   body.position.y = s.moving ? Math.abs(Math.sin(s.walk * 1.4)) * 0.9 : 0; body.rotation.x = 0; body.rotation.z = 0;
-  head.rotation.set(s.moving ? -0.05 : Math.sin(t * 0.9) * 0.08, s.moving ? 0 : Math.sin(t * 0.5) * 0.35, 0);
+  head.rotation.set(s.moving ? -0.05 : Math.sin(t * 0.9) * 0.08, (pp.kind === 'cat' ? -0.48 : 0) + (s.moving ? 0 : Math.sin(t * 0.5) * 0.35), 0);
   tail.rotation.set(0, 0, 0); tail.rotation.y = Math.sin(t * (pp.kind === 'dog' ? (s.moving ? 16 : 9) : 1.6)) * (pp.kind === 'dog' ? 0.6 : 0.4);
   if (s.sit) { legs[2].rotation.x = legs[3].rotation.x = -1.2; body.rotation.x = -0.35; body.position.y = -1.6; legs[0].rotation.x = legs[1].rotation.x = 0.25; }
   if (s.lounge) {   // cat stretched out on its side, slow breathing, tail swish

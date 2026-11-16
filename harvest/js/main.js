@@ -81,7 +81,7 @@ const ui = new UI({
   tap: () => { snd.unlock(); snd.play('tap'); },
   // 商店
   shopOpen: () => { snd.unlock(); snd.play('tap'); ensurePreview(); },
-  thumb: (it) => { try { return ensurePreview().thumb(it); } catch (_) { return ''; } },
+  thumb: (it) => { try { return ensurePreview().thumb(it, data.character, data.shop.eq); } catch (_) { return ''; } },
   shopBuy: (id) => {
     const r = Shop.buy(data, id);
     if (r === 'ok') { Save.save(data); applyLook(); snd.play('restore'); hap.pattern([30, 40, 30], [200, 255]); fx.confetti(R.W, R.H, 60); }
@@ -137,15 +137,25 @@ const ui = new UI({
   locked: () => { snd.play('full'); hap.tick(30, 0); },
   save: () => saveRun(data, world, { credit, persist: Save.save }),
   shopToggle: (id) => { const r = Shop.toggle(data, id); Save.save(data); applyLook(); snd.play(r === 'on' ? 'appear' : 'tap'); hap.tick(14, 0); return r; },
+  setCharacter: (character) => { data.character = Shop.CHARACTER_IDS.includes(character) ? character : 'girl'; Save.save(data); applyLook(); if (preview) preview.thumbs = {}; if (mode === 'home') ui.renderHome(data); },
   clearDecoSelection: () => { decoEdit=null; },
   decoAction: (action, uid) => { let ok=false; if(action==='store') ok=Shop.storeDeco(data,uid); else if(action==='place') ok=Shop.placeDeco(data,uid); else if(action==='sell'){const r=Shop.sellStoredDeco(data,uid);ok=r.ok;if(ok)ui.toast(`已出售，获得${r.amount}金币`);} if(ok){Save.save(data);applyLook();}return ok; },
 });
 
 // 商店 look: the farmer's outfit (3D in levels) and the decorations (estate + level scenery)
 let preview = null;
+let artRefreshQueued = false;
+window.addEventListener('doll-art-ready', () => {
+  if (artRefreshQueued) return; artRefreshQueued = true;
+  setTimeout(() => { artRefreshQueued = false; if (!preview) return; preview.thumbs = {};
+    const shop = document.getElementById('shop'); if (shop && !shop.classList.contains('hidden')) ui.renderShop();
+  }, 120);
+});
 function ensurePreview() { if (!preview) { preview = new Preview(document.getElementById('shopPrev')); } return preview; }
 function applyLook() {
-  R.setOutfit(Shop.heroStyle(data.shop.eq)); R.setDecos(data.shop.deco); R.setUniform(Shop.uniformStyle(data.shop.uni));
+  const hero = Shop.heroStyle(data.shop.eq, data.character), shoulderPet = Shop.petById(data.shop.pet.cat);
+  if (shoulderPet && shoulderPet.col && shoulderPet.col.shoulder) hero.owlCompanion = true;
+  R.setOutfit(hero); R.setDecos(data.shop.deco); R.setUniform(Shop.uniformStyle(data.shop.uni));
   const dog = Shop.petById(data.shop.pet.dog); R.setPet(dog ? dog.col : null); R.setFestival(Fest.currentFestival());
 }
 function rememberFestivalMap() {
@@ -155,6 +165,10 @@ function rememberFestivalMap() {
   if (!data.festivalMaps.includes(id)) { data.festivalMaps.push(id); Save.save(data); }
 }
 const petOpt = () => (data.shop.pet.dog ? 'dog' : null);
+const companionOpt = () => {
+  const pet = Shop.petById(data.shop.pet.cat);
+  return pet && pet.col && !pet.col.shoulder ? { kind: 'cat', id: pet.id, col: pet.col } : null;
+};
 applyLook();
 
 input.onFirst = () => snd.unlock();
@@ -228,8 +242,8 @@ function start(li) {
     : { season: sea, rain: forceRain !== null ? forceRain && li > 0 : Seasons.rollRain(li) };
   forceRain = null;
   R.setFestival(Fest.currentFestival());
-  world = new World(li, { crew, pet: petOpt(), ...env });
-  if (resume) { try { world.restore(data.cur); } catch (_) { world = new World(li, { crew, pet: petOpt(), ...env }); } }
+  world = new World(li, { crew, pet: petOpt(), companion: companionOpt(), ...env });
+  if (resume) { try { world.restore(data.cur); } catch (_) { world = new World(li, { crew, pet: petOpt(), companion: companionOpt(), ...env }); } }
   else data.cur = world.snapshot();
   Orders.ensureOrders(data); ordBase = Orders.cloneStats(world.stats); ordItems = Orders.levelItems(li, world.L); bookBase = Book.cloneBookStats(world.stats);
   data.played = true; Save.save(data);
@@ -248,7 +262,7 @@ function startDaily() {
   if (Daily.ensureDay(data, dc.day, dc)) Save.save(data);
   const crew = Crew.levelCrew(data.crew, dc.li);
   R.setFestival(Fest.currentFestival());
-  world = new World(dc.li, { crew, seed: dc.seed, level: dc.L, daily: dc, timeLimit: CFG.daily.time, season: Seasons.currentSeason(), pet: petOpt(), ...dc.opts });
+  world = new World(dc.li, { crew, seed: dc.seed, level: dc.L, daily: dc, timeLimit: CFG.daily.time, season: Seasons.currentSeason(), pet: petOpt(), ...dc.opts, companion: companionOpt() });
   Orders.ensureOrders(data); ordBase = Orders.cloneStats(world.stats); ordItems = Orders.levelItems(dc.li); bookBase = Book.cloneBookStats(world.stats);
   R.setWorld(world); R.setMode('play'); R.follow(0, true); fx.clear();
   mode = 'play'; winDone = false; guide = null; guideT = 0;

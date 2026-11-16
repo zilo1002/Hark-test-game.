@@ -6,6 +6,8 @@ import {
   OUTFITS, STAR_OUTFITS, UNIFORMS, STAR_UNIFORMS, PETS, STAR_PETS,
   HERO_BASE, WORKER_BASE, heroStyle, shopDefaults, buy, toggle,
 } from '../js/shop.js';
+import { petDollRole } from '../js/doll-art.js';
+import { World } from '../js/world.js';
 
 const outfits = [...OUTFITS, ...STAR_OUTFITS];
 const uniforms = [...UNIFORMS, ...STAR_UNIFORMS];
@@ -54,6 +56,33 @@ for (const item of pets) {
   assert.equal(data.shop.pet[item.pet], item.id, `${item.id}: equips into its existing pet slot`);
   assert.equal(toggle(data, item.id), 'off', `${item.id}: existing equip toggle still works`);
   assert.equal(data.shop.pet[item.pet], null, `${item.id}: existing unequip behavior still works`);
+}
+
+// Every plush pet has an explicit art role; an unrecognized kind must never silently become a cat.
+const plushRoles = new Set();
+for (const item of pets) {
+  const role = petDollRole(item.pet, item.col);
+  assert.ok(role, `${item.id}: has an explicit visual mapping`);
+  if (item.col.dollRole) assert.equal(role, item.col.dollRole, `${item.id}: retains its requested sprite`);
+  plushRoles.add(role);
+}
+for (const role of ['dog_plush', 'cat_tortoise_plush', 'penguin', 'hedgehog', 'rabbit', 'fox', 'owl']) assert.ok(plushRoles.has(role), `${role}: requested plush species is mapped`);
+assert.equal(petDollRole('unlisted-species', {}), null, 'unknown pet does not fall back to a cat');
+assert.equal(heroStyle({}, 'boy').dollRole, 'boy', 'boy farmer uses the matching doll template');
+assert.equal(heroStyle({}, 'girl').dollRole, 'farmer', 'girl farmer template remains the default');
+
+// The equipped cat slot routes each non-shoulder species into the level companion follower;
+// the owl stays composited on the farmer, and the fetching dog remains an independent feature.
+for (const item of pets.filter((x) => x.pet === 'cat')) {
+  const companion = item.col.shoulder ? null : { kind: 'cat', id: item.id, col: item.col };
+  const world = new World(0, { pet: 'dog', companion, quiet: true, seed: 19 });
+  if (item.col.shoulder) assert.equal(world.companion, null, `${item.id}: shoulder owl is not duplicated as a follower`);
+  else {
+    assert.equal(world.companion.id, item.id, `${item.id}: equipped species is wired to the gameplay follower`);
+    assert.equal(world.companion.col.dollRole, item.col.dollRole, `${item.id}: gameplay follower retains its species artwork mapping`);
+    assert.equal('fetchT' in world.companion, false, `${item.id}: non-dog companion does not gain dog fetch behavior`);
+  }
+  assert.equal(world.dog.state, 'follow', `${item.id}: dog follow/fetch system remains independently active`);
 }
 
 // Simultaneous equipped slots remain composable (shop preview and live player use this exact style).
