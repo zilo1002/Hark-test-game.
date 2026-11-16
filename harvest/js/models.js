@@ -648,14 +648,21 @@ export function posePerson(pp, s) {
   for (const tl of [pp.tool, axe, pp.net]) if (tl && tl !== tool) tl.visible = false;
   if (s.net && !s.fishing) tool.rotation.set(H, 0, 0); // return the net to its resting pose after a cast
   const sw = s.moving ? Math.sin(s.walk) : 0;
-  const bob = s.moving ? Math.abs(Math.sin(s.walk)) * 1.6 : Math.sin(s.t * 3 + (s.seed || 0)) * 0.3;
+  // Enhanced 3D bounce & secondary vertical oscillation
+  const bob = s.moving ? Math.abs(Math.sin(s.walk)) * 2.2 : Math.sin(s.t * 2.5 + (s.seed || 0)) * 0.5;
   body.position.y = bob;
-  legs[0].rotation.x = sw * 0.75; legs[1].rotation.x = -sw * 0.75;
+  // Leg strides with slight knee lift in 3D
+  legs[0].rotation.x = sw * 0.95; legs[1].rotation.x = -sw * 0.95;
+  legs[0].rotation.z = sw * 0.05; legs[1].rotation.z = -sw * 0.05;
   const carrySway = s.carry && s.moving ? Math.sin(s.walk * 0.5) : 0;
-  torso.rotation.z = s.carry ? carrySway * 0.075 : (s.moving ? Math.sin(s.walk) * 0.05 : 0);
-  torso.rotation.x = s.carry ? -0.09 + (s.moving ? Math.abs(Math.sin(s.walk)) * 0.025 : 0) : (s.moving ? 0.08 : 0);
-  head.rotation.x = s.carry ? -0.1 : 0;
-  head.rotation.z = s.moving ? -Math.sin(s.walk) * 0.04 : Math.sin(s.t * 1.3 + (s.seed || 0)) * 0.04;
+  // 3D torso lean & twist when running
+  torso.rotation.z = s.carry ? carrySway * 0.12 : (s.moving ? Math.sin(s.walk) * 0.09 : 0);
+  torso.rotation.x = s.carry ? -0.12 + (s.moving ? Math.abs(Math.sin(s.walk)) * 0.04 : 0) : (s.moving ? 0.14 : 0);
+  torso.rotation.y = s.moving && !s.carry ? Math.sin(s.walk) * 0.12 : 0;
+  // Head counter-sway for dynamic alive feeling
+  head.rotation.x = s.carry ? -0.12 : (s.moving ? -0.06 : Math.sin(s.t * 1.5) * 0.03);
+  head.rotation.z = s.moving ? -Math.sin(s.walk) * 0.08 : Math.sin(s.t * 1.3 + (s.seed || 0)) * 0.06;
+  head.rotation.y = s.moving ? -Math.sin(s.walk) * 0.06 : 0;
   if (s.fishing) {
     // A readable, eased cast-and-pull: reach out, sweep the net, then draw the catch in.
     const p = Math.max(0, Math.min(1, s.actionProgress || 0));

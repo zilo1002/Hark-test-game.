@@ -60,8 +60,8 @@ export class Renderer {
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(new THREE.Color('#A8DDF0'), 1400, 2600);
     this.camera = new THREE.PerspectiveCamera(VIEW.fov, 1, 20, 4000);
-    this.hemi = new THREE.HemisphereLight(0xFFFFFF, 0x7AA850, 1.9); this.scene.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(0xFFF4DD, 2.1);
+    this.hemi = new THREE.HemisphereLight(0xFFFFFF, 0x5C8040, 1.35); this.scene.add(this.hemi);
+    this.sun = new THREE.DirectionalLight(0xFFF6E5, 2.65);
     this.sun.castShadow = true; this.sun.shadow.bias = -0.0008; this.sun.shadow.normalBias = 0.6;
     this.scene.add(this.sun); this.scene.add(this.sun.target);
     this.vp = new THREE.Matrix4();
