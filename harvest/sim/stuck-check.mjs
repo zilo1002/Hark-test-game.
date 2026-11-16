@@ -22,7 +22,22 @@ function hasWork(w, wk) {
   if (wk.holding) return false;
   if (wk.state === 'deliver') return wk.stack.length > 0 && (wk.toObjs || []).some((s) => (s.kind === 'counter' ? wk.stack.some((t) => s.items.includes(t)) : s.kind === 'tray' ? wk.stack.includes(s.item) && s.pile.total + s.pile.pending < s.pile.cap : !w.procFull(s) && wk.stack.includes(s.inItem)) && (!w.smart || w.sinkOpen(wk, s)));
   if (space <= 0) return false;
-  return (wk.sources || []).some((s) => (s.kind === 'coop' ? s.pile.total : (s.pile ? s.pile.total : 0) + (s.ripe || 0)) > 0 && w.hasSink(s.kind === 'proc' ? s.outItem : s.item));
+  // A raw source having stock is not actionable when its assigned sink is safely
+  // back-pressured (e.g. rawFull/closed counter); that is intentional waiting,
+  // not a path/scheduler stall. Match this worker's real sink and sinkOpen gate.
+  const sinks = wk.toObjs || [];
+  return (wk.sources || []).some((src) => {
+    const amount = src.kind === 'coop' ? src.pile.total : (src.pile ? src.pile.total : 0) + (src.ripe || 0);
+    if (amount <= 0) return false;
+    const item = src.kind === 'proc' ? src.outItem : src.item;
+    return w.hasSink(item) && sinks.some((sink) => {
+      const accepts = sink.kind === 'counter' ? sink.items.includes(item)
+        : sink.kind === 'tray' ? sink.item === item
+        : sink.kind === 'proc' ? sink.inItem === item
+        : sink.kind === 'stand' ? sink.item === item : false;
+      return accepts && (!w.smart || w.sinkOpen(wk, sink));
+    });
+  });
 }
 
 function watch(w, secs, tag, botFn) {

@@ -157,6 +157,8 @@ export const PETS = [
   { id: 'dogWhite', pet: 'dog', name: '小白狗', price: 600, col: { body: '#F7F5EE', belly: '#FFFFFF', ear: '#D9B88A', nose: '#2A1A10', spot: '#5A3A22' }, sw: ['#F7F5EE', '#5A3A22'] },
   { id: 'catOrange', pet: 'cat', name: '橘猫',  price: 300, col: { body: '#F2A040', belly: '#FFF3DC', ear: '#E8823A', nose: '#FF8FA0', stripe: '#D9762A' }, sw: ['#F2A040', '#FFF3DC'] },
   { id: 'catTux',    pet: 'cat', name: '奶牛猫', price: 420, col: { body: '#2E2E36', belly: '#FFFFFF', ear: '#2E2E36', nose: '#FF8FA0' }, sw: ['#2E2E36', '#FFFFFF'] },
+  // v5.2.4: mottled dark cat, based on the owner's two appearance references; ordinary coin exchange.
+  { id: 'catMottled', pet: 'cat', name: '花斑猫', price: 520, col: { body: '#302A29', belly: '#D9CDBE', ear: '#514039', nose: '#D98B9A', patch: '#8B6248', patch2: '#B49A7B', patch3: '#E4D9C9', patch2d: [['#8B6248', -1.8, -8.5, 4.6, 2.3, -0.2], ['#B49A7B', 5.2, -7.2, 3.3, 1.8, 0.3], ['#E4D9C9', -11, -8, 2.1, 2.0, 0]] }, sw: ['#302A29', '#B49A7B', '#D9CDBE'] },
 ];
 
 // ---- 星星宠物 (v5.0.7): colour variants only, no new models; one dog / one cat at a time

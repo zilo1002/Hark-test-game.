@@ -551,11 +551,13 @@ function cat2d(g, t, col) {
   shadow(g, 0, 0, 16, 4);
   g.save(); g.translate(13, -4); g.rotate(Math.sin(t * 1.3) * 0.35 - 0.2); g.strokeStyle = B; g.lineWidth = 3.4; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(8, -2, 11, -9); g.stroke(); g.restore();
   g.fillStyle = B; g.strokeStyle = OL; g.lineWidth = 1; g.beginPath(); g.ellipse(2, -5, 13 * br, 6 * br, 0, 0, TAU); g.fill(); g.stroke();
+  if (col.patch2d) for (const [c, x, y, rx, ry, a] of col.patch2d) { g.save(); g.fillStyle = c; g.beginPath(); g.ellipse(x, y, rx, ry, a, 0, TAU); g.fill(); g.restore(); }
   g.fillStyle = W; g.beginPath(); g.ellipse(1, -2.6, 9, 2.6, 0, 0, TAU); g.fill();
   if (col.stripe) { g.strokeStyle = col.stripe; g.lineWidth = 1.6; for (const x of [-2, 3, 8]) { g.beginPath(); g.moveTo(x, -10.6); g.lineTo(x + 1, -7); g.stroke(); } }
   g.fillStyle = B; for (const x of [-6, -1]) { g.beginPath(); g.ellipse(x, -0.6, 3, 1.6, 0, 0, TAU); g.fill(); }
   const fl = Math.sin(t * 0.7) > 0.96 ? 0.4 : 0;
   g.save(); g.translate(-11, -8); g.fillStyle = B; g.strokeStyle = OL; g.beginPath(); g.arc(0, 0, 5.6, 0, TAU); g.fill(); g.stroke();
+  if (col.patch && !col.patch2d) { g.fillStyle = col.patch; g.beginPath(); g.ellipse(-2.5, -1.8, 2.3, 1.4, -0.4, 0, TAU); g.fill(); }
   for (const s of [-1, 1]) { g.save(); g.translate(s * 3.4, -4); g.rotate(s * 0.3 + (s < 0 ? -fl : 0)); g.fillStyle = col.ear || B; g.beginPath(); g.moveTo(-2.2, 1); g.lineTo(0, -4); g.lineTo(2.2, 1); g.closePath(); g.fill(); g.fillStyle = '#FFB3C0'; g.beginPath(); g.moveTo(-1, 0.6); g.lineTo(0, -2.2); g.lineTo(1, 0.6); g.closePath(); g.fill(); g.restore(); }
   g.fillStyle = W; g.beginPath(); g.ellipse(0, 2, 3, 2, 0, 0, TAU); g.fill();
   g.strokeStyle = '#1A1A22'; g.lineWidth = 1; for (const s of [-1, 1]) { g.beginPath(); g.arc(s * 2.2, -0.6, 1.3, 0.2, Math.PI - 0.2); g.stroke(); }   // sleepy closed eyes

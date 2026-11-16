@@ -938,6 +938,11 @@ export function makePet(kind, col) {
   const trunk = new THREE.Mesh(cap(dog ? 3.6 : 3.0, dog ? 7 : 6.4, 3, 8), colMat(B)); trunk.rotation.x = H; trunk.position.set(0, dog ? 8 : 6.6, 0); trunk.castShadow = true; body.add(trunk);
   mesh(sph(dog ? 3.0 : 2.6, 8, 6), W, 0, dog ? 6.4 : 5.2, 2.6, 1, 0.8, 1.6);
   if (col.spot) { mesh(sph(2.2, 6, 5), col.spot, 2.2, 10.4, -2, 1, 0.5, 1.2); mesh(sph(1.6, 6, 5), col.spot, -2.4, 9.8, 3, 1, 0.5, 1); }
+  // v5.2.4: extra low-poly coat patches for the mottled exchange cat. They sit on the
+  // trunk/head surface, so other pet palettes stay unchanged.
+  if (col.patch && kind === 'cat') {
+    for (const [x, y, z, sx, sz, color] of [[-1.7, 9.1, -2.2, 1.35, 0.95, col.patch], [1.9, 9.2, 1.7, 1.15, 0.8, col.patch2 || col.patch], [-0.7, 9.4, 0.4, 0.9, 0.72, col.patch3 || col.patch]]) mesh(ico(1.2, 0), color, x, y, z, sx, 0.28, sz);
+  }
   if (col.stripe) for (const z of [-3, 0, 3]) mesh(box(6.6, 1, 1.1), col.stripe, 0, 10.6 + (dog ? 1 : 0) - (kind === 'cat' ? 0.8 : 0), z);
   const legs = [];
   for (const [x, z] of [[-2.2, 4.6], [2.2, 4.6], [-2.2, -4.6], [2.2, -4.6]]) {
@@ -950,6 +955,7 @@ export function makePet(kind, col) {
   mesh(sph(dog ? 4.2 : 3.8, 10, 8), B, 0, 0, 0, 1, 0.95, 1, head);
   if (dog) { mesh(box(3.6, 2.8, 4.2), W, 0, -1.4, 3.8, 1, 1, 1, head); mesh(sph(1.0, 6, 4), col.nose, 0, -0.4, 6.0, 1.2, 0.9, 0.8, head); mesh(box(1.6, 0.5, 1.6), '#E8586A', 0, -3.0, 4.6, 1, 1, 1, head); }
   else { mesh(sph(2.0, 8, 6), W, 0, -1.2, 3.0, 1.3, 0.8, 0.8, head); mesh(sph(0.6, 5, 4), col.nose, 0, -0.4, 3.9, 1.2, 0.8, 0.8, head);
+    if (col.patch) mesh(ico(1.2, 0), col.patch2 || col.patch, -2.5, 2.4, 2.2, 1.0, 0.42, 0.7, head);
     for (const sx of [-1, 1]) for (const k of [0, 1]) { const w = new THREE.Mesh(box(4, 0.25, 0.25), colMat('#FFFFFF')); w.position.set(sx * 3.2, -1.2 - k * 0.7, 3.2); w.rotation.z = sx * (0.1 - k * 0.2); head.add(w); } }
   for (const sx of [-1, 1]) {
     mesh(sph(0.75, 6, 4), '#1A1A22', sx * 1.7, 0.9, dog ? 3.7 : 3.3, 1, 1.2, 0.6, head);

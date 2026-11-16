@@ -81,11 +81,11 @@ function buyReady(w, skip = () => false) {
   }
 }
 
-// Fishers retain the school's restock window; they should not dump one fish as soon as a school moves away.
+// Fishers keep a short bounded restock window instead of dumping fish as soon as a school moves away.
 {
   const w = new World(33, { quiet: true, seed: 702 });
   const pondWait = collectWaitLimit({ feedFor: 'M1' }, [{ kind: 'pond' }], CFG);
-  assert.ok(pondWait >= 7 && pondWait <= 12);
+  assert.ok(pondWait >= 4 && pondWait <= 6);
   const level = w.L;
   buyReady(w);
   // v4.9.7: the pond's fish go onto the raw board first — a farmhand fishes the pond and

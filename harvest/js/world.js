@@ -594,7 +594,9 @@ export class World {
       w.pickR = Wk.pickR; w.harvestR = Wk.harvestR;
       w.cutRate = Wk.cutRate || 0; w.pickRate = Wk.pickRate; w.dropRate = Wk.dropRate;
       const cm = w.crewMul;   // 雇工特长 (persistent roster level), at most +30%
-      if (cm) { w.speed *= cm.speed; w.cap = Math.round(w.cap * cm.cap); w.pickRate *= cm.rate; w.dropRate *= cm.rate; w.cutRate *= cm.rate; w.pickR *= cm.reach; w.harvestR *= cm.reach; }
+      // v5.2.4: strong crew bonuses must not inflate a clerk's or chain feeder's
+      // fixed, source-fillable batch. They still receive their speed/rate/reach traits.
+      if (cm) { w.speed *= cm.speed; if (!w.clerk && !w.chainFor) w.cap = Math.round(w.cap * cm.cap); w.pickRate *= cm.rate; w.dropRate *= cm.rate; w.cutRate *= cm.rate; w.pickR *= cm.reach; w.harvestR *= cm.reach; }
     }
   }
 
@@ -1513,6 +1515,17 @@ export class World {
       srcs = w.otherTray ? [w.otherTray] : own && !own.hidden ? [own] : srcs;
     }
     const sinks = w.to.map((id) => this.objs[id]).filter((o) => o && !o.hidden);
+    // v5.2.4: keep regular sales clerks' preferred full batch when supply is steady,
+    // but never let a partial trip wait indefinitely for the last few items. Start a
+    // bounded collection clock with the first item; after 5 seconds dispatch the
+    // available partial load, even if a slow source is still trickling goods.
+    if (w.clerk && w.state === 'collect' && w.stack.length + w.incoming > 0) {
+      w.clerkCollectAge = (w.clerkCollectAge || 0) + dt;
+      const held = w.stack.length + w.incoming;
+      if (held < (w.clerkBatch || w.cap) && w.clerkCollectAge >= 5) {
+        w.state = 'deliver'; w.batch = held; w.batchCap = held; w.clerkBatch = held;
+      }
+    } else if (w.clerk) w.clerkCollectAge = 0;
     w.sources = srcs; w.toObjs = sinks;
     w.holding = false;
     const space = w.cap - w.stack.length - w.incoming;
