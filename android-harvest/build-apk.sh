@@ -5,7 +5,7 @@
 # In CI (GitHub Actions) set SDK=$ANDROID_HOME and keep the runner's JAVA_HOME; OUT_DIR picks where the copy goes.
 set -euo pipefail
 VERSION_CODE=65
-VERSION_NAME=5.3.0
+VERSION_NAME=5.2.5
 TC=${TC:-/workspace/work/tc}
 if [ -z "${SDK:-}" ]; then
   export JAVA_HOME=$TC/jdk-17.0.21+9
