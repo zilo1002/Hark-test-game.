@@ -531,10 +531,24 @@ export function makePerson(o = {}) {
   const hm = new THREE.Mesh(HAIR_GEO, M(hair)); hm.position.set(0, 0.8, -0.4); hm.rotation.x = -0.42; hm.castShadow = true; head.add(hm);
   head.add(mesh(sph(6.6, 10, 7), hair, 0, -0.4, -2.6, 1.05, 1, 0.8));
   for (const s of [-1, 1]) {
-    const eye = new THREE.Mesh(sph(1.05, 6, 5), M('#2A1A10')); eye.position.set(s * 2.6, 0.2, 7.6); eye.scale.set(1, 1.3, 0.6); eye.visible = o.hat !== 'pumpkin'; head.add(eye);
-    const cheek = new THREE.Mesh(sph(1.3, 6, 4), M('#FF9C8A')); cheek.position.set(s * 4.4, -2.4, 6.6); cheek.scale.set(1, 0.6, 0.4); cheek.visible = o.hat !== 'pumpkin'; head.add(cheek);
+    // Soft chibi face: broad warm eyes with a clear iris and one small catchlight read
+    // at the actual in-level scale; every outfit preview uses this same person model.
+    const eyeWhite = new THREE.Mesh(sph(1.55, 9, 7), M('#FFF8F1'));
+    eyeWhite.position.set(s * 2.65, 0.1, 7.45); eyeWhite.scale.set(1.0, 1.18, 0.66); eyeWhite.visible = o.hat !== 'pumpkin'; head.add(eyeWhite);
+    const iris = new THREE.Mesh(sph(1.02, 9, 7), M(o.eyeColor || '#694536'));
+    iris.position.set(s * 2.65, 0.0, 8.0); iris.scale.set(0.95, 1.05, 0.62); iris.visible = o.hat !== 'pumpkin'; head.add(iris);
+    const pupil = new THREE.Mesh(sph(0.52, 8, 6), M('#211A19'));
+    pupil.position.set(s * 2.65, -0.08, 8.45); pupil.scale.set(1, 1.05, 0.6); pupil.visible = o.hat !== 'pumpkin'; head.add(pupil);
+    const glint = new THREE.Mesh(sph(0.34, 7, 5), M('#FFFFFF'));
+    glint.position.set(s * 2.92, 0.42, 8.92); glint.visible = o.hat !== 'pumpkin'; head.add(glint);
+    const cheek = new THREE.Mesh(sph(1.65, 7, 5), M('#F39A91'));
+    cheek.position.set(s * 4.45, -2.55, 6.75); cheek.scale.set(1, 0.55, 0.34); cheek.visible = o.hat !== 'pumpkin'; head.add(cheek);
   }
-  const nose = new THREE.Mesh(sph(1.1, 6, 4), M('#F2B486')); nose.position.set(0, -1.2, 8.1); nose.visible = o.hat !== 'pumpkin'; head.add(nose);
+  const nose = new THREE.Mesh(sph(0.78, 7, 5), M('#E99A85')); nose.position.set(0, -1.25, 8.1); nose.visible = o.hat !== 'pumpkin'; head.add(nose);
+  const mouth = new THREE.Mesh(sph(0.58, 7, 5), M('#8C4B4B'));
+  mouth.position.set(0, -2.45, 8.0); mouth.scale.set(1.0, 0.58, 0.42); mouth.visible = o.hat !== 'pumpkin'; head.add(mouth);
+  const tongue = new THREE.Mesh(sph(0.3, 6, 4), M('#E98291'));
+  tongue.position.set(0, -2.75, 8.28); tongue.scale.set(1.0, 0.45, 0.32); tongue.visible = o.hat !== 'pumpkin'; head.add(tongue);
   if (o.beard) head.add(mesh(sph(5, 8, 6), o.beard, 0, -4.4, 4.2, 1.1, 0.7, 0.6));
   if (o.hat === 'beanie') {
     head.add(mesh(dome(8.45, 12, 6), o.capColor || '#E8452C', 0, 2.2, -0.4, 1, 0.92, 1));
@@ -613,6 +627,9 @@ export function makePerson(o = {}) {
     for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; head.add(mesh(cone(1.5, 3.4, 5), '#FFD23F', Math.sin(a) * 4.6, 11.6, -0.4 + Math.cos(a) * 4.6)); }
     head.add(mesh(sph(1.3, 6, 5), '#E8283C', 0, 8.8, 5.0));
   }
+  // A modest chibi proportion pass is shared by in-level people and every shop costume;
+  // it keeps job silhouettes/props intact while making faces softer and more readable.
+  head.scale.set(1.12, 1.10, 1.12);
   // tool in the right hand (sickle), hidden unless cutting
   const tool = new THREE.Group();
   tool.add(mesh(cyl(0.6, 0.6, 6, 5), '#8E5627', 0, 0, 0));
@@ -948,7 +965,16 @@ export function makePet(kind, col) {
   // v5.2.4: extra low-poly coat patches for the mottled exchange cat. They sit on the
   // trunk/head surface, so other pet palettes stay unchanged.
   if (col.patch && kind === 'cat') {
-    for (const [x, y, z, sx, sz, color] of [[-1.7, 9.1, -2.2, 1.35, 0.95, col.patch], [1.9, 9.2, 1.7, 1.15, 0.8, col.patch2 || col.patch], [-0.7, 9.4, 0.4, 0.9, 0.72, col.patch3 || col.patch]]) mesh(ico(1.2, 0), color, x, y, z, sx, 0.28, sz);
+    // Multi-tone tortoiseshell markings across the back, shoulder and flank. These
+    // use the same supplied palette as the home portrait and shop preview.
+    const marks = [
+      [-1.7, 9.1, -2.2, 1.45, 1.0, col.patch],
+      [1.9, 9.2, 1.7, 1.25, 0.9, col.patch2 || col.patch],
+      [-0.7, 9.4, 0.4, 1.0, 0.78, col.patch3 || col.patch],
+      [2.2, 8.1, -3.7, 0.95, 0.7, col.patch2 || col.patch],
+      [-2.4, 8.5, 3.4, 0.88, 0.72, col.patch3 || col.patch],
+    ];
+    for (const [x, y, z, sx, sz, color] of marks) mesh(ico(1.2, 0), color, x, y, z, sx, 0.3, sz);
   }
   if (col.stripe) for (const z of [-3, 0, 3]) mesh(box(6.6, 1, 1.1), col.stripe, 0, 10.6 + (dog ? 1 : 0) - (kind === 'cat' ? 0.8 : 0), z);
   const legs = [];
@@ -959,20 +985,37 @@ export function makePet(kind, col) {
     body.add(hip); legs.push(hip);
   }
   const head = new THREE.Group(); head.position.set(0, dog ? 13 : 11, dog ? 7.4 : 6.6); body.add(head);
-  mesh(sph(dog ? 4.2 : 3.8, 10, 8), B, 0, 0, 0, 1, 0.95, 1, head);
+  mesh(sph(dog ? 4.55 : 4.35, 12, 9), B, 0, 0, 0, 1.02, 0.98, 1, head);
   if (dog) { mesh(box(3.6, 2.8, 4.2), W, 0, -1.4, 3.8, 1, 1, 1, head); mesh(sph(1.0, 6, 4), col.nose, 0, -0.4, 6.0, 1.2, 0.9, 0.8, head); mesh(box(1.6, 0.5, 1.6), '#E8586A', 0, -3.0, 4.6, 1, 1, 1, head); }
   else { mesh(sph(2.0, 8, 6), W, 0, -1.2, 3.0, 1.3, 0.8, 0.8, head); mesh(sph(0.6, 5, 4), col.nose, 0, -0.4, 3.9, 1.2, 0.8, 0.8, head);
     if (col.patch) mesh(ico(1.2, 0), col.patch2 || col.patch, -2.5, 2.4, 2.2, 1.0, 0.42, 0.7, head);
     for (const sx of [-1, 1]) for (const k of [0, 1]) { const w = new THREE.Mesh(box(4, 0.25, 0.25), colMat('#FFFFFF')); w.position.set(sx * 3.2, -1.2 - k * 0.7, 3.2); w.rotation.z = sx * (0.1 - k * 0.2); head.add(w); } }
   for (const sx of [-1, 1]) {
-    mesh(sph(0.75, 6, 4), '#1A1A22', sx * 1.7, 0.9, dog ? 3.7 : 3.3, 1, 1.2, 0.6, head);
-    if (dog) { const ear = new THREE.Mesh(box(2.2, 4.2, 1.2), colMat(col.ear)); ear.position.set(sx * 3.4, 1.4, -0.4); ear.rotation.z = sx * 0.5; ear.castShadow = true; head.add(ear); }
-    else { mesh(cone(1.5, 3.2, 4), col.ear, sx * 2.2, 3.8, 0, 1, 1, 0.6, head); mesh(cone(0.8, 1.8, 4), '#FFB3C0', sx * 2.2, 3.5, 0.5, 1, 1, 0.4, head); }
+    // Large warm eyes and tiny highlights keep every pet variant readable as one
+    // coherent, soft-chibi family at the shop and gameplay camera scales.
+    mesh(sph(dog ? 1.08 : 1.18, 9, 7), '#FFF8F1', sx * 1.7, 1.0, dog ? 3.8 : 3.45, 1.0, 1.1, 0.62, head);
+    mesh(sph(dog ? 0.72 : 0.78, 8, 6), col.eye || '#594239', sx * 1.7, 0.95, dog ? 4.28 : 3.9, 1, 1.08, 0.62, head);
+    mesh(sph(0.42, 7, 5), '#211A19', sx * 1.7, 0.91, dog ? 4.62 : 4.22, 1, 1.05, 0.6, head);
+    mesh(sph(0.24, 6, 4), '#FFFFFF', sx * 1.94, 1.29, dog ? 4.94 : 4.54, 1, 1, 0.55, head);
+    if (dog) { const ear = new THREE.Mesh(sph(2.0, 8, 6), colMat(col.ear)); ear.position.set(sx * 3.4, 1.4, -0.4); ear.scale.set(0.78, 1.2, 0.55); ear.rotation.z = sx * 0.42; ear.castShadow = true; head.add(ear); }
+    else {
+      mesh(sph(1.65, 9, 6), col.ear, sx * 2.35, 3.0, -0.05, 0.86, 1.24, 0.55, head);
+      mesh(cone(0.78, 1.75, 5), '#F3A6AF', sx * 2.35, 3.1, 0.45, 1, 1, 0.36, head);
+    }
   }
+  // Tiny warm mouth; muzzle stays small so the face keeps the plush reference's simple read.
+  mesh(sph(dog ? 0.65 : 0.42, 7, 5), '#7A5146', 0, -2.0, dog ? 5.05 : 4.2, 1.15, 0.55, 0.55, head);
   if (col.collar !== false && dog) mesh(tor(3.0, 0.6, 4, 12), '#E8283C', 0, -2.8, 0.6, 1, 1, 1, head).rotation.x = H;
   const tail = new THREE.Group(); tail.position.set(0, dog ? 10 : 8, dog ? -6.6 : -6.0); body.add(tail);
   if (dog) { const tm = new THREE.Mesh(cap(1.1, 3.6, 2, 6), colMat(B)); tm.position.set(0, 2.4, -0.6); tm.rotation.x = -0.5; tail.add(tm); mesh(sph(1.2, 6, 4), W, 0, 4.6, -1.8, 1, 1, 1, tail); }
-  else { const tm = new THREE.Mesh(cap(0.9, 8, 2, 6), colMat(B)); tm.position.set(0, 4.4, -1.6); tm.rotation.x = -0.35; tail.add(tm); }
+  else {
+    const tm = new THREE.Mesh(cap(1.2, 8.4, 3, 8), colMat(B)); tm.position.set(0, 4.4, -1.6); tm.rotation.x = -0.35; tail.add(tm);
+    if (col.patch) {
+      for (const [y, c, x] of [[2.5, col.patch, -0.75], [5.2, col.patch2 || col.patch, 0.8], [7.2, col.patch3 || col.patch, -0.55]]) {
+        const mark = new THREE.Mesh(ico(1.0, 0), colMat(c)); mark.position.set(x, y, -1.7); mark.scale.set(0.9, 0.38, 0.65); tail.add(mark);
+      }
+    }
+  }
   const blob = new THREE.Mesh(BLOB_GEO, BLOB_MAT); blob.rotation.x = -H; blob.position.y = 0.3; blob.scale.set(7, 10, 1); root.add(blob);
   return { root, body, head, legs, tail, kind, blob };
 }
