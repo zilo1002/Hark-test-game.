@@ -146,17 +146,18 @@ function __warmShop() {
   const step = () => {
     if (job !== __warmJob) return;
     const shop = document.getElementById('shop');
-    if (shop && !shop.classList.contains('hidden')) { setTimeout(() => idle(step), 500); return; }   // never compete with the open shop
+    if (shop && !shop.classList.contains('hidden')) { setTimeout(() => idle(step), 500); return; }
+    if (mode !== 'home') { setTimeout(() => idle(step), 2000); return; }   // v5.9.4: never steal frames from a level   // never compete with the open shop
     try {
       const p = ensurePreview();
       if (i === 0) { p.size(96, 96); p.key = ''; p.show({ kind: 'person', eq: data.shop.eq, character: data.character }); p.render(0); }
       const it = items[i++]; if (it) p.thumb(it, data.character, data.shop.eq);
     } catch (_) {}
-    if (i < items.length) setTimeout(() => idle(step), 30);
+    if (i < items.length) setTimeout(() => idle(step), 250);
   };
   idle(step);
 }
-window.addEventListener('person-glb-ready', () => { if (preview) preview.thumbs = {}; setTimeout(__warmShop, 800); });
+window.addEventListener('person-glb-ready', () => { if (preview) preview.thumbs = {}; setTimeout(__warmShop, 5000); });
 let __petWarm = 0;
-window.addEventListener('pet-glb-ready', () => { clearTimeout(__petWarm); __petWarm = setTimeout(() => { if (preview) for (const k in preview.thumbs) if (!k.includes(':')) delete preview.thumbs[k]; __warmShop(); }, 600); });"""),
+window.addEventListener('pet-glb-ready', () => { clearTimeout(__petWarm); __petWarm = setTimeout(() => { if (preview) for (const k in preview.thumbs) if (!k.includes(':')) delete preview.thumbs[k]; __warmShop(); }, 5000); });"""),
 ])
