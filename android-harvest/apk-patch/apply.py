@@ -130,6 +130,28 @@ patch('js/main.js', [
      "  endDecoDrag(); if (decoDropped) { decoDropped = false; return; }\n"
      "  if (mode !== 'home' || modalOpen) return;"),
 ])
+
+# v5.9.5: customers are chibi girls in their own colours; a short loading screen covers model loading at start-up
+patch('js/render3d.js', [
+    ("pigtails: !cu.vip && cu.hue % 3 === 2 });",
+     "pigtails: !cu.vip && cu.hue % 3 === 2, glbSkin: cu.vip ? 'vip' : 'cust' + (cu.hue % 8), glbOutfit: null });"),
+])
+patch('js/main.js', [
+    ("applyLook();\n\ninput.onFirst",
+     "applyLook();\n"
+     "{ // v5.9.5 loading screen: hold until the person model and every pet model are in (8 s at most)\n"
+     "  const ov = document.createElement('div');\n"
+     "  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#BFE6A0;color:#3E6B22;font:900 22px sans-serif;transition:opacity .4s';\n"
+     "  ov.innerHTML = '<div>半亩·丰收</div><div style=\"margin-top:14px;font-size:15px\">正在准备农场…</div>';\n"
+     "  document.body.appendChild(ov);\n"
+     "  const need = new Set(['person', 'tortie', 'orange', 'shiba', 'rabbit', 'penguin']);\n"
+     "  const done = () => { if (!ov.parentNode) return; ov.style.opacity = '0'; setTimeout(() => ov.remove(), 450); };\n"
+     "  const tick = (k) => { need.delete(k); if (!need.size) setTimeout(done, 300); };\n"
+     "  window.addEventListener('person-glb-ready', () => tick('person'));\n"
+     "  window.addEventListener('pet-glb-ready', (e) => tick(e.detail));\n"
+     "  setTimeout(done, 8000);\n"
+     "}\n\ninput.onFirst"),
+])
 print('apk-patch applied')
 
 # shop: warm up the turntable and every thumbnail in the background once the model is in, so opening the shop

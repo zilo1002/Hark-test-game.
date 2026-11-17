@@ -79,3 +79,6 @@ export function attachPetModel(pp, col) {
   pp.body.visible = false;                               // no flash of the old plush while the model loads
   st.pending.push(pp);
 }
+
+// v5.9.5: load every pet model at start-up (behind the loading screen) instead of the first time one appears
+for (const k in MODELS) if (!STATE[k]) load(k);

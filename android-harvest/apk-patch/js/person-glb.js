@@ -20,6 +20,21 @@ const BASE_OVERALLS = '#4F79A9';   // the farm look's own overalls are the model
 let LIB = null, FAILED = false;
 const PENDING = [];
 
+  // v5.9.1: the same body with its cat ears folded down onto the hair, worn under hats so the ears never poke through.
+  // An ear is whatever sticks out of the head's front silhouette (an ellipse round the hair dome); each ear vertex
+  // is pulled straight back onto that outline, just inside the hair.
+function earsFolded(geo) {
+  const pos = geo.attributes.position, earPos = pos.clone();
+  { const cx = 0, cy = 0.78 * HS, rx = 0.30 * HS, ry = 0.165 * HS;
+    for (let i = 0; i < pos.count; i++) {
+      const px = pos.getX(i), py = pos.getY(i); if (py < 0.79 * HS || Math.abs(px) < 0.06 * HS) continue;
+      const ex = (px - cx) / rx, ey = (py - cy) / ry, e = Math.hypot(ex, ey);
+      if (e <= 1.0) continue;
+      const k = 0.97 / e; earPos.setXYZ(i, cx + ex * k * rx, cy + ey * k * ry, pos.getZ(i) * 0.9);
+    } }
+  const g = geo.clone(); g.setAttribute('position', earPos); return g;
+}
+
 function buildLib(geo, heroMat, staffMat) {
   geo.scale(HS, HS, HS);
   const pos = geo.attributes.position, nor = geo.attributes.normal, reg = geo.attributes._region;
@@ -56,18 +71,7 @@ function buildLib(geo, heroMat, staffMat) {
       dots.push(new THREE.Vector3(pos.getX(i) + nor.getX(i) * 0.15, y(i) + nor.getY(i) * 0.15, pos.getZ(i) + nor.getZ(i) * 0.15));
     }
   }
-  // v5.9.1: the same body with its cat ears folded down onto the hair, worn under hats so the ears never poke through.
-  // An ear is whatever sticks out of the head's front silhouette (an ellipse round the hair dome); each ear vertex
-  // is pulled straight back onto that outline, just inside the hair.
-  const earPos = pos.clone();
-  { const cx = 0, cy = 0.78 * HS, rx = 0.30 * HS, ry = 0.165 * HS;
-    for (let i = 0; i < pos.count; i++) {
-      const px = pos.getX(i), py = pos.getY(i); if (py < 0.79 * HS || Math.abs(px) < 0.06 * HS) continue;
-      const ex = (px - cx) / rx, ey = (py - cy) / ry, e = Math.hypot(ex, ey);
-      if (e <= 1.0) continue;
-      const k = 0.97 / e; earPos.setXYZ(i, cx + ex * k * rx, cy + ey * k * ry, pos.getZ(i) * 0.9);
-    } }
-  const geoHat = geo.clone(); geoHat.setAttribute('position', earPos);
+  const geoHat = earsFolded(geo);
   return {
     geo, geoHat, mats: { hero: heroMat, staff: staffMat }, dots,
     shells: {
@@ -76,6 +80,26 @@ function buildLib(geo, heroMat, staffMat) {
       boots: shell(faces((i) => r(i) === 3 && y(i) < 3.3), thick),
     },
   };
+}
+
+// v5.9.5: customers wear the same chibi model in their own colours (hair + dress, 1k textures) on a lighter mesh,
+// so a full shop of them stays smooth.
+function loadLod() {
+  new GLTFLoader().load(new URL('../models/person_lod.glb', import.meta.url).href, (gltf) => {
+    try {
+      let src = null; gltf.scene.traverse((o) => { if (o.isMesh && !src) src = o; });
+      const g = src.geometry.clone(); g.scale(HS, HS, HS);
+      LIB.lod = g; LIB.lodHat = earsFolded(g);
+    } catch (e) { console.warn('person lod', e); }
+  }, undefined, () => {});
+}
+function skinMat(skin) {
+  if (LIB.mats[skin]) return LIB.mats[skin];
+  const m = /^cust(\d)$/.exec(skin), file = skin === 'vip' ? 'person_vip.jpg' : m ? `person_cust${m[1]}.jpg` : null;
+  if (!file) return LIB.mats.staff;
+  const map = new THREE.TextureLoader().load(new URL('../models/' + file, import.meta.url).href);
+  map.flipY = false; map.colorSpace = THREE.SRGBColorSpace;
+  return (LIB.mats[skin] = LIB.mk(map));
 }
 
 function giveUp() {   // the model could not load: show the procedural figures that were waiting for it
@@ -93,6 +117,7 @@ function load() {
       staffMap.flipY = false; staffMap.colorSpace = THREE.SRGBColorSpace;
       const mk = (map) => new THREE.MeshLambertMaterial({ map, side: THREE.DoubleSide });
       LIB = buildLib(src.geometry.clone(), mk(heroMap), mk(staffMap));
+      LIB.mk = mk; loadLod();
       for (const [pp, skin] of PENDING.splice(0)) { pp.body.visible = true; apply(pp, skin); }
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('person-glb-ready'));
     } catch (e) { console.warn('person model', e); giveUp(); }
@@ -128,7 +153,8 @@ function apply(pp, skin) {
   // bind
   const hat = (o && o.hat) || '';
   const earsDown = hat && !['bow', 'flower', 'crown'].includes(hat);   // these sit between / around the ears
-  const mesh = new THREE.SkinnedMesh(earsDown ? LIB.geoHat : LIB.geo, LIB.mats[skin] || LIB.mats.staff);
+  const cust = skin === 'vip' || skin.startsWith('cust'), lod = cust && LIB.lod;
+  const mesh = new THREE.SkinnedMesh(earsDown ? (lod ? LIB.lodHat : LIB.geoHat) : (lod ? LIB.lod : LIB.geo), skinMat(skin));
   mesh.frustumCulled = false; mesh.castShadow = skin === 'hero';
   root.add(mesh);
   root.updateMatrixWorld(true);
