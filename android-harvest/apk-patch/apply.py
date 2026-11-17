@@ -82,6 +82,20 @@ patch('js/ui.js', [
     ("    const eq = { ...d.shop.eq }; if (it && it.slot) eq[it.slot] = it.id;",
      "    const worn = it && it.slot && d.shop.eq[it.slot] === it.id, eq = worn ? {} : { ...d.shop.eq }; if (it && it.slot) eq[it.slot] = it.id;"),
 ])
+
+# v5.9.2: every walking pet (not just the dog) trails the farmer round the estate, and turns the way it walks
+patch('js/home.js', [
+    ("    const x = pets.active.pet === 'dog' ? WALK.dx : 150, y = pets.active.pet === 'dog' ? WALK.dy : 238;",
+     "    const x = WALK.dx, y = WALK.dy;"),
+])
+patch('js/home3d.js', [
+    ("      const x = activePet.pet === 'dog' ? petX : 150;\n      const y = activePet.pet === 'dog' ? petY : 238;",
+     "      const x = petX, y = petY;\n      if (dogMoving && Math.abs(x - (pet.__lx ?? x)) > 0.05) pet.__face = x > pet.__lx ? 1 : -1;\n      pet.__lx = x;"),
+    ("      pet.root.rotation.y = -0.18;\n      M.posePet(pet, { t, walk: activePet.pet === 'dog' ? walk : t * 0.12, moving: activePet.pet === 'dog' && dogMoving, sit: activePet.pet !== 'dog' });",
+     "      { const f = pet.__face || -1;   // the side-profile cat faces left at rest; turn her round to walk right
+        const want = pet.profileCat ? (dogMoving && f > 0 ? Math.PI - 0.18 : -0.18) : (dogMoving ? f * 1.15 : -0.18), cur = pet.__ry ?? -0.18;
+        pet.__ry = cur + (want - cur) * 0.18; pet.root.rotation.y = pet.__ry; }\n      M.posePet(pet, { t, walk, moving: dogMoving, sit: !dogMoving && activePet.pet !== 'dog' });"),
+])
 print('apk-patch applied')
 
 # shop: warm up the turntable and every thumbnail in the background once the model is in, so opening the shop
