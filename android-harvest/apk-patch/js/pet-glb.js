@@ -26,6 +26,7 @@ function load() {
 function apply(pp) {
   if (pp.glbModel) return;
   const { root, body, legs, head, tail } = pp;
+  head.rotation.order = 'YXZ';                          // yaw outermost, so x is a nod and z a roll
   body.traverse((o) => { if (o.isMesh) o.visible = false; });
   const sv = { b: body.rotation.clone(), by: body.position.y, h: head.rotation.clone(), t: tail.rotation.clone(), l: legs.map((l) => l.rotation.clone()) };
   body.rotation.set(0, 0, 0); body.position.y = 0; tail.rotation.set(0, 0, 0);
