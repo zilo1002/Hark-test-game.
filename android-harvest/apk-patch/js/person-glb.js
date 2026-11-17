@@ -17,7 +17,7 @@ const J = {                  // joints in game units (feet at y 0); the body's c
   head: [26.4, 2.8], headScale: [1.74, 1.62, 1.8],   // maps the procedural head (r 7.7) onto the model's hair
 };
 const BASE_OVERALLS = '#4F79A9';   // the farm look's own overalls are the model's dress, not a garment
-let LIB = null;
+let LIB = null, FAILED = false;
 const PENDING = [];
 
 function buildLib(geo, heroMat, staffMat) {
@@ -66,6 +66,11 @@ function buildLib(geo, heroMat, staffMat) {
   };
 }
 
+function giveUp() {   // the model could not load: show the procedural figures that were waiting for it
+  FAILED = true; LIB = null;
+  for (const [pp] of PENDING.splice(0)) pp.body.visible = true;
+}
+
 function load() {
   new GLTFLoader().load(new URL('../models/person.glb', import.meta.url).href, (gltf) => {
     try {
@@ -76,10 +81,10 @@ function load() {
       staffMap.flipY = false; staffMap.colorSpace = THREE.SRGBColorSpace;
       const mk = (map) => new THREE.MeshLambertMaterial({ map, side: THREE.DoubleSide });
       LIB = buildLib(src.geometry.clone(), mk(heroMap), mk(staffMap));
-      for (const [pp, skin] of PENDING.splice(0)) apply(pp, skin);
+      for (const [pp, skin] of PENDING.splice(0)) { pp.body.visible = true; apply(pp, skin); }
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('person-glb-ready'));
-    } catch (e) { console.warn('person model', e); }
-  }, undefined, (e) => console.warn('person model failed, keeping procedural', e && e.message));
+    } catch (e) { console.warn('person model', e); giveUp(); }
+  }, undefined, (e) => { console.warn('person model failed, keeping procedural', e && e.message); giveUp(); });
 }
 
 // which shop clothes this figure wears (staff: only their uniform; the farm owner: what differs from the farm look)
@@ -142,6 +147,9 @@ function apply(pp, skin) {
 
 export function attachPersonModel(pp, skin) {
   if (!skin) return;
-  if (LIB) apply(pp, skin); else PENDING.push([pp, skin]);
+  if (LIB) { apply(pp, skin); return; }
+  if (FAILED) return;
+  pp.body.visible = false;            // don't flash the old block figure while the model is still loading
+  PENDING.push([pp, skin]);
 }
 load();

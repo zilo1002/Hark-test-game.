@@ -75,3 +75,30 @@ patch('js/preview3d.js', [("const pp = M.makePerson(personStyle);", "const pp = 
 patch('js/shop.js', [("export const isBoyCharacter = (id) => String(id || '').startsWith('boy');", "export const isBoyCharacter = (id) => false;")])
 patch('js/ui.js', [("    characterSwitch.classList.remove('hidden');", "    characterSwitch.classList.add('hidden');")])
 print('apk-patch applied')
+
+# shop: warm up the turntable and every thumbnail in the background once the model is in, so opening the shop
+# no longer stalls (first WebGL context + one full figure render per thumbnail used to happen on the tap)
+patch('js/main.js', [
+    ("function ensurePreview() { if (!preview) { preview = new Preview(document.getElementById('shopPrev')); } return preview; }",
+     """function ensurePreview() { if (!preview) { preview = new Preview(document.getElementById('shopPrev')); } return preview; }
+let __warmJob = 0;
+function __warmShop() {
+  const job = ++__warmJob;
+  const items = [...Shop.OUTFITS, ...Shop.STAR_OUTFITS, ...Shop.UNIFORMS, ...Shop.STAR_UNIFORMS, ...Shop.PETS, ...Shop.STAR_PETS, ...Shop.DECOS, ...Shop.STAR_DECOS, ...Shop.MAPS];
+  let i = 0;
+  const idle = window.requestIdleCallback ? (f) => window.requestIdleCallback(f, { timeout: 400 }) : (f) => setTimeout(f, 60);
+  const step = () => {
+    if (job !== __warmJob) return;
+    const shop = document.getElementById('shop');
+    if (shop && !shop.classList.contains('hidden')) { setTimeout(() => idle(step), 500); return; }   // never compete with the open shop
+    try {
+      const p = ensurePreview();
+      if (i === 0) { p.size(96, 96); p.key = ''; p.show({ kind: 'person', eq: data.shop.eq, character: data.character }); p.render(0); }
+      const it = items[i++]; if (it) p.thumb(it, data.character, data.shop.eq);
+    } catch (_) {}
+    if (i < items.length) setTimeout(() => idle(step), 30);
+  };
+  idle(step);
+}
+window.addEventListener('person-glb-ready', () => { if (preview) preview.thumbs = {}; setTimeout(__warmShop, 800); });"""),
+])
