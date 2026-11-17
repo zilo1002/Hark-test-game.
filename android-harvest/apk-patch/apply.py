@@ -94,6 +94,42 @@ patch('js/home3d.js', [
     ("      pet.root.rotation.y = -0.18;\n      M.posePet(pet, { t, walk: activePet.pet === 'dog' ? walk : t * 0.12, moving: activePet.pet === 'dog' && dogMoving, sit: activePet.pet !== 'dog' });",
      "      { const f = pet.__face || -1;   // the side-profile cat faces left at rest; turn her round to walk right\n        const want = pet.profileCat ? (dogMoving && f > 0 ? Math.PI - 0.18 : -0.18) : (dogMoving ? f * 1.15 : -0.18), cur = pet.__ry ?? -0.18;\n        pet.__ry = cur + (want - cur) * 0.18; pet.root.rotation.y = pet.__ry; }\n      M.posePet(pet, { t, walk, moving: dogMoving, sit: !dogMoving && activePet.pet !== 'dog' });"),
 ])
+
+# v5.9.3: long-press a decoration on the estate and drag it where you want; let go to drop it there (saved at once)
+patch('js/main.js', [
+    ("// tap a dashed ring on the estate (装扮 mode) to build that spot with stars\ncv.addEventListener('pointerup', (e) => {\n  if (mode !== 'home' || modalOpen) return;",
+     "let decoDrag = null, decoPress = null, decoDropped = false;\n"
+     "cv.addEventListener('pointerdown', (e) => {\n"
+     "  decoDropped = false; if (decoPress) { clearTimeout(decoPress.timer); decoPress = null; }\n"
+     "  if (mode !== 'home' || modalOpen) return;\n"
+     "  const hit = hitDeco(R.W, R.H, areaRect(), data, e.clientX, e.clientY); if (!hit) return;\n"
+     "  const sx = e.clientX, sy = e.clientY;\n"
+     "  decoPress = { sx, sy, timer: setTimeout(() => {\n"
+     "    decoPress = null; homeTap = null;\n"
+     "    if (!ui.build) ui.setBuild(true);\n"
+     "    const pt = homePoint(R.W, R.H, areaRect(), sx, sy);\n"
+     "    decoEdit = hit; decoDrag = { dx: hit.x - pt.x, dy: hit.y - pt.y };\n"
+     "    try { navigator.vibrate && navigator.vibrate(25); } catch (_) {}\n"
+     "    snd.play('tap');\n"
+     "  }, 380) };\n"
+     "});\n"
+     "cv.addEventListener('pointermove', (e) => {\n"
+     "  if (decoPress && Math.hypot(e.clientX - decoPress.sx, e.clientY - decoPress.sy) > 14) { clearTimeout(decoPress.timer); decoPress = null; }\n"
+     "  if (!decoDrag || !decoEdit) return;\n"
+     "  const pt = homePoint(R.W, R.H, areaRect(), e.clientX, e.clientY);\n"
+     "  decoEdit.x = Math.max(8, Math.min(352, pt.x + decoDrag.dx)); decoEdit.y = Math.max(90, Math.min(430, pt.y + decoDrag.dy));\n"
+     "});\n"
+     "const endDecoDrag = () => {\n"
+     "  if (decoPress) { clearTimeout(decoPress.timer); decoPress = null; }\n"
+     "  if (!decoDrag) return;\n"
+     "  decoDrag = null; decoDropped = true;\n"
+     "  if (decoEdit) { Shop.moveDeco(data, decoEdit.uid, decoEdit.x, decoEdit.y); Save.save(data); applyLook(); }\n"
+     "};\n"
+     "cv.addEventListener('pointercancel', endDecoDrag);\n"
+     "// tap a dashed ring on the estate (装扮 mode) to build that spot with stars\ncv.addEventListener('pointerup', (e) => {\n"
+     "  endDecoDrag(); if (decoDropped) { decoDropped = false; return; }\n"
+     "  if (mode !== 'home' || modalOpen) return;"),
+])
 print('apk-patch applied')
 
 # shop: warm up the turntable and every thumbnail in the background once the model is in, so opening the shop
