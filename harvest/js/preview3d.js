@@ -21,7 +21,7 @@ export class Preview {
     this.stage = new THREE.Group(); this.scene.add(this.stage);
     const disc = new THREE.Mesh(new THREE.CylinderGeometry(20, 21, 3, 28), new THREE.MeshLambertMaterial({ color: 0x8ED65A }));
     disc.position.y = -1.5; this.scene.add(disc); this.disc = disc;
-    this.key = ''; this.obj = null; this.thumbs = {}; this.character = 'girl'; this.showDisc = true;
+    this.key = ''; this.obj = null; this.thumbs = {}; this.character = 'girl'; this.showDisc = true; this.petId = null;
   }
   size(w, h) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -42,14 +42,14 @@ export class Preview {
   // what: { kind: 'person', eq } | { kind: 'deco', id }
   show(what) {
     const key = JSON.stringify(what);
-    if (key === this.key) return; this.key = key; this._clear();
+    if (key === this.key) return; this.key = key; this._clear(); this.petId = null;
     if (what.kind === 'person') {
       const personStyle = what.uni !== undefined ? { ...WORKER_BASE, ...(what.style || {}), character: what.character || 'girl', dollRole: isBoyCharacter(what.character) ? what.character : 'farmer' } : heroStyle(what.eq, what.character);
       if (what.owlCompanion) personStyle.owlCompanion = true;
       const pp = M.makePerson(personStyle); pp.blob.visible = false; this.pp = pp; this.pet = null; this.obj = pp.root;
       this.view = this._fitObjectView(pp.root, 31); this.showDisc = true;
     } else if (what.kind === 'pet' || (what.kind === 'animal' && (what.id === 'dog' || what.id === 'cat'))) {
-      const p = what.kind === 'pet' ? petById(what.id) : null;
+      const p = what.kind === 'pet' ? petById(what.id) : null; this.petId = what.id;
       const kind = p ? p.pet : what.id, col = p ? p.col : (kind === 'dog' ? petById('dogShiba').col : petById('catOrange').col);
       const pp = M.makePet(kind, col); pp.blob.visible = false; this.pet = pp; this.sails = null; this.pp = null; this.obj = pp.root; pp.root.scale.setScalar(1.35);
       this.view = this._fitObjectView(pp.root, 26); this.showDisc = false;
@@ -71,7 +71,7 @@ export class Preview {
   }
   render(t) {
     if (!this.obj) return;
-    // Keep the face readable from the shop's fixed front camera; subtle turntable motion avoids profile-only snapshots.
+    // Keep ordinary pets front-readable; the tortie model itself now carries a side-on pose.
     this.stage.rotation.y = 0.10 + Math.sin(t * 0.32) * 0.16;
     if (this.pp) M.posePerson(this.pp, { t, walk: 0, moving: false, carry: false, seed: 1 });
     if (this.pet) M.posePet(this.pet, { t, walk: 0, moving: false, sit: this.pet.kind === 'dog' });

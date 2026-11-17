@@ -50,7 +50,7 @@ export function renderHome3d({ W, H, dpr, layout, t, look, personX = 190, person
       const x = activePet.pet === 'dog' ? petX : 150;
       const y = activePet.pet === 'dog' ? petY : 238;
       pet.root.position.set(ox + x * s, H - (oy + y * s), -(oy + y * s) * 0.01 + 0.1);
-      pet.root.scale.setScalar(s * (activePet.pet === 'dog' ? 0.70 : 0.76));
+      pet.root.scale.setScalar(s * (activePet.pet === 'dog' ? 0.70 : pet.profileCat ? 1.0 : 0.76));
       pet.root.rotation.y = -0.18;
       M.posePet(pet, { t, walk: activePet.pet === 'dog' ? walk : t * 0.12, moving: activePet.pet === 'dog' && dogMoving, sit: activePet.pet !== 'dog' });
     }

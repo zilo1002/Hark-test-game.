@@ -93,7 +93,7 @@ export class UI {
     // 商店
     this.el.shop = $('shop'); this.shopTab = 'outfit'; this.shopSel = null;
     for (const b of $('shopTabs').children) b.onclick = () => { this.shopTab = b.dataset.t; this.shopSel = null; this.renderShop(); h.tap(); };
-    $('characterSwitch').onclick = () => { const d=h.data(), i=CHARACTER_IDS.indexOf(d.character); h.setCharacter(CHARACTER_IDS[(i+1+CHARACTER_IDS.length)%CHARACTER_IDS.length]); this.renderShop(); h.tap(); };
+    $('characterSwitch').onclick = () => { const d = h.data(); const next = isBoyCharacter(d.character) ? 'girl' : 'boy'; h.setCharacter(next); this.renderShop(); h.tap(); };
     $('shopAct').onclick = () => {
       const it = this.shopSel && itemById(this.shopSel); if (!it) return;
       const d = h.data();
@@ -420,8 +420,9 @@ export class UI {
   renderShop() {
     const d = this.h.data(), list = this.shopList();
     const characterSwitch = $('characterSwitch');
-    characterSwitch.classList.toggle('hidden', !['outfit', 'uni'].includes(this.shopTab));
-    characterSwitch.textContent = d.character === 'girl' ? '切换为男孩' : (isBoyCharacter(d.character) && CHARACTER_IDS.indexOf(d.character) < CHARACTER_IDS.length - 1 ? '换个男孩' : '切换为女孩');
+    characterSwitch.classList.remove('hidden');
+    characterSwitch.textContent = isBoyCharacter(d.character) ? '切换为女孩' : '切换为男孩';
+    characterSwitch.setAttribute('aria-label', `当前${isBoyCharacter(d.character) ? '男孩' : '女孩'}，点击切换为${isBoyCharacter(d.character) ? '女孩' : '男孩'}`);
     for (const b of $('shopTabs').children) b.classList.toggle('on', b.dataset.t === this.shopTab);
     if (!this.shopSel || !list.some((x) => x.id === this.shopSel)) this.shopSel = list[0].id;
     $('shopCoins').textContent = d.coins.toLocaleString('en-US'); $('coinCount').textContent = d.coins.toLocaleString('en-US'); $('shopStars').textContent = starsLeft(d);

@@ -1121,7 +1121,7 @@ export class Renderer {
       const d = world.companion, o = this.companionObj, sp = Math.hypot(d.vx, d.vy);
       if (sp > 6) o.ang = angLerp(o.ang, Math.atan2(d.vx, d.vy), Math.min(1, dt * 10));
       else { const p = world.player; o.ang = angLerp(o.ang, Math.atan2(p.x - d.x, p.y - d.y), Math.min(1, dt * 3)); }
-      o.pp.root.position.set(d.x, 0, d.y); o.pp.root.rotation.y = o.ang; o.pp.root.scale.setScalar(1.4);
+      o.pp.root.position.set(d.x, 0, d.y); o.pp.root.rotation.y = o.ang + (o.pp.profileCat ? Math.PI / 2 : 0); o.pp.root.scale.setScalar(1.4);
       M.posePet(o.pp, { t: time, walk: d.walk, moving: sp > 6, sit: sp <= 6 && !world.player.moving });
     }
     // customers (pooled figures)

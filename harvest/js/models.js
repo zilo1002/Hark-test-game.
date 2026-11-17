@@ -69,6 +69,135 @@ function softMat(hex) {
   return SOFT_MATS[hex] || (SOFT_MATS[hex] = new THREE.MeshLambertMaterial({ color: hex }));
 }
 
+// A subtle procedural fur surface for the true 3D tortie kitten meshes. The texture only
+// colors the volumetric geometry; silhouette, markings and all facial features remain meshes.
+const FUR_MATS = {};
+const FUR_GEOS = new Map();
+const FUR_STRAND_MATS = new WeakMap();
+function addFurStrands(parent, center, radii, count, seed, coat, fuzz = null, skip = null) {
+  const positions = [], uvs = [], colors = [];
+  const down = new THREE.Vector3(0, -1, 0), side = new THREE.Vector3(), normal = new THREE.Vector3();
+  let state = seed >>> 0;
+  const rand = () => { state = (state * 1664525 + 1013904223) >>> 0; return state / 4294967296; };
+  const shades = coat?.userData?.tortieFur
+    ? [0x393433, 0x403835, 0x493E39, 0x56463D, 0x69503F, 0x926A4C, 0xB58A64, 0xD0B18A]
+    : [0xC6A88F, 0xD2B89E, 0xB99B82, 0xA98D79, 0xE0C8AC];
+  let added = 0;
+  for (let i = 0; i < count * 1.35 && added < count; i++) {
+    const y = 1 - 2 * (i + 0.5) / (count * 1.35), angle = i * 2.399963229728653;
+    const ring = Math.sqrt(1 - y * y), x = Math.cos(angle) * ring, z = Math.sin(angle) * ring;
+    if (skip && skip(x, y, z)) continue;
+    normal.set(x / radii[0], y / radii[1], z / radii[2]).normalize();
+    let tangent = down.clone().addScaledVector(normal, -down.dot(normal));
+    if (tangent.lengthSq() < 0.015) tangent.set(1, 0, 0).addScaledVector(normal, -normal.x);
+    tangent.normalize().applyAxisAngle(normal, (rand() - 0.5) * 0.9);
+    const direction = tangent.multiplyScalar(0.44).addScaledVector(normal, 0.90).normalize();
+    side.crossVectors(normal, direction).normalize();
+    const length = 0.25 + rand() * 0.42, width = 0.032 + rand() * 0.038;
+    const factor = fuzz ? 1 + fuzz.amplitude / fuzz.radius * (
+      Math.sin(x * 14.3 + y * 21.7 + z * 11.9 + fuzz.seed) * Math.cos(x * 18.1 - y * 9.7 + z * 23.9 - fuzz.seed * 0.71) * 0.54 +
+      Math.sin(x * 37.1 + y * 19.3 - z * 31.7 + fuzz.seed * 1.17) * Math.cos(-x * 27.1 + y * 39.7 + z * 11.3 - fuzz.seed * 0.83) * 0.32 +
+      Math.sin(x * 51.7 - y * 43.3 + z * 29.1 + fuzz.seed * 0.27) * 0.14
+    ) : 1;
+    const base = new THREE.Vector3(center[0] + x * radii[0] * factor, center[1] + y * radii[1] * factor, center[2] + z * radii[2] * factor).addScaledVector(normal, 0.055);
+    const left = base.clone().addScaledVector(side, -width), right = base.clone().addScaledVector(side, width);
+    const tip = base.clone().addScaledVector(direction, length).addScaledVector(normal, 0.12 + rand() * 0.08);
+    positions.push(left.x,left.y,left.z, right.x,right.y,right.z, tip.x,tip.y,tip.z);
+    const u = Math.atan2(z, x) / (Math.PI * 2) + 0.5, v = Math.asin(y) / Math.PI + 0.5;
+    uvs.push(u,v,u,v,u,v);
+    const c = new THREE.Color(shades[Math.floor(rand() * shades.length)]);
+    const bright = 0.88 + rand() * 0.24;
+    for (let k = 0; k < 3; k++) colors.push(c.r * bright, c.g * bright, c.b * bright);
+    added++;
+  }
+  if (!added) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  let mat = FUR_STRAND_MATS.get(coat);
+  if (!mat) { mat = new THREE.MeshLambertMaterial({ map: coat.map || null, vertexColors: true, side: THREE.DoubleSide }); FUR_STRAND_MATS.set(coat, mat); }
+  const strands = new THREE.Mesh(geo, mat); strands.frustumCulled = false; strands.castShadow = false; strands.receiveShadow = false; parent.add(strands);
+  return strands;
+}
+function fuzzySphere(radius, widthSegments, heightSegments, seed, amplitude) {
+  const key = [radius, widthSegments, heightSegments, seed, amplitude].join(':');
+  if (FUR_GEOS.has(key)) return FUR_GEOS.get(key);
+  const geo = new THREE.SphereGeometry(radius, widthSegments, heightSegments), pos = geo.getAttribute('position');
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) / radius, y = pos.getY(i) / radius, z = pos.getZ(i) / radius;
+    // Incommensurate 3D waves avoid ring-like latitude bands while keeping the coat soft.
+    const broad = Math.sin(x * 14.3 + y * 21.7 + z * 11.9 + seed) * Math.cos(x * 18.1 - y * 9.7 + z * 23.9 - seed * 0.71);
+    const fine = Math.sin(x * 37.1 + y * 19.3 - z * 31.7 + seed * 1.17) * Math.cos(-x * 27.1 + y * 39.7 + z * 11.3 - seed * 0.83);
+    const grain = Math.sin(x * 51.7 - y * 43.3 + z * 29.1 + seed * 0.27);
+    const r = radius + amplitude * (broad * 0.54 + fine * 0.32 + grain * 0.14);
+    pos.setXYZ(i, x * r, y * r, z * r);
+  }
+  pos.needsUpdate = true; geo.computeVertexNormals(); FUR_GEOS.set(key, geo); return geo;
+}
+function tortieFurMat(hex, face = false) {
+  const key = `${hex}:${face ? 'face' : 'coat'}`;
+  if (FUR_MATS[key]) return FUR_MATS[key];
+  if (typeof document === 'undefined') return softMat(hex);
+  const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const base = new THREE.Color(hex);
+  const baseCss = `#${base.getHexString()}`;
+  const fill = ctx.createLinearGradient(0, 0, 0, 256);
+  fill.addColorStop(0, face ? '#514541' : baseCss);
+  fill.addColorStop(0.52, baseCss);
+  fill.addColorStop(1, face ? '#342F2E' : '#302B2A');
+  ctx.fillStyle = fill; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let seed = 0x51F15E; const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const palette = ['#59483F', '#76583F', '#956A48', '#AE805C', '#C49B73', '#D4B58D', '#E0CCAA'];
+  const drawIsland = (x, y, rx, ry, color, alpha, blur) => {
+    ctx.save(); ctx.filter = `blur(${blur}px)`; ctx.globalAlpha = alpha; ctx.fillStyle = color;
+    ctx.beginPath();
+    const n = 18;
+    for (let j = 0; j < n; j++) {
+      const a = j * Math.PI * 2 / n;
+      const wobble = 0.72 + rand() * 0.58;
+      const px = x + Math.cos(a) * rx * wobble, py = y + Math.sin(a) * ry * wobble;
+      j ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  };
+  // The two broad sides of the body get warm tortoiseshell islands rather than fine, muddy speckles.
+  if (!face) {
+    const islands = [
+      [0.205,0.39,0.105,0.18,2], [0.285,0.61,0.080,0.17,4], [0.165,0.72,0.055,0.11,1],
+      [0.315,0.34,0.052,0.10,5], [0.735,0.43,0.105,0.19,3], [0.815,0.63,0.075,0.16,5],
+      [0.685,0.72,0.055,0.11,1], [0.865,0.34,0.052,0.10,4], [0.49,0.62,0.055,0.12,1],
+    ];
+    for (const [u,v,rx,ry,pal] of islands) {
+      const x = u * 512, y = v * 256;
+      drawIsland(x, y, rx * 512, ry * 256, palette[pal], 0.76, 4.5);
+      drawIsland(x + (rand() - 0.5) * rx * 70, y + (rand() - 0.5) * ry * 54,
+        rx * 512 * 0.63, ry * 256 * 0.62, palette[Math.min(palette.length - 1, pal + 1)], 0.40, 2.4);
+    }
+  } else {
+    // Gentle paired tortie markings across the cheeks and brow; leave the muzzle dark and readable.
+    for (const [u,v,rx,ry,pal] of [
+      [0.18,0.60,0.075,0.16,4], [0.34,0.63,0.065,0.13,2], [0.66,0.62,0.065,0.14,5],
+      [0.82,0.59,0.075,0.16,3], [0.25,0.80,0.045,0.08,5], [0.75,0.80,0.045,0.08,4],
+    ]) drawIsland(u * 512, v * 256, rx * 512, ry * 256, palette[pal], 0.72, 3.6);
+  }
+  // Fine flecks soften the islands into fur instead of looking like painted stickers.
+  ctx.globalAlpha = 0.30;
+  for (let i = 0; i < 7800; i++) {
+    const x = rand() * 512, y = rand() * 256, len = 2 + rand() * 8;
+    const light = rand() < 0.28;
+    ctx.strokeStyle = light ? 'rgba(225,199,174,.50)' : 'rgba(20,16,17,.52)';
+    ctx.lineWidth = 0.35 + rand() * 0.8;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + (rand() - 0.5) * 3, y + len * 0.5, x + (rand() - 0.5) * 3, y + len); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace; map.needsUpdate = true;
+  const mat = new THREE.MeshLambertMaterial({ map }); mat.userData.tortieFur = true;
+  FUR_MATS[key] = mat; return mat;
+}
+
 // ------------------------------------------------------------------ stack / pile items
 // Each item sits centred on its origin, about CFG.items[type].step tall, ~12-14 units wide.
 const ITEM_PARTS = {
@@ -504,10 +633,10 @@ export function makePerson(o = {}) {
   }
   if (o.overalls) {   // trousers part round the hips + a fitted bib + two buttons
     torso.add(mesh(cyl(6.55, 6.9, 6.2, 12), o.overalls, 0, 3.4, 0, 1, 1, 0.9));
-    torso.add(front(panel(6.62, 6.62, 4.6, 1.15), o.overalls, 8.6));
+    torso.add(front(panel(6.62, 6.62, 4.2, 1.0), o.overalls, 7.2));
     for (const sx of [-1, 1]) {
-      torso.add(mesh(sph(0.7, 10, 8), o.overallButton || '#E8B96A', sx * 2.6, 10.2, 5.95));
-      torso.add(mesh(cap(0.58, 4.1, 5, 10), o.overalls, sx * 3.1, 10.3, 5.25, 1, 1, 0.78));
+      torso.add(mesh(sph(0.62, 10, 8), o.overallButton || '#E8B96A', sx * 2.6, 7.6, 5.25));
+      torso.add(mesh(cap(0.52, 3.6, 5, 10), o.overalls, sx * 3.1, 7.7, 4.65, 1, 1, 0.72));
     }
   }
   if (o.apron) {   // 碎花围裙: a skirt panel and a bib that follow the curve of the body, dots on its surface
@@ -531,9 +660,9 @@ export function makePerson(o = {}) {
     // tail hanging down the chest centre, clear of the arms even when they hug the stack
     const cols = o.scarf === 'rainbow' ? ['#FF4D4D', '#FFD23F', '#3BA7FF'] : [o.scarf, o.scarf];
     // the ring is tilted: low under the chin in front (clear of the face), higher at the back over the collar
-    const sc = new THREE.Group(); sc.position.set(0, 9.9, -0.3); sc.rotation.x = 0.24; torso.add(sc);
+    const sc = new THREE.Group(); sc.position.set(0, 8.6, -0.3); sc.rotation.x = 0.24; torso.add(sc);
     cols.forEach((c, i) => { const r = new THREE.Mesh(tor(6.75 - i * 0.12, 1.1, 6, 16), M(c)); r.rotation.x = H; r.position.y = i * 0.9; r.scale.set(1, 0.92, 1); r.castShadow = true; sc.add(r); });
-    torso.add(mesh(box(2.6, 4.6, 1.2), cols[0], 1.5, 5.4, 6.25)); torso.add(mesh(box(2.6, 1.6, 1.3), cols[cols.length - 1], 1.5, 2.6, 6.2));
+    torso.add(mesh(box(2.4, 3.8, 1.1), cols[0], 1.5, 4.6, 6.1)); torso.add(mesh(box(2.4, 1.4, 1.2), cols[cols.length - 1], 1.5, 2.2, 6.0));
   }
   // arms: pivot at the shoulder
   const arms = [];
@@ -1006,15 +1135,23 @@ export function makePet(kind, col) {
   const role = col.dollRole || '';
   const species = ({ penguin: 'penguin', hedgehog: 'hedgehog', rabbit: 'rabbit', fox: 'fox', owl: 'owl' })[role] || kind;
   const dog = species === 'dog', bird = species === 'penguin' || species === 'owl', B = col.body, W = col.belly || '#FFFFFF';
-  // Character and animal surfaces stay genuine geometry with solid materials; no fur image maps or billboards.
+  // The tortie reference is a standing side-profile cat, not a front-facing round plush.
+  const profileCat = species === 'cat' && col.fluffy && role === 'cat_tortoise_plush';
+  // Character and animal surfaces stay genuine geometry; the tortie coat uses procedural fur texture, never a billboard.
   const mesh = (geo, c, x, y, z, sx = 1, sy = 1, sz = 1, par = body) => { const m = new THREE.Mesh(geo, softMat(c)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; par.add(m); return m; };
-  const trunk = new THREE.Mesh(sph(dog ? 5.2 : bird ? 6.4 : 6.1, 40, 28), softMat(B));
+  const fur = profileCat ? tortieFurMat(B) : softMat(B);
+  const faceFur = profileCat ? tortieFurMat(B, true) : fur;
+  const trunkRadius = dog ? 5.2 : bird ? 6.4 : 6.1;
+  const trunkGeo = species === 'cat' && col.fluffy ? fuzzySphere(trunkRadius, 64, 48, 1.3, 0.42) : sph(trunkRadius, 40, 28);
+  const trunk = new THREE.Mesh(trunkGeo, fur);
   trunk.position.set(0, dog ? 8.2 : bird ? 7.2 : 6.5, -0.8);
-  trunk.scale.set(dog ? 1.04 : species === 'penguin' ? 0.98 : species === 'owl' ? 1.08 : 1.22, bird ? 1.08 : dog ? 0.92 : 0.84, bird ? 0.92 : dog ? 1.16 : 1.08); trunk.castShadow = true; body.add(trunk);
-  if (!dog && !bird) body.rotation.y = 0.48;
-  mesh(sph(dog ? 3.0 : 3.1, 20, 14), W, 0, dog ? 6.5 : bird ? 6.4 : 5.8, bird ? 3.1 : 3.2, bird ? 0.92 : 1.0, bird ? 0.9 : 0.78, bird ? 0.58 : 0.55);
+  trunk.scale.set(dog ? 1.04 : species === 'penguin' ? 0.98 : species === 'owl' ? 1.08 : species === 'cat' ? 1.52 : 1.22, bird ? 1.08 : dog ? 0.92 : species === 'cat' ? 0.84 : 0.84, bird ? 0.92 : dog ? 1.16 : species === 'cat' ? 1.10 : 1.08); trunk.castShadow = true; body.add(trunk);
+  if (species === 'cat' && col.fluffy) addFurStrands(body, [0, 6.5, -0.8], [trunkRadius * 1.52, trunkRadius * 0.84, trunkRadius * 1.10], 2300, 0x2A1, fur, { radius: trunkRadius, seed: 1.3, amplitude: 0.42 }, (x,y,z) => z > 0.78 && Math.abs(x) < 0.42 && y > -0.45 && y < 0.42);
+  if (!dog && !bird && !profileCat) body.rotation.y = 0.48;
+  mesh(sph(dog ? 3.0 : 3.1, 20, 14), W, profileCat ? -3.2 : 0, dog ? 6.5 : bird ? 6.4 : 5.8, bird ? 3.1 : 3.2, bird ? 0.92 : 1.0, bird ? 0.9 : 0.78, bird ? 0.58 : 0.55);
   // 3D silhouette details distinguish species, rather than substituting their old flat cutout art.
-  if (species === 'cat') for (const [x,y,z,r] of [[-4.2,8.2,-2.6,1.65],[4.2,8.2,-2.5,1.65],[-3.5,10.0,1.1,1.45],[3.5,10.0,1.2,1.45],[-2.2,5.3,-3.4,1.25],[2.2,5.4,-3.5,1.25],[0,11.0,-3.8,1.5]]) mesh(sph(r, 16, 12), B, x, y, z, 1.1, 0.9, 1.0);
+  if (species === 'cat') for (const [x,y,z,r] of [[-4.2,8.2,-2.6,1.65],[4.2,8.2,-2.5,1.65],[-3.5,10.0,1.1,1.45],[3.5,10.0,1.2,1.45],[-2.2,5.3,-3.4,1.25],[2.2,5.4,-3.5,1.25],[0,11.0,-3.8,1.5]]) { const puff = mesh(sph(r, 16, 12), B, x, y, z, 1.1, 0.9, 1.0); if (col.fluffy) puff.material = fur; }
+  if (species === 'cat' && col.fluffy) for (const [x,y,z,r] of [[-4.2,8.2,-2.6,1.65],[4.2,8.2,-2.5,1.65],[-3.5,10.0,1.1,1.45],[3.5,10.0,1.2,1.45],[-2.2,5.3,-3.4,1.25],[2.2,5.4,-3.5,1.25],[0,11.0,-3.8,1.5]]) addFurStrands(body, [x,y,z], [r*1.1,r*0.9,r], 95, 0xBABE + Math.round((x+5)*31+y*7), fur);
   if (species === 'penguin' || species === 'owl') {
     for (const sx of [-1, 1]) {
       const wing = mesh(sph(species === 'penguin' ? 2.4 : 2.0, 18, 12), B, sx * (species === 'penguin' ? 5.2 : 5.8), 7.0, -0.2, species === 'penguin' ? 0.55 : 0.62, 1.15, 0.72); wing.rotation.z = sx * -0.22;
@@ -1026,42 +1163,47 @@ export function makePet(kind, col) {
     for (let row = 0; row < 3; row++) for (let i = 0; i < 7; i++) { const x = -4.6 + i * 1.53, z = -3.2 + row * 2.5; const q = mesh(cone(0.78, 3.0 + (i % 3) * 0.35, 6), col.spines || '#493B34', x, 11.0 + (i % 2) * 0.7, z, 0.82, 1, 0.82); q.rotation.x = 0.45 + row * 0.1; q.rotation.z = (x / 7) * 0.42; }
   }
   if (col.spot) { mesh(sph(2.2, 6, 5), col.spot, 2.2, 10.4, -2, 1, 0.5, 1.2); mesh(sph(1.6, 6, 5), col.spot, -2.4, 9.8, 3, 1, 0.5, 1); }
-  // v5.2.4: extra low-poly coat patches for the mottled exchange cat. They sit on the
-  // trunk/head surface, so other pet palettes stay unchanged.
-  if (col.patch && species === 'cat') {
-    // Multi-tone tortoiseshell markings across the back, shoulder and flank. These
-    // use the same supplied palette as the home portrait and shop preview.
-    const marks = [
-      [-1.7, 9.1, -2.2, 1.45, 1.0, col.patch],
-      [1.9, 9.2, 1.7, 1.25, 0.9, col.patch2 || col.patch],
-      [-0.7, 9.4, 0.4, 1.0, 0.78, col.patch3 || col.patch],
-      [2.2, 8.1, -3.7, 0.95, 0.7, col.patch2 || col.patch],
-      [-2.4, 8.5, 3.4, 0.88, 0.72, col.patch3 || col.patch],
-    ];
-    for (const [x, y, z, sx, sz, color] of marks) mesh(sph(1.2, 16, 10), color, x, y, z, sx, 0.3, sz);
-  }
+  // Tortie markings are painted into the fur surface instead of raised blobs, so the coat reads as one plush body.
+
   if (col.stripe && species === 'cat') for (const z of [-3, 0, 3]) mesh(box(6.6, 1, 1.1), col.stripe, 0, 10.6 + (dog ? 1 : 0) - 0.8, z);
   const legs = [];
-  for (const [x, z] of [[-2.2, 4.6], [2.2, 4.6], [-2.2, -4.6], [2.2, -4.6]]) {
-    const hip = new THREE.Group(); hip.position.set(x * (dog ? 1 : 0.94), dog ? 6.3 : 6.1, z * (dog ? 1 : 0.94));
-    mesh(cap(1.55, dog ? 4.0 : 3.4, 7, 16), B, 0, dog ? -2.4 : -2.0, 0, 1.05, 1.0, 1.05, hip);
-    mesh(sph(1.55, 16, 12), bird ? (col.nose || '#F5A12B') : W, 0, dog ? -4.6 : -4.0, 0.5, 1.05, 0.68, 1.1, hip);
+  const legAnchors = profileCat ? [[-6.1, -3.0], [-6.1, 3.0], [6.1, -3.0], [6.1, 3.0]] : [[-2.2, 4.6], [2.2, 4.6], [-2.2, -4.6], [2.2, -4.6]];
+  for (const [x, z] of legAnchors) {
+    const cat = species === 'cat';
+    const hip = new THREE.Group(); hip.position.set(x * (dog ? 1 : cat ? 0.94 : 0.94), dog ? 6.3 : cat ? (profileCat ? 4.9 : 5.7) : 6.1, z * (dog ? 1 : 0.94));
+    const legCoat = cat && col.fluffy ? fur : softMat(B);
+    const catLegLength = profileCat ? 3.25 : 2.55;
+    const leg = new THREE.Mesh(cap(1.55, dog ? 4.0 : cat ? catLegLength : 3.4, 7, 16), legCoat); leg.position.set(0, dog ? -2.4 : cat ? (profileCat ? -2.15 : -1.55) : -2.0, 0); leg.scale.set(1.05, 1.0, 1.05); leg.castShadow = true; hip.add(leg);
+    mesh(sph(cat ? 1.72 : 1.55, 16, 12), bird ? (col.nose || '#F5A12B') : W, 0, dog ? -4.6 : cat ? (profileCat ? -3.55 : -3.2) : -4.0, 0.5, cat ? 1.16 : 1.05, 0.68, cat ? 1.18 : 1.1, hip);
     body.add(hip); legs.push(hip);
   }
-  const head = new THREE.Group(); head.position.set(0, dog ? 14.1 : 12.8, dog ? 7.6 : 7.8); body.add(head);
-  head.scale.set(dog ? 1.15 : 1.16, dog ? 1.14 : 1.16, dog ? 1.08 : 1.04);
-  if (!dog) head.rotation.y = -0.48;
-  mesh(sph(dog ? 5.3 : 6.0, 44, 32), B, 0, 0, 0, 1.08, 1.0, 0.98, head);
-  if (species === 'cat' || species === 'fox' || species === 'hedgehog') for (const [sx,sy,sz,r] of [[-4,0.6,0.5,1.6],[4,0.8,0.4,1.55],[-2.6,-3.4,0.4,1.2],[2.5,-3.4,0.4,1.2],[0,3.8,-0.2,1.3]]) mesh(sph(r, 16, 12), B, sx, sy, sz, 1.05, 1.0, 0.78, head);
+  const head = new THREE.Group(); head.position.set(profileCat ? -7.2 : 0, dog ? 14.1 : 12.8, profileCat ? -0.7 : dog ? 7.6 : 7.8); body.add(head);
+  head.scale.set(dog ? 1.15 : species === 'cat' ? 0.90 : 1.16, dog ? 1.14 : species === 'cat' ? 0.90 : 1.16, dog ? 1.08 : species === 'cat' ? 0.92 : 1.04);
+  if (!dog) head.rotation.y = profileCat ? -Math.PI / 2 : -0.48;
+  const headRadius = dog ? 5.3 : species === 'cat' ? 4.95 : 6.0;
+  const headGeo = species === 'cat' && col.fluffy ? fuzzySphere(headRadius, 56, 40, 2.7, 0.29) : sph(headRadius, 44, 32);
+  const headMesh = new THREE.Mesh(headGeo, faceFur); headMesh.position.set(0, 0, 0); headMesh.scale.set(species === 'cat' ? 1.06 : 1.08, 1.0, 0.98); headMesh.castShadow = true; head.add(headMesh);
+  if (species === 'cat' && col.fluffy) addFurStrands(head, [0,0,0], [headRadius * 1.06, headRadius, headRadius * 0.98], 1800, 0xCA71, faceFur, { radius: headRadius, seed: 2.7, amplitude: 0.29 }, (x,y,z) => z > 0.72 && Math.abs(x) < 0.56 && y > -0.55 && y < 0.38);
+  if (species === 'cat' || species === 'fox' || species === 'hedgehog') for (const [sx,sy,sz,r] of [[-3.35,0.45,0.15,1.18],[3.35,0.45,0.15,1.18],[-2.0,-2.7,0.45,0.88],[2.0,-2.7,0.45,0.88],[0,3.0,-0.2,0.95]]) { const puff = mesh(sph(r, 16, 12), B, sx, sy, sz, 1.05, 0.95, 0.72, head); if (species === 'cat' && col.fluffy) puff.material = faceFur; }
   if (species === 'penguin' || species === 'owl') {
     for (const sx of [-1, 1]) mesh(sph(species === 'owl' ? 2.8 : 2.5, 18, 12), species === 'owl' ? '#E6DED1' : W, sx * 2.6, 0.0, 2.4, 1.0, 1.12, 0.38, head);
   }
   if (dog) { mesh(box(3.6, 2.8, 4.2), W, 0, -1.4, 3.8, 1, 1, 1, head); mesh(sph(1.0, 6, 4), col.nose, 0, -0.4, 6.0, 1.2, 0.9, 0.8, head); mesh(box(1.6, 0.5, 1.6), '#E8586A', 0, -3.0, 4.6, 1, 1, 1, head); }
   else if (species === 'penguin' || species === 'owl') {
     mesh(cone(species === 'penguin' ? 1.3 : 0.95, species === 'penguin' ? 2.4 : 1.7, 7), col.nose || '#F5A12B', 0, -0.65, 5.0, 1, 0.72, 1.1, head);
-  } else { mesh(sph(2.0, 16, 12), W, 0, -1.2, 4.0, 1.3, 0.8, 0.65, head); mesh(sph(0.72, 12, 9), col.nose, 0, -0.4, 4.75, 1.2, 0.8, 0.48, head);
-    if (col.patch) { mesh(sph(2.1, 20, 14), col.patch2 || col.patch, -3.0, 2.8, 2.5, 1.0, 0.38, 0.75, head); mesh(sph(1.6, 18, 12), col.patch3 || col.patch, 3.2, -2.4, 2.6, 1.0, 0.36, 0.72, head); }
-    for (const sx of [-1, 1]) for (const k of [0, 1]) { const w = new THREE.Mesh(box(4, 0.25, 0.25), colMat('#FFFFFF')); w.position.set(sx * 3.2, -1.2 - k * 0.7, 3.2); w.rotation.z = sx * (0.1 - k * 0.2); head.add(w); } }
+  } else if (species === 'cat') {
+    const cheek = col.cheek || '#8A7165';
+    mesh(sph(0.92, 20, 14), cheek, -0.72, -1.55, 4.7, 1.0, 0.72, 0.54, head);
+    mesh(sph(0.92, 20, 14), cheek, 0.72, -1.55, 4.7, 1.0, 0.72, 0.54, head);
+    mesh(cone(0.42, 0.5, 3), col.nose || '#A77A79', 0, -1.08, 5.22, 1.0, 0.72, 0.62, head);
+    mesh(sph(0.24, 12, 8), '#35292A', 0, -1.94, 5.03, 0.72, 0.9, 0.42, head);
+    // Short, fine muted whiskers; avoid the thick white bars of the old toy face.
+    for (const sx of [-1, 1]) for (const k of [-1, 0, 1]) {
+      const y0 = -1.55 + k * 0.18, y1 = y0 + k * 0.34;
+      const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(sx * 1.2, y0, 4.55), new THREE.Vector3(sx * 2.05, y1, 4.35), new THREE.Vector3(sx * 2.75, y1 + k * 0.1, 4.1)]);
+      head.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 6, 0.055, 5, false), softMat('#B4A093')));
+    }
+  } else { mesh(sph(2.0, 16, 12), W, 0, -1.2, 4.0, 1.3, 0.8, 0.65, head); mesh(sph(0.72, 12, 9), col.nose, 0, -0.4, 4.75, 1.2, 0.8, 0.48, head); }
   for (const sx of [-1, 1]) {
     // Large warm eyes and tiny highlights keep every pet variant readable as one
     // coherent, soft-chibi family at the shop and gameplay camera scales.
@@ -1079,38 +1221,43 @@ export function makePet(kind, col) {
       const ear = mesh(sph(2.0, 20, 14), col.ear || B, sx * 3.2, 5.6, -0.1, 0.82, 2.15, 0.55, head); ear.rotation.z = sx * -0.12;
       mesh(sph(1.0, 18, 12), '#E7B6B7', sx * 3.2, 5.9, 0.35, 0.55, 1.54, 0.22, head);
     } else if (species === 'fox' || species === 'cat' || species === 'hedgehog') {
-      const ear = mesh(cone(species === 'fox' ? 2.8 : 2.5, species === 'fox' ? 7 : 5.6, 28), col.ear || B, sx * 3.65, species === 'fox' ? 4.3 : 4.1, -0.05, 0.9, 1.0, 0.65, head); ear.rotation.z = sx * -0.12;
-      mesh(cone(1.25, 3.0, 24), species === 'fox' ? '#F5E7D7' : '#D6A0A0', sx * 3.65, 4.1, 0.55, 0.78, 0.82, 0.22, head);
+      const ear = mesh(cone(species === 'fox' ? 2.8 : species === 'cat' ? 2.3 : 2.5, species === 'fox' ? 7 : species === 'cat' ? 4.4 : 5.6, 28), col.ear || B, sx * (species === 'cat' ? 3.2 : 3.65), species === 'fox' ? 4.3 : species === 'cat' ? 3.9 : 4.1, -0.05, species === 'cat' ? 0.86 : 0.9, 1.0, 0.65, head);
+      if (species === 'cat' && col.fluffy) ear.material = fur; ear.rotation.z = sx * -0.12;
+      mesh(cone(species === 'cat' ? 1.05 : 1.25, species === 'cat' ? 3.2 : 3.0, 24), species === 'fox' ? '#F5E7D7' : species === 'cat' ? '#9B6A65' : '#D6A0A0', sx * (species === 'cat' ? 3.2 : 3.65), species === 'cat' ? 3.9 : 4.1, 0.55, 0.70, 0.82, 0.22, head);
       if (species === 'fox') mesh(cone(1.5, 3.1, 18), '#332722', sx * 3.65, 6.8, -0.1, 0.72, 0.68, 0.6, head);
     } else if (species === 'owl') { const tuft = mesh(cone(1.5, 2.2, 8), col.ear || B, sx * 3.5, 3.4, -0.4, 1, 0.9, 0.7, head); tuft.rotation.z = sx * -0.4; }
   }
   // Tiny warm mouth; muzzle stays small so the face keeps the plush reference's simple read.
   mesh(sph(dog ? 0.65 : 0.48, 12, 9), '#7A5146', 0, -2.0, dog ? 5.45 : 5.1, 1.15, 0.55, 0.35, head);
   if (col.collar !== false && dog) mesh(tor(3.0, 0.6, 4, 12), '#E8283C', 0, -2.8, 0.6, 1, 1, 1, head).rotation.x = H;
-  const tail = new THREE.Group(); tail.position.set(0, dog ? 10 : 8, dog ? -6.6 : -6.0); body.add(tail);
+  const tail = new THREE.Group(); tail.position.set(profileCat ? 7.2 : species === 'cat' ? 5.8 : 0, dog ? 10 : 8, dog ? -6.6 : profileCat ? -0.7 : species === 'cat' ? 5.0 : -6.0); body.add(tail);
   if (species === 'penguin' || species === 'owl') tail.visible = false;
   if (dog) { const tm = new THREE.Mesh(cap(1.1, 3.6, 10, 14), softMat(B)); tm.position.set(0, 2.4, -0.6); tm.rotation.x = -0.5; tail.add(tm); mesh(sph(1.2, 6, 4), W, 0, 4.6, -1.8, 1, 1, 1, tail); }
-  else {
+  else if (species === 'cat') {
+    const pts = [new THREE.Vector3(0,0,0), new THREE.Vector3(1.3,1.4,-0.1), new THREE.Vector3(2.8,3.8,-0.3), new THREE.Vector3(3.2,6.4,-0.6), new THREE.Vector3(2.0,8.0,-0.9)];
+    const curve = new THREE.CatmullRomCurve3(pts);
+    const tm = new THREE.Mesh(new THREE.TubeGeometry(curve, 28, 2.5, 14, false), fur); tm.castShadow = true; tail.add(tm);
+    for (const [x,y,z,r,c] of [[0.6,1.8,-0.1,1.8,B],[2.1,3.8,-0.3,2.0,B],[3.0,6.2,-0.6,2.2,col.patch || B],[2.2,7.8,-0.9,2.1,col.patch2 || B]]) {
+      const puffGeo = col.fluffy ? fuzzySphere(r, 28, 20, 7.3 + y, 0.22) : sph(r,18,12);
+      const puff = new THREE.Mesh(puffGeo, col.fluffy ? fur : softMat(c)); puff.position.set(x,y,z); puff.scale.set(0.9,1.05,1.08); puff.castShadow = true; tail.add(puff);
+      if (col.fluffy) addFurStrands(tail, [x,y,z], [r*0.9,r*1.05,r*1.08], 150, 0xF00D + Math.round(y*97), fur);
+    }
+  } else {
     const tm = new THREE.Mesh(cap(1.8, 8.4, 14, 20), softMat(B)); tm.position.set(0, 4.5, -1.6); tm.rotation.x = -0.72; tm.scale.set(1.15, 1.08, 1.2); tail.add(tm);
     for (const [y,x] of [[1.4,-0.3],[3.2,0.35],[5.1,-0.35],[7,0.2]]) { const tuft = new THREE.Mesh(sph(1.3,16,12),softMat(B)); tuft.position.set(x,y,-1.9); tuft.scale.set(1.0,1.15,0.85); tail.add(tuft); }
     if (species === 'fox') { const tip = new THREE.Mesh(sph(1.55, 18, 12), softMat(W)); tip.position.set(0, 9.0, -3.0); tip.scale.set(1.15, 1.1, 0.9); tail.add(tip); }
-    if (col.patch && species === 'cat') {
-      for (const [y, c, x] of [[2.5, col.patch, -0.75], [5.2, col.patch2 || col.patch, 0.8], [7.2, col.patch3 || col.patch, -0.55]]) {
-        const mark = new THREE.Mesh(sph(1.0, 14, 10), softMat(c)); mark.position.set(x, y, -1.7); mark.scale.set(0.9, 0.38, 0.65); tail.add(mark);
-      }
-    }
   }
   const blob = new THREE.Mesh(BLOB_GEO, BLOB_MAT); blob.rotation.x = -H; blob.position.y = 0.3; blob.scale.set(7, 10, 1); root.add(blob);
-  return { root, body, head, legs, tail, kind: species, blob };
+  return { root, body, head, legs, tail, kind: species, blob, profileCat };
 }
 // s: { t, walk, moving, sit, lounge, carry (dog: an item in its mouth is drawn by the renderer) }
 export function posePet(pp, s) {
   const { legs, body, head, tail } = pp, t = s.t, sw = s.moving ? Math.sin(s.walk * 1.4) : 0;
   legs[0].rotation.x = sw * 0.7; legs[3].rotation.x = sw * 0.7; legs[1].rotation.x = -sw * 0.7; legs[2].rotation.x = -sw * 0.7;
   body.position.y = s.moving ? Math.abs(Math.sin(s.walk * 1.4)) * 0.9 : 0; body.rotation.x = 0; body.rotation.z = 0;
-  head.rotation.set(s.moving ? -0.05 : Math.sin(t * 0.9) * 0.08, (pp.kind === 'cat' ? -0.48 : 0) + (s.moving ? 0 : Math.sin(t * 0.5) * 0.35), 0);
+  head.rotation.set(s.moving ? -0.05 : Math.sin(t * 0.9) * 0.08, (pp.profileCat ? -Math.PI / 2 : pp.kind === 'cat' ? -0.48 : 0) + (s.moving ? 0 : Math.sin(t * 0.5) * 0.12), 0);
   tail.rotation.set(0, 0, 0); tail.rotation.y = Math.sin(t * (pp.kind === 'dog' ? (s.moving ? 16 : 9) : 1.6)) * (pp.kind === 'dog' ? 0.6 : 0.4);
-  if (s.sit) { legs[2].rotation.x = legs[3].rotation.x = -1.2; body.rotation.x = -0.35; body.position.y = -1.6; legs[0].rotation.x = legs[1].rotation.x = 0.25; }
+  if (s.sit && !pp.profileCat) { legs[2].rotation.x = legs[3].rotation.x = -1.2; body.rotation.x = -0.35; body.position.y = -1.6; legs[0].rotation.x = legs[1].rotation.x = 0.25; }
   if (s.lounge) {   // cat stretched out on its side, slow breathing, tail swish
     for (const l of legs) l.rotation.x = 1.25; body.rotation.z = 1.25; body.position.y = 2.4 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, 0, -1.0 + Math.sin(t * 0.7) * 0.06);
   }
