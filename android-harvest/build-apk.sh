@@ -4,8 +4,8 @@
 #   ./build-apk.sh            → build/banmu-harvest-debug.apk (+ copy to /workspace/work/out/)
 # In CI (GitHub Actions) set SDK=$ANDROID_HOME and keep the runner's JAVA_HOME; OUT_DIR picks where the copy goes.
 set -euo pipefail
-VERSION_CODE=71
-VERSION_NAME=5.5.1
+VERSION_CODE=72
+VERSION_NAME=5.6.0
 TC=${TC:-/workspace/work/tc}
 if [ -z "${SDK:-}" ]; then
   export JAVA_HOME=$TC/jdk-17.0.21+9
@@ -19,6 +19,8 @@ HERE=$(cd "$(dirname "$0")" && pwd); APP=$HERE/app/src/main; B=$HERE/build
 rm -rf "$B"; mkdir -p "$B/res" "$B/gen" "$B/classes" "$B/dex" "$B/assets/harvest"
 # game files → assets/harvest (offline copy of ../harvest; dev-only files stay out)
 ( cd "$HERE/../harvest" && tar cf - index.html style.css js vendor models assets ) | ( cd "$B/assets/harvest" && tar xf - )
+# APK-only artwork: files in overrides/ replace the web copy inside the APK (the web game is left unchanged)
+[ -d "$HERE/overrides" ] && cp -R "$HERE/overrides/." "$B/assets/harvest/"
 "$AAPT2" compile --dir "$APP/res" -o "$B/res/res.zip"
 sed 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android">#<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.zilo.banmuharvest">#' "$APP/AndroidManifest.xml" > "$B/AndroidManifest.xml"
 "$AAPT2" link -I "$JAR" --manifest "$B/AndroidManifest.xml" -o "$B/base.apk" --java "$B/gen" -A "$B/assets" "$B/res/res.zip" --min-sdk-version 24 --target-sdk-version 34 --version-code $VERSION_CODE --version-name $VERSION_NAME

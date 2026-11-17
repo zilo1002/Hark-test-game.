@@ -36,7 +36,12 @@ with zipfile.ZipFile(apk) as archive:
     missing_all = sorted(all_source_assets - actual)
     if missing_all:
         raise SystemExit("APK is missing artwork files from the source tree:\n  " + "\n  ".join(missing_all))
-    stale_or_changed = sorted(name for name in all_source_assets if archive.read(name) != (source / "assets" / "dolls" / name.removeprefix("assets/harvest/assets/dolls/")).read_bytes())
+    overrides = Path(__file__).resolve().parent / "overrides" / "assets" / "dolls"
+    def expected_bytes(name):
+        rel = name.removeprefix("assets/harvest/assets/dolls/")
+        ov = overrides / rel
+        return (ov if ov.is_file() else source / "assets" / "dolls" / rel).read_bytes()
+    stale_or_changed = sorted(name for name in all_source_assets if archive.read(name) != expected_bytes(name))
     if stale_or_changed:
         raise SystemExit("APK artwork differs from the current source files:\n  " + "\n  ".join(stale_or_changed))
     bad_images = []
