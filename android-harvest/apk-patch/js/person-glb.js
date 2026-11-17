@@ -56,8 +56,20 @@ function buildLib(geo, heroMat, staffMat) {
       dots.push(new THREE.Vector3(pos.getX(i) + nor.getX(i) * 0.15, y(i) + nor.getY(i) * 0.15, pos.getZ(i) + nor.getZ(i) * 0.15));
     }
   }
+  // v5.9.1: the same body with its cat ears folded down onto the hair, worn under hats so the ears never poke through.
+  // An ear is whatever sticks out of the head's front silhouette (an ellipse round the hair dome); each ear vertex
+  // is pulled straight back onto that outline, just inside the hair.
+  const earPos = pos.clone();
+  { const cx = 0, cy = 0.78 * HS, rx = 0.30 * HS, ry = 0.165 * HS;
+    for (let i = 0; i < pos.count; i++) {
+      const px = pos.getX(i), py = pos.getY(i); if (py < 0.79 * HS || Math.abs(px) < 0.06 * HS) continue;
+      const ex = (px - cx) / rx, ey = (py - cy) / ry, e = Math.hypot(ex, ey);
+      if (e <= 1.0) continue;
+      const k = 0.97 / e; earPos.setXYZ(i, cx + ex * k * rx, cy + ey * k * ry, pos.getZ(i) * 0.9);
+    } }
+  const geoHat = geo.clone(); geoHat.setAttribute('position', earPos);
   return {
-    geo, mats: { hero: heroMat, staff: staffMat }, dots,
+    geo, geoHat, mats: { hero: heroMat, staff: staffMat }, dots,
     shells: {
       dress: shell(faces((i) => r(i) === 1), thin),
       apron: shell(apronIdx, thin),
@@ -114,7 +126,9 @@ function apply(pp, skin) {
   arms.forEach((a, i) => { const s = i ? 1 : -1; a.position.set(s * J.shoulder[0], J.shoulder[1] - J.torso, 0); });
   head.position.set(0, J.head[0], J.head[1]); head.scale.set(...J.headScale);
   // bind
-  const mesh = new THREE.SkinnedMesh(LIB.geo, LIB.mats[skin] || LIB.mats.staff);
+  const hat = (o && o.hat) || '';
+  const earsDown = hat && !['bow', 'flower', 'crown'].includes(hat);   // these sit between / around the ears
+  const mesh = new THREE.SkinnedMesh(earsDown ? LIB.geoHat : LIB.geo, LIB.mats[skin] || LIB.mats.staff);
   mesh.frustumCulled = false; mesh.castShadow = skin === 'hero';
   root.add(mesh);
   root.updateMatrixWorld(true);

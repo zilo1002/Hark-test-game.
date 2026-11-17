@@ -74,6 +74,14 @@ patch('js/preview3d.js', [("const pp = M.makePerson(personStyle);", "const pp = 
 # the farm owner has one look: no boy/girl switch in the shop
 patch('js/shop.js', [("export const isBoyCharacter = (id) => String(id || '').startsWith('boy');", "export const isBoyCharacter = (id) => false;")])
 patch('js/ui.js', [("    characterSwitch.classList.remove('hidden');", "    characterSwitch.classList.add('hidden');")])
+
+# v5.9.1: a piece she already wears is previewed on its own over the farm look, so worn pieces don't all show the same full outfit
+patch('js/ui.js', [
+    ("      if (it.slot) { const eq = { ...d.shop.eq }; eq[it.slot] = it.id; return { kind: 'person', eq, character: d.character }; }",
+     "      if (it.slot) { const worn = d.shop.eq[it.slot] === it.id, eq = worn ? {} : { ...d.shop.eq }; eq[it.slot] = it.id; return { kind: 'person', eq, character: d.character }; }"),
+    ("    const eq = { ...d.shop.eq }; if (it && it.slot) eq[it.slot] = it.id;",
+     "    const worn = it && it.slot && d.shop.eq[it.slot] === it.id, eq = worn ? {} : { ...d.shop.eq }; if (it && it.slot) eq[it.slot] = it.id;"),
+])
 print('apk-patch applied')
 
 # shop: warm up the turntable and every thumbnail in the background once the model is in, so opening the shop
