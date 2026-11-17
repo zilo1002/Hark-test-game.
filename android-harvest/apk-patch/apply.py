@@ -19,8 +19,37 @@ def patch(rel, pairs):
 # one model for everyone: hero skin for the farm owner, staff skin for every employee
 patch('js/models.js', [
     ("import * as THREE from '../vendor/three.module.min.js';", "import * as THREE from '../vendor/three.module.min.js';\nimport { attachPersonModel } from './person-glb.js';"),
+    # tag the procedural body ("base") so the model can replace it while decorations stay
+    ("  const mesh = (geo, c, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new THREE.Mesh(geo, M(c)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; return m; };",
+     "  const mesh = (geo, c, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new THREE.Mesh(geo, M(c)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; return m; };\n  const BASE = (m) => { m.userData.base = true; return m; };"),
+    ("    hip.add(mesh(cap(2.65, 4.6, 5, 16), o.pants || '#3A4A78', 0, -4.2, 0, 1.08, 0.92, 1.05));", "    hip.add(BASE(mesh(cap(2.65, 4.6, 5, 16), o.pants || '#3A4A78', 0, -4.2, 0, 1.08, 0.92, 1.05)));"),
+    ("    } else hip.add(mesh(sph(1, 18, 12), o.shoes || '#5A3414', 0, -8.3, 1.15, 2.8, 1.25, 3.3));", "    } else hip.add(BASE(mesh(sph(1, 18, 12), o.shoes || '#5A3414', 0, -8.3, 1.15, 2.8, 1.25, 3.3)));"),
+    ("  if (o.dress) torso.add(mesh(sph(1, 24, 18), o.dress, 0, 4.4, 0, 7.0, 5.8, 5.3));\n  else torso.add(mesh(cap(6.4, 4.0, 6, 18), o.vest || o.shirt || '#FFFFFF', 0, 5.2, 0, 1.05, 1.05, 0.92));",
+     "  if (o.dress) torso.add(BASE(mesh(sph(1, 24, 18), o.dress, 0, 4.4, 0, 7.0, 5.8, 5.3)));\n  else torso.add(BASE(mesh(cap(6.4, 4.0, 6, 18), o.vest || o.shirt || '#FFFFFF', 0, 5.2, 0, 1.05, 1.05, 0.92)));"),
+    ("    sh.add(mesh(cap(2.5, 3.8, 5, 16), o.sleeve || o.dress || o.shirt || '#FFFFFF', 0, -2.8, 0, 1.05, 1, 1.05));\n    sh.add(mesh(sph(2.4, 18, 12), skin, 0, -6.1, 0, 1.08, 0.92, 1.05));",
+     "    sh.add(BASE(mesh(cap(2.5, 3.8, 5, 16), o.sleeve || o.dress || o.shirt || '#FFFFFF', 0, -2.8, 0, 1.05, 1, 1.05)));\n    sh.add(BASE(mesh(sph(2.4, 18, 12), skin, 0, -6.1, 0, 1.08, 0.92, 1.05)));"),
+    ("  head.add(mesh(sph(7.7, 40, 28), skin, 0, 0, 0, 1.08, 1.04, 0.98));", "  head.add(BASE(mesh(sph(7.7, 40, 28), skin, 0, 0, 0, 1.08, 1.04, 0.98)));"),
+    ("hm.castShadow = true; head.add(hm);", "hm.castShadow = true; BASE(hm); head.add(hm);"),
+    ("  head.add(mesh(sph(6.6, 10, 7), hair, 0, -0.4, -2.6, 1.05, 1, 0.8));\n", "  head.add(BASE(mesh(sph(6.6, 10, 7), hair, 0, -0.4, -2.6, 1.05, 1, 0.8)));\n  const __faceFrom = head.children.length;\n"),
+    ("  if (o.beard) head.add(", "  head.children.slice(__faceFrom).forEach((c) => c.traverse((m) => { if (m.isMesh) m.userData.base = true; }));\n  if (o.beard) head.add("),
+    ("  if (o.pigtails) for (const s of [-1, 1]) head.add(mesh(sph(2.6, 7, 5), hair, s * 7.6, -0.8, -2.2));", "  if (o.pigtails) for (const s of [-1, 1]) head.add(BASE(mesh(sph(2.6, 7, 5), hair, s * 7.6, -0.8, -2.2)));"),
     ("  return { root, body, legs, arms, torso, head, tool, axe, net, blob, o };\n}",
      "  const __pp = { root, body, legs, arms, torso, head, tool, axe, net, blob, o };\n  if (o.glbSkin) attachPersonModel(__pp, o.glbSkin);\n  return __pp;\n}"),
+])
+# every pet gets the plush fur look (fuzzy body and head, fur strands), not only the cat
+patch('js/models.js', [
+    ("  const role = col.dollRole || '';", "  col = { ...col, fluffy: true };\n  const role = col.dollRole || '';"),
+    ("const trunkGeo = species === 'cat' && col.fluffy ?", "const trunkGeo = col.fluffy ?"),
+    ("  if (species === 'cat' && col.fluffy) addFurStrands(body, [0, 6.5, -0.8]", "  if (col.fluffy) addFurStrands(body, [0, dog ? 8.2 : bird ? 7.2 : 6.5, -0.8]"),
+    ("const headGeo = species === 'cat' && col.fluffy ?", "const headGeo = col.fluffy ?"),
+    ("  if (species === 'cat' && col.fluffy) addFurStrands(head, [0,0,0]", "  if (col.fluffy) addFurStrands(head, [0,0,0]"),
+])
+# the tortie plush cat uses her Hunyuan 3D model, skinned to the pet's pivots
+patch('js/models.js', [
+    ("import { attachPersonModel } from './person-glb.js';", "import { attachPersonModel } from './person-glb.js';\nimport { attachPetModel } from './pet-glb.js';"),
+    ("  return { root, body, head, legs, tail, kind: species, blob, profileCat };", "  const __pet = { root, body, head, legs, tail, kind: species, blob, profileCat };\n  attachPetModel(__pet);\n  return __pet;"),
+    ("for (const l of legs) l.rotation.x = 1.25; body.rotation.z = 1.25; body.position.y = 2.4 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, 0, -1.0 + Math.sin(t * 0.7) * 0.06);",
+     "if (pp.glbModel) { for (const l of legs) l.rotation.x = 0.35; body.rotation.x = 1.3; body.position.y = 1.2 + Math.sin(t * 1.8) * 0.15; head.rotation.set(-0.9 + Math.sin(t * 0.7) * 0.06, -Math.PI / 2, 0); }\n    else { for (const l of legs) l.rotation.x = 1.25; body.rotation.z = 1.25; body.position.y = 2.4 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, 0, -1.0 + Math.sin(t * 0.7) * 0.06); }"),
 ])
 patch('js/render3d.js', [
     ("M.makePerson(this.heroStyle || HERO)", "M.makePerson({ ...(this.heroStyle || HERO), glbSkin: 'hero' })"),
