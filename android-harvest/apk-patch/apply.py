@@ -51,11 +51,11 @@ patch('js/models.js', [
 # the tortie plush cat uses her Hunyuan 3D model, skinned to the pet's pivots
 patch('js/models.js', [
     ("import { attachPersonModel } from './person-glb.js';", "import { attachPersonModel } from './person-glb.js';\nimport { attachPetModel } from './pet-glb.js';"),
-    ("  return { root, body, head, legs, tail, kind: species, blob, profileCat };", "  const __pet = { root, body, head, legs, tail, kind: species, blob, profileCat };\n  attachPetModel(__pet);\n  return __pet;"),
+    ("  return { root, body, head, legs, tail, kind: species, blob, profileCat };", "  const __pet = { root, body, head, legs, tail, kind: species, blob, profileCat };\n  attachPetModel(__pet, col);\n  return __pet;"),
     # the 3D tortie looks left and right (yaw) and nods a little, instead of tilting its neck
-    ("+ (s.moving ? 0 : Math.sin(t * 0.5) * 0.12), 0);", "+ (s.moving ? 0 : Math.sin(t * 0.5) * 0.12), 0);\n  if (pp.glbModel) head.rotation.set(s.moving ? 0.04 : Math.sin(t * 0.9) * 0.07, -Math.PI / 2 + (s.look || 0) + (s.moving ? Math.sin(t * 1.3) * 0.05 : Math.sin(t * 0.55) * 0.3 + Math.sin(t * 1.7) * 0.06), 0);"),
+    ("+ (s.moving ? 0 : Math.sin(t * 0.5) * 0.12), 0);", "+ (s.moving ? 0 : Math.sin(t * 0.5) * 0.12), 0);\n  if (pp.glbModel) head.rotation.set(s.moving ? 0.04 : Math.sin(t * 0.9) * 0.07, (pp.profileCat ? -Math.PI / 2 : 0) + (s.look || 0) + (s.moving ? Math.sin(t * 1.3) * 0.05 : Math.sin(t * 0.55) * 0.3 + Math.sin(t * 1.7) * 0.06), 0);"),
     ("for (const l of legs) l.rotation.x = 1.25; body.rotation.z = 1.25; body.position.y = 2.4 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, 0, -1.0 + Math.sin(t * 0.7) * 0.06);",
-     "if (pp.glbModel) { for (const l of legs) l.rotation.x = 0.35; body.rotation.x = 1.3; body.position.y = 1.2 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, -Math.PI / 2, 0.9 + Math.sin(t * 0.7) * 0.06); }\n    else { for (const l of legs) l.rotation.x = 1.25; body.rotation.z = 1.25; body.position.y = 2.4 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, 0, -1.0 + Math.sin(t * 0.7) * 0.06); }"),
+     "if (pp.glbModel && pp.profileCat) { for (const l of legs) l.rotation.x = 0.35; body.rotation.x = 1.3; body.position.y = 1.2 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, -Math.PI / 2, 0.9 + Math.sin(t * 0.7) * 0.06); }\n    else { for (const l of legs) l.rotation.x = 1.25; body.rotation.z = 1.25; body.position.y = 2.4 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, 0, -1.0 + Math.sin(t * 0.7) * 0.06); }"),
 ])
 patch('js/render3d.js', [
     # 3D cat: head leads into turns and toward the player
@@ -100,5 +100,7 @@ function __warmShop() {
   };
   idle(step);
 }
-window.addEventListener('person-glb-ready', () => { if (preview) preview.thumbs = {}; setTimeout(__warmShop, 800); });"""),
+window.addEventListener('person-glb-ready', () => { if (preview) preview.thumbs = {}; setTimeout(__warmShop, 800); });
+let __petWarm = 0;
+window.addEventListener('pet-glb-ready', () => { clearTimeout(__petWarm); __petWarm = setTimeout(() => { if (preview) for (const k in preview.thumbs) if (!k.includes(':')) delete preview.thumbs[k]; __warmShop(); }, 600); });"""),
 ])
