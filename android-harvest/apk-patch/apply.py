@@ -40,6 +40,11 @@ patch('js/models.js', [
     ("  return { root, body, legs, arms, torso, head, tool, axe, net, blob, o };\n}",
      "  const __pp = { root, body, legs, arms, torso, head, tool, axe, net, blob, o };\n  if (o.glbSkin) attachPersonModel(__pp, o.glbSkin);\n  return __pp;\n}"),
 ])
+# v5.9.6: tag the hat pieces so the model can refit each hat round its (bigger) hair
+patch('js/models.js', [
+    ("  if (o.hat === 'beanie') {", "  const __hat0 = head.children.length;\n  if (o.hat === 'beanie') {"),
+    ("  if (o.pigtails) for (const s of [-1, 1]) head.add(BASE(", "  head.children.slice(__hat0).forEach((c) => { c.userData.hat = true; });\n  if (o.pigtails) for (const s of [-1, 1]) head.add(BASE("),
+])
 # every pet gets the plush fur look (fuzzy body and head, fur strands), not only the cat
 patch('js/models.js', [
     ("  const role = col.dollRole || '';", "  col = { ...col, fluffy: true };\n  const role = col.dollRole || '';"),
@@ -53,14 +58,14 @@ patch('js/models.js', [
     ("import { attachPersonModel } from './person-glb.js';", "import { attachPersonModel } from './person-glb.js';\nimport { attachPetModel } from './pet-glb.js';"),
     ("  return { root, body, head, legs, tail, kind: species, blob, profileCat };", "  const __pet = { root, body, head, legs, tail, kind: species, blob, profileCat };\n  attachPetModel(__pet, col);\n  return __pet;"),
     # the 3D tortie looks left and right (yaw) and nods a little, instead of tilting its neck
-    ("+ (s.moving ? 0 : Math.sin(t * 0.5) * 0.12), 0);", "+ (s.moving ? 0 : Math.sin(t * 0.5) * 0.12), 0);\n  if (pp.glbModel) head.rotation.set(s.moving ? 0.04 : Math.sin(t * 0.9) * 0.07, (pp.profileCat ? -Math.PI / 2 : 0) + (s.look || 0) + (s.moving ? Math.sin(t * 1.3) * 0.05 : Math.sin(t * 0.55) * 0.3 + Math.sin(t * 1.7) * 0.06), 0);"),
+    ("+ (s.moving ? 0 : Math.sin(t * 0.5) * 0.12), 0);", "+ (s.moving ? 0 : Math.sin(t * 0.5) * 0.12), 0);\n  if (pp.glbModel) head.rotation.set(s.moving ? 0.04 : Math.sin(t * 0.9) * 0.07, (pp.profileCat ? -Math.PI / 2 : 0) + (s.look || 0) + (s.moving ? Math.sin(t * 1.3) * 0.04 : Math.sin(t * 0.55) * 0.16 + Math.sin(t * 1.7) * 0.04), 0);"),
     ("for (const l of legs) l.rotation.x = 1.25; body.rotation.z = 1.25; body.position.y = 2.4 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, 0, -1.0 + Math.sin(t * 0.7) * 0.06);",
-     "if (pp.glbModel && pp.profileCat) { for (const l of legs) l.rotation.x = 0.35; body.rotation.x = 1.3; body.position.y = 1.2 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, -Math.PI / 2, 0.9 + Math.sin(t * 0.7) * 0.06); }\n    else { for (const l of legs) l.rotation.x = 1.25; body.rotation.z = 1.25; body.position.y = 2.4 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, 0, -1.0 + Math.sin(t * 0.7) * 0.06); }"),
+     "if (pp.glbModel && pp.profileCat) { for (const l of legs) l.rotation.x = 0.35; body.rotation.x = 1.3; body.position.y = 1.2 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, -Math.PI / 2, 0.9 + Math.sin(t * 0.7) * 0.06); }\n    else { for (const l of legs) l.rotation.x = 1.25; body.rotation.z = 1.25; body.position.y = 2.4 + Math.sin(t * 1.8) * 0.15; head.rotation.set(0, 0, (pp.glbModel ? -0.2 : -1.0) + Math.sin(t * 0.7) * 0.06); }"),
 ])
 patch('js/render3d.js', [
     # 3D cat: head leads into turns and toward the player
     ('      if (sp > 6) o.ang = angLerp(o.ang, Math.atan2(d.vx, d.vy), Math.min(1, dt * 10));\n      else { const p = world.player; o.ang = angLerp(o.ang, Math.atan2(p.x - d.x, p.y - d.y), Math.min(1, dt * 3)); }\n      o.pp.root.position.set(d.x, 0, d.y); o.pp.root.rotation.y = o.ang + (o.pp.profileCat ? Math.PI / 2 : 0); o.pp.root.scale.setScalar(1.4);\n      M.posePet(o.pp, { t: time, walk: d.walk, moving: sp > 6, sit: sp <= 6 && !world.player.moving });',
-     '      { const p = world.player, tgt = sp > 6 ? Math.atan2(d.vx, d.vy) : Math.atan2(p.x - d.x, p.y - d.y);\n        o.ang = angLerp(o.ang, tgt, Math.min(1, dt * (o.pp.glbModel ? (sp > 6 ? 5 : 2) : (sp > 6 ? 10 : 3))));\n        let dA = tgt - o.ang; dA = Math.atan2(Math.sin(dA), Math.cos(dA));   // the head turns toward where she is going before the body does\n        o.look = (o.look || 0) + (Math.max(-0.95, Math.min(0.95, dA * 1.6)) - (o.look || 0)) * Math.min(1, dt * 8); }\n      o.pp.root.position.set(d.x, 0, d.y); o.pp.root.rotation.y = o.ang + (o.pp.profileCat ? Math.PI / 2 : 0); o.pp.root.scale.setScalar(1.4);\n      M.posePet(o.pp, { t: time, walk: d.walk, moving: sp > 6, sit: sp <= 6 && !world.player.moving, look: o.look });'),
+     '      { const p = world.player, tgt = sp > 6 ? Math.atan2(d.vx, d.vy) : Math.atan2(p.x - d.x, p.y - d.y);\n        o.ang = angLerp(o.ang, tgt, Math.min(1, dt * (o.pp.glbModel ? (sp > 6 ? 5 : 2) : (sp > 6 ? 10 : 3))));\n        let dA = tgt - o.ang; dA = Math.atan2(Math.sin(dA), Math.cos(dA));   // the head turns toward where she is going before the body does\n        o.look = (o.look || 0) + (Math.max(-0.5, Math.min(0.5, dA * 1.0)) - (o.look || 0)) * Math.min(1, dt * 8); }\n      o.pp.root.position.set(d.x, 0, d.y); o.pp.root.rotation.y = o.ang + (o.pp.profileCat ? Math.PI / 2 : 0); o.pp.root.scale.setScalar(1.4);\n      M.posePet(o.pp, { t: time, walk: d.walk, moving: sp > 6, sit: sp <= 6 && !world.player.moving, look: o.look });'),
     ("M.makePerson(this.heroStyle || HERO)", "M.makePerson({ ...(this.heroStyle || HERO), glbSkin: 'hero' })"),
     ("M.makePerson(this.wLook(FISHER))", "M.makePerson({ ...this.wLook(FISHER), glbSkin: 'staff', glbOutfit: this.uniform || null })"),
     ("M.makePerson(this.wLook(c.lumber ? LUMBERJACK : GARDENER))", "M.makePerson({ ...this.wLook(c.lumber ? LUMBERJACK : GARDENER), glbSkin: 'staff', glbOutfit: this.uniform || null })"),

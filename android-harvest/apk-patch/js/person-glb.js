@@ -16,7 +16,29 @@ const J = {                  // joints in game units (feet at y 0); the body's c
   BZ: 4.7, hip: [3.0, 5.0], torso: 5.0, shoulder: [6.6, 12.6],
   head: [26.4, 2.8], headScale: [1.74, 1.62, 1.8],   // maps the procedural head (r 7.7) onto the model's hair
 };
-const BASE_OVERALLS = '#4F79A9';   // the farm look's own overalls are the model's dress, not a garment
+const BASE_OVERALLS = '#4F79A9';
+// v5.9.6: the model's hair is bigger than the old procedural head, so each hat is scaled round its own base
+// (head-local units) until it encloses the hair: crowns wider than the hair dome, the pumpkin over the whole head.
+const CAP = { p: [0, 2.4, -0.4], s: [1.05, 1.1, 1.05] };
+const HAT_FIT = {
+  straw:   { p: [0, 4.7, 0],    s: [1.36, 1.12, 1.36] },
+  cowboy:  { p: [0, 4.9, -0.4], s: [1.4, 1.1, 1.4] },
+  pumpkin: { p: [0, 1.6, -0.2], s: [1.32, 1.3, 1.32], dy: -1.6 },
+  chef:    { p: [0, 4.2, -0.4], s: [1.07, 1.04, 1.07] },
+  santa:   { p: [0, 5.2, -0.4], s: [1.1, 1.05, 1.1] },
+  scholar: { p: [0, 4.1, -0.4], s: [1.04, 1, 1.04], dy: 0.4 },
+  beanie:  { p: [0, 2.2, -0.4], s: [1.03, 1.04, 1.03] },
+  cap: CAP, star: CAP, moon: CAP, rain: CAP,
+};
+function refitHat(head, hat) {
+  const f = HAT_FIT[hat]; if (!f || head.userData.hatFit) return;
+  head.userData.hatFit = true;
+  for (const c of head.children) {
+    if (!c.userData.hat) continue;
+    c.position.set(f.p[0] + (c.position.x - f.p[0]) * f.s[0], f.p[1] + (c.position.y - f.p[1]) * f.s[1] + (f.dy || 0), f.p[2] + (c.position.z - f.p[2]) * f.s[2]);
+    c.scale.multiply(new THREE.Vector3(...f.s));
+  }
+}   // the farm look's own overalls are the model's dress, not a garment
 let LIB = null, FAILED = false;
 const PENDING = [];
 
@@ -152,6 +174,7 @@ function apply(pp, skin) {
   head.position.set(0, J.head[0], J.head[1]); head.scale.set(...J.headScale);
   // bind
   const hat = (o && o.hat) || '';
+  refitHat(head, hat);
   const earsDown = hat && !['bow', 'flower', 'crown'].includes(hat);   // these sit between / around the ears
   const cust = skin === 'vip' || skin.startsWith('cust'), lod = cust && LIB.lod;
   const mesh = new THREE.SkinnedMesh(earsDown ? (lod ? LIB.lodHat : LIB.geoHat) : (lod ? LIB.lod : LIB.geo), skinMat(skin));
