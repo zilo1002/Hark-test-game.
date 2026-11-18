@@ -18,7 +18,19 @@ const MODELS = {
     feet: [[-0.1678, 0.3701], [0.1647, 0.3519], [-0.1845, -0.3141], [0.1879, -0.3192]], head: [0, 0.45, 0.35], tail: [0, 0.25, -0.6] },
   penguin: { file: 'pet_penguin.glb', hs: 18, hipY: 0.08,
     feet: [[-0.1525, 0.0613], [0.1583, 0.0481], [-0.1525, 0.0613], [0.1583, 0.0481]], head: [0, 0.55, 0.0], tail: [0, 0.2, -0.3] },
+  fox: { file: 'pet_fox.glb', hs: 18, hipY: 0.2,
+    feet: [[-0.1322, 0.258], [0.0997, 0.2878], [-0.0942, -0.2416], [0.1393, -0.1856]], head: [-0.05, 0.55, 0.22], tail: [0, 0.45, -0.25] },
+  tux: { file: 'pet_tux.glb', hs: 17, hipY: 0.15,
+    feet: [[-0.092, 0.2892], [0.1294, 0.2767], [-0.1296, -0.2743], [0.1312, -0.2633]], head: [0, 0.5, 0.28], tail: [0, 0.45, -0.32] },
+  white: { file: 'pet_white.glb', hs: 17, hipY: 0.15,
+    feet: [[-0.0947, 0.2773], [0.0993, 0.3149], [-0.1081, -0.2781], [0.1064, -0.1917]], head: [0, 0.55, 0.22], tail: [0, 0.5, -0.22] },
+  owl: { file: 'pet_owl.glb', hs: 16, hipY: 0.06,
+    feet: [[-0.1321, 0.0317], [0.1287, 0.0225], [-0.1321, 0.0317], [0.1287, 0.0225]], head: [0, 0.6, 0.05], tail: [0, 0.2, -0.3] },
+  hedgehog: { file: 'pet_hedgehog.glb', hs: 13, hipY: 0.08,
+    feet: [[-0.1395, 0.256], [0.126, 0.2565], [-0.1519, -0.2071], [0.1832, -0.1987]], head: [0, 0.45, 0.3], tail: [0, 0.3, -0.5] },
 };
+// v5.9.9 blinking: eye centre (model heights), outward normal, eyelid colour; radius r. The tortie's eyes are closed already.
+const LIDS = {"fox": {"r": 0.045, "eyes": [[-0.1927, 0.6784, 0.5243, -0.373, -0.013, 0.928, "#F59540"], [-0.3075, 0.6803, 0.3981, -0.967, -0.104, 0.233, "#F9AA5D"]]}, "white": {"r": 0.042, "eyes": [[-0.1731, 0.6726, 0.4571, -0.767, 0.015, 0.641, "#C9B094"], [0.0501, 0.6756, 0.5549, -0.171, 0.012, 0.985, "#CDBBA9"]]}, "owl": {"r": 0.068, "eyes": [[-0.1118, 0.7619, 0.3216, -0.448, -0.005, 0.894, "#DCD3CB"], [0.0956, 0.7567, 0.3202, 0.47, 0.038, 0.882, "#DDD3C8"]]}, "hedgehog": {"r": 0.035, "eyes": [[-0.1224, 0.5484, 0.4716, -0.217, 0.653, 0.725, "#F4DCC2"], [0.1323, 0.5369, 0.4813, 0.327, 0.507, 0.797, "#E5BE9A"]]}, "tux": {"r": 0.036, "eyes": [[-0.2119, 0.6066, 0.4904, -0.634, 0.0, 0.773, "#2E2A26"], [-0.037, 0.6035, 0.5848, -0.278, 0.046, 0.96, "#2E2A26"]]}, "orange": {"r": 0.036, "eyes": [[-0.2375, 0.6488, 0.525, -0.691, 0.01, 0.723, "#F5C595"], [-0.097, 0.6516, 0.6089, -0.341, -0.058, 0.938, "#FBCD9D"]]}, "shiba": {"r": 0.04, "eyes": [[-0.1539, 0.7324, 0.5631, -0.755, -0.052, 0.653, "#E1A265"], [0.0288, 0.7282, 0.642, 0.044, 0.038, 0.998, "#DEA46B"]]}, "rabbit": {"r": 0.036, "eyes": [[-0.1605, 0.7342, 0.7692, -0.825, 0.14, 0.547, "#D5C8BD"], [0.1695, 0.737, 0.7624, 0.779, 0.142, 0.611, "#D0C3B7"]]}, "penguin": {"r": 0.035, "eyes": [[-0.1431, 0.7222, 0.3012, -0.5, 0.173, 0.849, "#E4D8C7"], [0.1258, 0.7131, 0.3064, 0.377, 0.14, 0.915, "#DBCAB8"]]}};
 const STATE = {};   // key -> { lib, failed, pending[] }
 
 function modelKey(pp, col) {
@@ -26,6 +38,11 @@ function modelKey(pp, col) {
   if (pp.profileCat) return 'tortie';
   if (pp.kind === 'penguin') return 'penguin';
   if (pp.kind === 'rabbit') return 'rabbit';
+  if (pp.kind === 'owl') return 'owl';
+  if (pp.kind === 'hedgehog') return 'hedgehog';
+  if (pp.kind === 'fox') return 'fox';
+  if (pp.kind === 'dog' && body === '#F7F5EE') return 'white';
+  if (pp.kind === 'cat' && !role && body === '#2E2E36') return 'tux';
   if (pp.kind === 'dog' && body === '#E89A44') return 'shiba';
   if (pp.kind === 'cat' && !role && body === '#F2A040') return 'orange';
   return null;
@@ -68,6 +85,7 @@ function apply(pp, key) {
   legs.forEach((l, i) => l.rotation.copy(sv.l[i]));
   if (!M.profile) body.rotation.y = 0;                   // the procedural plush turned its body 3/4 to camera; the model faces forward
   pp.glbModel = mesh;
+  addLids(pp, key);
 }
 
 export function attachPetModel(pp, col) {
@@ -82,3 +100,36 @@ export function attachPetModel(pp, col) {
 
 // v5.9.5: load every pet model at start-up (behind the loading screen) instead of the first time one appears
 for (const k in MODELS) if (!STATE[k]) load(k);
+
+// ---- v5.9.9 (宝宝 2026-11-19 "能不能眨眼睛"): pets blink. A thin fur-coloured eyelid sits over each eye on the
+// head bone (so it turns with the head) and closes for ~0.15 s every 2.5–5.5 s, now and then twice in a row.
+const BLINKERS = new Set();
+const _Z = new THREE.Vector3(0, 0, 1), _UP = new THREE.Vector3(0, 1, 0);
+function addLids(pp, key) {
+  const D = LIDS[key]; if (!D) return;
+  const M = MODELS[key], HS = M.hs, R = D.r * HS * 1.12, lids = [];
+  for (const e of D.eyes) {
+    const n = new THREE.Vector3(e[3], e[4], e[5]).normalize();
+    const x = new THREE.Vector3().crossVectors(_UP, n); if (x.lengthSq() < 1e-6) x.set(1, 0, 0); x.normalize();
+    const y = new THREE.Vector3().crossVectors(n, x).normalize();
+    const geo = new THREE.SphereGeometry(R, 18, 12); geo.scale(1, 1, 0.42);
+    const lid = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: e[6] }));
+    lid.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, n));
+    lid.position.set((e[0] - M.head[0]) * HS + n.x * R * 0.12, (e[1] - M.head[1]) * HS + n.y * R * 0.12, (e[2] - M.head[2]) * HS + n.z * R * 0.12);
+    lid.visible = false; lid.renderOrder = 1;
+    pp.head.add(lid); lids.push(lid);
+  }
+  BLINKERS.add({ root: pp.root, lids, start: -1, next: performance.now() / 1000 + 1 + Math.random() * 3, gone: 0 });
+  if (BLINKERS.size === 1 && typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(blinkLoop);
+}
+function blinkLoop() {
+  const t = performance.now() / 1000;
+  for (const b of BLINKERS) {
+    if (!b.root.parent) { if (++b.gone > 1800) BLINKERS.delete(b); continue; }
+    b.gone = 0;
+    if (t >= b.next) { b.start = t; b.next = t + (Math.random() < 0.22 ? 0.3 : 2.5 + Math.random() * 3); }
+    const k = (t - b.start) / 0.15, c = k >= 0 && k < 1 ? Math.sin(Math.PI * k) : 0;
+    for (const l of b.lids) { l.visible = c > 0.04; l.scale.y = Math.max(0.05, c); }
+  }
+  if (BLINKERS.size) requestAnimationFrame(blinkLoop);
+}
