@@ -141,50 +141,18 @@ patch('js/render3d.js', [
     ("pigtails: !cu.vip && cu.hue % 3 === 2 });",
      "pigtails: !cu.vip && cu.hue % 3 === 2, glbSkin: cu.vip ? 'vip' : 'cust' + (cu.hue % 8), glbOutfit: null });"),
 ])
-patch('js/main.js', [
-    ("applyLook();\n\ninput.onFirst",
-     "applyLook();\n"
-     "{ // v5.9.5 loading screen: hold until the person model and every pet model are in (8 s at most)\n"
-     "  const ov = document.createElement('div');\n"
-     "  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#BFE6A0;color:#3E6B22;font:900 22px sans-serif;transition:opacity .4s';\n"
-     "  ov.innerHTML = '<div>半亩·丰收</div><div style=\"margin-top:14px;font-size:15px\">正在准备农场…</div>';\n"
-     "  document.body.appendChild(ov);\n"
-     "  const need = new Set(['person', 'tortie', 'orange', 'shiba', 'rabbit', 'penguin']);\n"
-     "  const done = () => { if (!ov.parentNode) return; ov.style.opacity = '0'; setTimeout(() => ov.remove(), 450); };\n"
-     "  const tick = (k) => { need.delete(k); if (!need.size) setTimeout(done, 300); };\n"
-     "  window.addEventListener('person-glb-ready', () => tick('person'));\n"
-     "  window.addEventListener('pet-glb-ready', (e) => tick(e.detail));\n"
-     "  setTimeout(done, 8000);\n"
-     "}\n\ninput.onFirst"),
-])
 print('apk-patch applied')
 
-# shop: warm up the turntable and every thumbnail in the background once the model is in, so opening the shop
-# no longer stalls (first WebGL context + one full figure render per thumbnail used to happen on the tap)
-patch('js/main.js', [
-    ("function ensurePreview() { if (!preview) { preview = new Preview(document.getElementById('shopPrev')); } return preview; }",
-     """function ensurePreview() { if (!preview) { preview = new Preview(document.getElementById('shopPrev')); } return preview; }
-let __warmJob = 0;
-function __warmShop() {
-  const job = ++__warmJob;
-  const items = [...Shop.OUTFITS, ...Shop.STAR_OUTFITS, ...Shop.UNIFORMS, ...Shop.STAR_UNIFORMS, ...Shop.PETS, ...Shop.STAR_PETS, ...Shop.DECOS, ...Shop.STAR_DECOS, ...Shop.MAPS];
-  let i = 0;
-  const idle = window.requestIdleCallback ? (f) => window.requestIdleCallback(f, { timeout: 400 }) : (f) => setTimeout(f, 60);
-  const step = () => {
-    if (job !== __warmJob) return;
-    const shop = document.getElementById('shop');
-    if (shop && !shop.classList.contains('hidden')) { setTimeout(() => idle(step), 500); return; }
-    if (mode !== 'home') { setTimeout(() => idle(step), 2000); return; }   // v5.9.4: never steal frames from a level   // never compete with the open shop
-    try {
-      const p = ensurePreview();
-      if (i === 0) { p.size(96, 96); p.key = ''; p.show({ kind: 'person', eq: data.shop.eq, character: data.character }); p.render(0); }
-      const it = items[i++]; if (it) p.thumb(it, data.character, data.shop.eq);
-    } catch (_) {}
-    if (i < items.length) setTimeout(() => idle(step), 250);
-  };
-  idle(step);
-}
-window.addEventListener('person-glb-ready', () => { if (preview) preview.thumbs = {}; setTimeout(__warmShop, 5000); });
-let __petWarm = 0;
-window.addEventListener('pet-glb-ready', () => { clearTimeout(__petWarm); __petWarm = setTimeout(() => { if (preview) for (const k in preview.thumbs) if (!k.includes(':')) delete preview.thumbs[k]; __warmShop(); }, 5000); });"""),
+# v5.9.7: loading screen with a progress bar + 开始游戏, shop thumbnails pre-rendered on their own renderer, shop grid fills lazily
+exec((here / 'loading.py.txt').read_text(encoding='utf-8'))
+
+# v5.9.7 人员精简: simple levels (one machine) keep farmhands + 1 机器专员 + 1 加工品搬运工 + 普通售货员 (carries raw) + 店员;
+# every level keeps one 加工品搬运工 per machine, and he rides the loader after the worker upgrade
+patch('js/sales.js', [
+    ("const out = L.foodLines ? splitFoodLevel(L) : splitSales0(L);", "const out = L.foodLines ? splitFoodLevel(L) : __slimStaff(splitSales0(L), CFG.levels.indexOf(L));"),
+])
+_sj = dst / 'js/sales.js'
+_sj.write_text(_sj.read_text(encoding='utf-8') + (here / 'slim_staff.js.txt').read_text(encoding='utf-8'), encoding='utf-8')
+patch('js/world.js', [
+    ("if (!w.cart && !w.loader && !w.porter && (!this.L.foodCollectionTables || !w.feedFor))", "if (!w.cart && !w.loader && (!this.L.foodCollectionTables || !w.feedFor))"),
 ])

@@ -1,0 +1,102 @@
+
+// v5.9.7 (APK) 人员精简 — 宝宝 2026-11-18: 简单关（只有一台加工机）人太乱。
+//   · 田间采收工 = 园丁：每块田一个采收工，原来的“雇园丁/原料搬运工”不再雇。
+//   · 只留一个机器专员、一个加工品搬运工（升级后开车，一次拿完一次放完）。
+//   · 普通售货员：收银 + 从原料木台搬到原料柜台。
+//   · 店员（加工品收银）保留。
+// 复杂关（两台以上机器）：只把加工品搬运工减到每台机器一个。
+function __slimStaff(L, idx = -1) {
+  if (!L || L.foodLines || !L.sale2) return L;
+  const procs = L.objects.filter((o) => o.type === 'proc');
+  if (!procs.length) return L;
+  const obj = Object.fromEntries(L.objects.map((o) => [o.id, o]));
+  const T = procs.filter((p) => obj[p.outTo] && obj[p.outTo].type === 'stand');
+  const removed = new Map();   // id -> its req (dependents inherit it)
+  const drop = (t) => { removed.set(t.id, { req: (t.req || []).slice(), reqAny: (t.reqAny || []).slice() }); };
+  // one 加工品搬运工 per finished-goods machine (any level)
+  const porters = L.tiles.filter((t) => t.effect.worker && t.effect.worker.porter);
+  const keepPor = new Set();
+  for (const p of T) { const t = porters.find((x) => x.effect.worker.tray === p.id && !keepPor.has(x)); if (t) keepPor.add(t); }
+  if (!keepPor.size && porters.length) keepPor.add(porters[0]);
+  for (const t of porters) if (!keepPor.has(t)) drop(t);
+  // 宝宝 2026-11-18: 30 关以后的大关也去掉重复岗位（园丁/原料搬运工 = 采收工；每台机器一个专员、一个搬运工，不要理货员）
+  const late = idx >= 29 || (idx < 0 && L.valley != null);
+  const simple = procs.length === 1 || late;
+  if (simple) {
+    for (const t of L.tiles) if (t.effect.worker && t.effect.worker.tally && keepPor.size) drop(t);
+    const sale = obj.PS;
+    const rawC = L.objects.filter((o) => o.type === 'counter' && o !== sale);
+    // keep exactly one machine specialist (the first feeder tile in purchase order)
+    const feeders = L.tiles.filter((t) => t.effect.worker && t.effect.worker.feeder && !removed.has(t.id));
+    const fed = new Set();
+    for (const t of feeders) { const f = t.effect.worker.feeder; if (fed.has(f)) drop(t); else { fed.add(f); t.label = '机器专员'; } }
+    // every raw carrier (the old 雇园丁 / 原料搬运工 field -> counter hires) goes; farmhands do the harvesting
+    for (const t of L.tiles) {
+      const w = t.effect.worker; if (!w || removed.has(t.id)) continue;
+      if (w.feeder || w.porter || w.standCarrier || (w.tally && !removed.has(t.id))) continue;
+      if (removed.has(t.id)) continue;
+      if (Object.keys(t.effect).some((k) => k !== 'worker')) { const e = { ...t.effect }; delete e.worker; t.effect = e; continue; }
+      drop(t);
+    }
+    // a raw board + one 田间采收工 per field for every crop the raw counter sells (some had none:
+    // they were only ever carried straight to the counter)
+    const stands = L.objects.filter((o) => o.type === 'stand');
+    const farm0 = L.tiles.find((t) => t.effect.worker && t.effect.worker.standCarrier);
+    const fPrice = farm0 ? farm0.price : 40;
+    const rawItems = [...new Set(rawC.flatMap((c) => c.items))];
+    const first = L.tiles[0];
+    const newFarm = [];
+    for (const item of rawItems) {
+      const src = L.objects.filter((o) => (o.type === 'field' || o.type === 'coop') && sourceObj(o) === item);
+      if (!src.length) continue;
+      let board = stands.find((s) => s.role === 'raw' && s.item === item);
+      if (!board) {
+        const x = Math.min(L.W - 90, Math.max(90, Math.max(...src.map((o) => o.x + o.w)) + 38));
+        const y = src.reduce((n, o) => n + o.y + o.h / 2, 0) / src.length;
+        const [sx, sy] = standSpot(L, stands, x, y, 120, 60);
+        board = saveStand(L, stands, { id: `R_${item}`, type: 'stand', role: 'raw', item, x: sx, y: sy, w: 120, h: 60, cap: 700 });
+        obj[board.id] = board;
+      }
+      src.forEach((s, k) => {
+        if (L.tiles.some((t) => t.effect.worker && t.effect.worker.standCarrier && t.effect.worker.from.includes(s.id))) return;
+        const gate = L.tiles.find((t) => t.effect.show && t.effect.show.includes(s.id));
+        const sp = spot(L, board.x - 10, board.y + 55 + k * 40);
+        const t = { id: `x_rf_${item}_${k + 1}`, x: sp[0], y: sp[1], price: fPrice, icon: s.type === 'coop' ? 'cart' : 'worker', label: '田间采收工',
+          req: [gate ? gate.id : first.id], effect: { worker: { from: [s.id], to: [board.id], standCarrier: true } } };
+        L.tiles.push(t); newFarm.push(t);
+      });
+    }
+    // 普通售货员 also stocks the raw counter from the raw boards
+    const rc = L.tiles.find((t) => t.id === 'x_rc');
+    if (rc) {
+      const boards = L.objects.filter((o) => o.type === 'stand' && o.role === 'raw' && rawItems.includes(o.item)).map((o) => o.id);
+      if (boards.length) rc.effect = { ...rc.effect, worker: { from: boards, to: rawC.map((c) => c.id), raw: true, clerk: true, fullBatch: true } };
+    }
+    // purchase order: new farmhands next to the others, the clerk right after the porter
+    const order = L.tiles.filter((t) => !newFarm.includes(t));
+    const lastFarm = order.map((t, i) => (t.effect.worker && t.effect.worker.standCarrier ? i : -1)).reduce((a, b) => Math.max(a, b), 0);
+    order.splice(lastFarm + 1, 0, ...newFarm);
+    if (rc) {
+      const i0 = order.indexOf(rc); order.splice(i0, 1);
+      const pi = order.findIndex((t) => keepPor.has(t));
+      order.splice(pi >= 0 ? pi + 1 : order.length, 0, rc);
+    }
+    L.tiles = order;
+  }
+  if (!removed.size) return L;
+  // a tile that waited on a removed hire waits on what that hire waited on
+  const resolve = (ids, seen = new Set()) => {
+    const out = [];
+    for (const id of ids || []) {
+      if (seen.has(id)) continue; seen.add(id);
+      if (removed.has(id)) out.push(...resolve(removed.get(id).req, seen)); else out.push(id);
+    }
+    return [...new Set(out)];
+  };
+  L.tiles = L.tiles.filter((t) => !removed.has(t.id));
+  for (const t of L.tiles) {
+    if (t.req) { const r = resolve(t.req); t.req = r.length ? r : undefined; }
+    if (t.reqAny) { const r = resolve(t.reqAny); t.reqAny = r.length ? r : undefined; }
+  }
+  return L;
+}

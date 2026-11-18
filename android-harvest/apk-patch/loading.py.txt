@@ -1,0 +1,74 @@
+# executed inside apply.py (patch / here / dst in scope)
+patch('js/preview3d.js', [
+    ("  thumb(item, character = this.character, eq = {}) {\n",
+     "  cachedThumb(item, character = this.character, eq = {}) {\n"
+     "    const cacheKey = (item.slot || item.uni) ? `${character || 'girl'}:${item.id}:${JSON.stringify(eq || {})}` : item.id;\n"
+     "    return this.thumbs[cacheKey] || '';\n"
+     "  }\n"
+     "  thumb(item, character = this.character, eq = {}) {\n"),
+])
+patch('js/main.js', [
+    # thumbnails render on their own small off-screen renderer, so they never tear down the big turntable
+    ("function ensurePreview() { if (!preview) { preview = new Preview(document.getElementById('shopPrev')); } return preview; }",
+     """function ensurePreview() { if (!preview) { preview = new Preview(document.getElementById('shopPrev')); } return preview; }
+let __tp = null;
+function ensureThumber() { if (!__tp) { const c = document.createElement('canvas'); c.width = c.height = 96; __tp = new Preview(c); __tp.size(96, 96); } return __tp; }
+function __clearThumbs() { if (preview) preview.thumbs = {}; if (__tp) __tp.thumbs = {}; }
+function __shopItems() { return [...Shop.OUTFITS, ...Shop.STAR_OUTFITS, ...Shop.UNIFORMS, ...Shop.STAR_UNIFORMS, ...Shop.PETS, ...Shop.STAR_PETS, ...Shop.DECOS, ...Shop.STAR_DECOS, ...Shop.MAPS]; }"""),
+    ("  thumb: (it) => { try { return ensurePreview().thumb(it, data.character, data.shop.eq); } catch (_) { return ''; } },",
+     "  thumb: (it) => { try { return ensureThumber().thumb(it, data.character, data.shop.eq); } catch (_) { return ''; } },\n"
+     "  thumbCached: (it) => { try { return ensureThumber().cachedThumb(it, data.character, data.shop.eq); } catch (_) { return ''; } },"),
+    ("if (preview) preview.thumbs = {}; if (mode === 'home') ui.renderHome(data); },", "__clearThumbs(); if (mode === 'home') ui.renderHome(data); },"),
+    ("if (!preview) return; preview.thumbs = {};", "__clearThumbs();"),
+    ("applyLook();\n\ninput.onFirst",
+     """applyLook();
+{ // v5.9.7 loading screen: progress bar while the person + pet models load and every shop thumbnail is drawn, then 开始游戏
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#BFE6A0;color:#3E6B22;font:900 26px sans-serif;transition:opacity .4s';
+  ov.innerHTML = '<div>半亩·丰收</div><div id="ldTxt" style="margin-top:16px;font-size:15px">正在准备农场…</div>'
+    + '<div style="margin-top:12px;width:66vw;max-width:340px;height:14px;border-radius:7px;background:#fff8;overflow:hidden;box-shadow:inset 0 1px 3px #0002"><div id="ldBar" style="height:100%;width:0;border-radius:7px;background:linear-gradient(#FFD45A,#F2A62B);transition:width .25s"></div></div>'
+    + '<div id="ldPct" style="margin-top:6px;font-size:13px">0%</div>'
+    + '<button id="ldGo" style="visibility:hidden;margin-top:22px;padding:12px 44px;border:0;border-radius:24px;background:#F2A62B;color:#fff;font:900 20px sans-serif;box-shadow:0 4px 0 #C47D12">开始游戏</button>';
+  document.body.appendChild(ov);
+  const bar = ov.querySelector('#ldBar'), pct = ov.querySelector('#ldPct'), txt = ov.querySelector('#ldTxt'), go = ov.querySelector('#ldGo');
+  const need = new Set(['person', 'tortie', 'orange', 'shiba', 'rabbit', 'penguin']), MODELS = need.size;
+  let items = [], i = 0, started = false, finished = false;
+  const show = () => {
+    const f = (MODELS - need.size) / MODELS * 0.45 + (items.length ? i / items.length : 0) * 0.55;
+    bar.style.width = Math.round(f * 100) + '%'; pct.textContent = Math.round(f * 100) + '%';
+  };
+  const finish = () => {
+    if (finished) return; finished = true;
+    bar.style.width = '100%'; pct.textContent = '100%'; txt.textContent = '准备好了！'; go.style.visibility = 'visible';
+  };
+  go.onclick = () => { try { snd.unlock(); snd.play('tap'); } catch (_) {} ov.style.opacity = '0'; setTimeout(() => ov.remove(), 450); };
+  const step = () => {
+    if (finished) return;
+    if (i >= items.length) { finish(); return; }
+    try { ensureThumber().thumb(items[i], data.character, data.shop.eq); } catch (_) {}
+    i++; show(); setTimeout(step, 0);
+  };
+  const startThumbs = () => {
+    if (started) return; started = true; txt.textContent = '正在准备商店…';
+    items = __shopItems(); i = 0; setTimeout(step, 30);
+  };
+  const tick = (k) => { need.delete(k); show(); if (!need.size) startThumbs(); };
+  window.addEventListener('person-glb-ready', () => tick('person'));
+  window.addEventListener('pet-glb-ready', (e) => tick(e.detail));
+  setTimeout(() => { if (!started) { need.clear(); startThumbs(); } }, 12000);
+  setTimeout(finish, 60000);
+}
+
+input.onFirst"""),
+])
+# the shop grid shows the thumbnails it already has at once and draws any missing ones a few at a time,
+# so switching tabs never freezes on a burst of 3D renders
+patch('js/ui.js', [
+    ("<img alt=\"\" src=\"${this.h.thumb(it) || ''}\">",
+     "<img alt=\"\" data-th=\"${it.id}\" src=\"${(this.h.thumbCached ? this.h.thumbCached(it) : this.h.thumb(it)) || ''}\">"),
+    ("    const it = itemById(this.shopSel), own = it.map ? mapOwned(d, it.map) : d.shop.owned.includes(it.id), on = isOn(d, it.id), a = $('shopAct');",
+     "    { const job = this.__thJob = (this.__thJob || 0) + 1, pend = [...g.querySelectorAll('img[data-th]')].filter((im) => !im.getAttribute('src'));\n"
+     "      const fill = () => { if (job !== this.__thJob) return; const im = pend.shift(); if (!im) return; const x = itemById(im.dataset.th); if (x) { try { im.src = this.h.thumb(x) || ''; } catch (_) {} } setTimeout(fill, 16); };\n"
+     "      if (pend.length) setTimeout(fill, 60); }\n"
+     "    const it = itemById(this.shopSel), own = it.map ? mapOwned(d, it.map) : d.shop.owned.includes(it.id), on = isOn(d, it.id), a = $('shopAct');"),
+])
