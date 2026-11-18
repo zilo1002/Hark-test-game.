@@ -25,7 +25,7 @@ function __shopItems() { return [...Shop.OUTFITS, ...Shop.STAR_OUTFITS, ...Shop.
 { // v5.9.7 loading screen: progress bar while the person + pet models load and every shop thumbnail is drawn, then 开始游戏
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#BFE6A0;color:#3E6B22;font:900 26px sans-serif;transition:opacity .4s';
-  ov.innerHTML = '<div>半亩·丰收</div><div id="ldTxt" style="margin-top:16px;font-size:15px">正在准备农场…</div>'
+  ov.innerHTML = '<div>半亩·丰收</div><div id="ldTxt" style="margin-top:16px;font-size:15px">加载数据中…</div>'
     + '<div style="margin-top:12px;width:66vw;max-width:340px;height:14px;border-radius:7px;background:#fff8;overflow:hidden;box-shadow:inset 0 1px 3px #0002"><div id="ldBar" style="height:100%;width:0;border-radius:7px;background:linear-gradient(#FFD45A,#F2A62B);transition:width .25s"></div></div>'
     + '<div id="ldPct" style="margin-top:6px;font-size:13px">0%</div>'
     + '<button id="ldGo" style="visibility:hidden;margin-top:22px;padding:12px 44px;border:0;border-radius:24px;background:#F2A62B;color:#fff;font:900 20px sans-serif;box-shadow:0 4px 0 #C47D12">开始游戏</button>';
@@ -49,7 +49,7 @@ function __shopItems() { return [...Shop.OUTFITS, ...Shop.STAR_OUTFITS, ...Shop.
     i++; show(); setTimeout(step, 0);
   };
   const startThumbs = () => {
-    if (started) return; started = true; txt.textContent = '正在准备商店…';
+    if (started) return; started = true; txt.textContent = '加载数据中…';
     items = __shopItems(); i = 0; setTimeout(step, 30);
   };
   const tick = (k) => { need.delete(k); show(); if (!need.size) startThumbs(); };

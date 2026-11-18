@@ -156,3 +156,14 @@ _sj.write_text(_sj.read_text(encoding='utf-8') + (here / 'slim_staff.js.txt').re
 patch('js/world.js', [
     ("if (!w.cart && !w.loader && !w.porter && (!this.L.foodCollectionTables || !w.feedFor))", "if (!w.cart && !w.loader && (!this.L.foodCollectionTables || !w.feedFor))"),
 ])
+
+# v5.9.8 (宝宝 2026-11-19): the walking 普通售货员 replaces the frozen desk figure at the raw counter —
+# no extra cashier standing by the processed-goods counter "像反应不过来一样". Money still goes straight in.
+patch('js/world.js', [
+    ("      if (e.worker.clerk) { w.clerk = true; this.refreshStats(); }",
+     "      if (e.worker.clerk) { w.clerk = true; this.refreshStats(); for (const id of (e.worker.to || [])) if (this.objs[id]) this.objs[id].walkClerk = true; }"),
+])
+patch('js/render3d.js', [
+    ("      if (c.cashier && !o.cashier) { o.cashier = M.makePerson(",
+     "      if (c.walkClerk && o.cashier) { this.levelRoot.remove(o.cashier.root); o.cashier = null; o.noDesk = true; }\n      if (c.cashier && !c.walkClerk && !o.cashier) { o.cashier = M.makePerson("),
+])
