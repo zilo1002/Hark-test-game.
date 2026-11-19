@@ -170,4 +170,50 @@ patch('js/render3d.js', [
 patch('js/models.js', [("    body.add(owl.root);\n  }", "    body.add(owl.root); root.userData.owl = owl.root;\n  }")])
 patch('js/ui.js', [("'已停在农夫肩头'", "'站在农夫头顶'"), ("'带上后会停在农夫肩头'", "'带上后会站在农夫头顶（帽子上）'")])
 patch('js/shop.js', [("name: '白绒肩头猫头鹰'", "name: '白绒头顶猫头鹰'")])
+
+# ---- v6.1.0 椰风海岛 (宝宝 2026-11-19): new estate map + levels 76–90 with tropical fruit, seafood, palms ----
+ISL = Path(__file__).parent / 'island'
+patch('js/config.js', [
+    ("export const isValley = (li) =>", (ISL / 'config.js.txt').read_text(encoding='utf-8') + "export const isValley = (li) =>"),
+    ("  { id: 'night', name: '夜市', from: 60, size: 15 },", "  { id: 'night', name: '夜市', from: 60, size: 15 },\n  { id: 'island', name: '椰风海岛', from: 75, size: 15 },"),
+])
+patch('js/sales.js', [("  28: ['rainboots', 'fishballs'], 29: ['rainboots', 'fishballs', 'xiaolongbao'],\n",
+    "  28: ['rainboots', 'fishballs'], 29: ['rainboots', 'fishballs', 'xiaolongbao'],\n"
+    "  // v6.1.0 椰风海岛 76–90\n  30: ['mangopuree'], 31: ['spicycray'], 32: ['canpine'], 33: ['garlicscallop'], 34: ['mangocrepe'], 35: ['dragonjuice', 'kelpknot'],\n"
+    "  36: ['coconutmilk', 'spicycray'], 37: ['coconutjelly'], 38: ['spicycray', 'garlicscallop', 'kelpknot'], 39: ['mangopuree', 'canpine', 'dragonjuice'],\n"
+    "  40: ['spicycray', 'garlicscallop'], 41: ['coconutjelly', 'mangopuree'], 42: ['garlicscallop', 'dragonjuice', 'canpine'], 43: ['mangocrepe', 'spicycray'],\n"
+    "  44: ['coconutmilk', 'spicycray', 'mangopuree'],\n")])
+p = dst / 'js/models.js'; p.write_text(p.read_text(encoding='utf-8') + (ISL / 'models.js.txt').read_text(encoding='utf-8'), encoding='utf-8')
+p = dst / 'js/sprites.js'; p.write_text(p.read_text(encoding='utf-8') + (ISL / 'sprites.js.txt').read_text(encoding='utf-8'), encoding='utf-8')
+SEA = "['fish', 'crayfish', 'scallop', 'kelp'].includes(f.item)"
+patch('js/render3d.js', [
+    ("      const water = f.item === 'fish';", "      const water = " + SEA + ";"),
+    ("fish: f.hidden ? '#8FBFD8' : '#3FA8E0', grape: '#9A7A4A', tomato: '#8A5A30', pepper: '#8A5A30' }[f.item];",
+     "fish: f.hidden ? '#8FBFD8' : '#3FA8E0', grape: '#9A7A4A', tomato: '#8A5A30', pepper: '#8A5A30', crayfish: f.hidden ? '#8FBFD8' : '#3FA8E0', scallop: f.hidden ? '#8FBFD8' : '#3FA8E0', kelp: f.hidden ? '#8FBFD8' : '#3FA8E0', mango: '#4F8A26', pineapple: '#B8935A', dragonfruit: '#A07A4A', coconut: '#E8D29A' }[f.item];"),
+    ("fish: '#B9B2A4', grape: '#76562A', tomato: '#6A4422', pepper: '#6A4422' }[f.item];",
+     "fish: '#B9B2A4', grape: '#76562A', tomato: '#6A4422', pepper: '#6A4422', crayfish: '#B9B2A4', scallop: '#B9B2A4', kelp: '#B9B2A4', mango: '#3A6E1C', pineapple: '#8E6A34', dragonfruit: '#76562A', coconut: '#C9AE72' }[f.item];"),
+    ("      if (f.item === 'fish') {   // pond: a stone bank", "      if (" + SEA + ") {   // pond: a stone bank"),
+    ("    this.lawn = L ? L[0] : COL.lawn; this.lawn2 = L ? L[1] : COL.lawn2;",
+     "    this.lawn = L ? L[0] : COL.lawn; this.lawn2 = L ? L[1] : COL.lawn2;\n    this.beach = !!(w.deco && w.deco.beach); if (this.beach) { this.lawn = '#A2DA6A'; this.lawn2 = '#48B6E4'; }   // v6.1.0 椰风海岛: the sea round the island"),
+    ("    g.fillStyle = this.lawn || COL.lawn; g.fillRect(0, 0, w.W, w.H);",
+     "    if (this.beach) {   // v6.1.0: a sand beach with a foam line between the island and the sea\n"
+     "      g.fillStyle = '#F2DDA4'; g.beginPath(); g.roundRect(-96, -96, w.W + 192, w.H + 192, 60); g.fill();\n"
+     "      g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 5; g.beginPath(); g.roundRect(-100, -100, w.W + 200, w.H + 200, 64); g.stroke();\n"
+     "      for (let i = 0; i < 70; i++) { g.fillStyle = ['#FFFFFF', '#F8C8B0', '#E8B880'][i % 3]; g.beginPath(); g.ellipse(-80 + R(i + 4400) * (w.W + 160), i % 2 ? -50 + R(i + 4500) * 30 : w.H + 20 + R(i + 4500) * 30, 2.4, 1.6, R(i) * 3, 0, TAU); g.fill(); }\n"
+     "    }\n    g.fillStyle = this.lawn || COL.lawn; g.fillRect(0, 0, w.W, w.H);"),
+])
+patch('js/shop.js', [("  { id: 'mapNight',  name: '夜市地图', starPrice: 20, map: 'night',  unlockAfter: 60, icon: '🏮', thumb: 'lanterns', desc: '夜色庄园，灯笼与摊位' },",
+    "  { id: 'mapNight',  name: '夜市地图', starPrice: 20, map: 'night',  unlockAfter: 60, icon: '🏮', thumb: 'lanterns', desc: '夜色庄园，灯笼与摊位' },\n"
+    "  { id: 'mapIsland', name: '海岛地图', starPrice: 25, map: 'island', unlockAfter: 75, icon: '🏝️', thumb: 'pond', desc: '椰林沙滩，碧蓝海湾' },")])
+patch('js/main.js', [("night: homeNight, build:", "night: homeNight, island: hm.mode === 'map' && hm.map === 'island', build:")])
+patch('js/home.js', [
+    ("let HNIGHT = false;", "let HNIGHT = false;\n" + (ISL / 'home.js.txt').read_text(encoding='utf-8')),
+    ("HSEASON, HNIGHT, page].join('|');", "HSEASON, HNIGHT, HISLAND, page].join('|');"),
+    ("C = HNIGHT ? NIGHT_GROUND : (SEASON_GROUND", "C = HNIGHT ? NIGHT_GROUND : HISLAND ? ISLAND_GROUND : (SEASON_GROUND"),
+    ("    if (inPlot(fx + fw / 2, fy + fh / 2, 150) || hsh(k) < 0.58) continue;", "    if (HISLAND || inPlot(fx + fw / 2, fy + fh / 2, 150) || hsh(k) < 0.58) continue;"),
+    ("    if (inPlot(x, y, -6)) continue;\n", "    if (inPlot(x, y, -6) || (HISLAND && (i % 3 || y < ISEA_Y + 20))) continue;\n"),
+    ("  // the lane out of the gate, down off the screen\n", "  if (HISLAND) islandSea(g, x0, x1, y0);\n  // the lane out of the gate, down off the screen\n"),
+    ("if (p) pine(g, 1.1); else roundTree(g, 0, false);", "if (HISLAND) { if (y > ISEA_Y + 24) palm2d(g, x); } else if (p) pine(g, 1.1); else roundTree(g, 0, false);"),
+    ("  HNIGHT = !!save.night;", "  HNIGHT = !!save.night; HISLAND = !!save.island && !HNIGHT;"),
+])
 print('apk-patch applied')

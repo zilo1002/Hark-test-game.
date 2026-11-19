@@ -1,0 +1,30 @@
+// v6.1.0 海岛地图: sand instead of meadow, a blue bay along the top, palms instead of woods. Look only.
+let HISLAND = false;
+const ISLAND_GROUND = ['#F2DDA4', '#E9D093', '#9FDA62', '#8CD150', '#C9A060', '#FFB02E'];
+const ISEA_Y = 34;   // design-space y where the bay's beach line runs (just above the plot)
+function islandSea(g, x0, x1, y0) {
+  const gr = g.createLinearGradient(0, y0, 0, ISEA_Y);
+  gr.addColorStop(0, '#2C9AD8'); gr.addColorStop(1, '#6FD2F0');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y0); g.lineTo(x1, ISEA_Y);
+  for (let x = x1; x >= x0; x -= 24) g.quadraticCurveTo(x - 6, ISEA_Y + 7, x - 12, ISEA_Y + 2);
+  g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 3; g.beginPath(); g.moveTo(x1, ISEA_Y);
+  for (let x = x1; x >= x0; x -= 24) g.quadraticCurveTo(x - 6, ISEA_Y + 7, x - 12, ISEA_Y + 2);
+  g.stroke();
+  for (let i = 0; i < 46; i++) {   // little wave caps
+    const x = x0 + hsh(i + 3100) * (x1 - x0), y = y0 + hsh(i + 3200) * (ISEA_Y - y0 - 12);
+    g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 1.6; g.beginPath(); g.arc(x, y, 5, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
+  }
+  // a little sailboat out in the bay
+  const bx = 330, by = ISEA_Y - 34;
+  g.fillStyle = '#A0622D'; g.beginPath(); g.moveTo(bx - 16, by); g.lineTo(bx + 16, by); g.lineTo(bx + 10, by + 7); g.lineTo(bx - 10, by + 7); g.closePath(); g.fill();
+  g.fillStyle = '#FFFFFF'; g.beginPath(); g.moveTo(bx, by - 2); g.lineTo(bx, by - 30); g.lineTo(bx + 14, by - 4); g.closePath(); g.fill();
+  g.fillStyle = '#FF8A3D'; g.beginPath(); g.moveTo(bx - 2, by - 2); g.lineTo(bx - 2, by - 24); g.lineTo(bx - 12, by - 4); g.closePath(); g.fill();
+}
+function palm2d(g, seed) {
+  const lean = (hsh(seed) - 0.5) * 10;
+  g.strokeStyle = '#8E5E2E'; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(lean * 0.4, -18, lean, -36); g.stroke();
+  g.strokeStyle = 'rgba(60,35,15,0.35)'; g.lineWidth = 1; for (let k = 1; k < 6; k++) { const y = -k * 6; g.beginPath(); g.moveTo(-2.4 + lean * k / 14, y); g.lineTo(2.4 + lean * k / 14, y); g.stroke(); }
+  for (let i = 0; i < 7; i++) { const a = -Math.PI / 2 + (i - 3) * 0.55; g.save(); g.translate(lean, -36); g.rotate(a); g.fillStyle = i % 2 ? '#3E9B2A' : '#5DBB3A'; g.beginPath(); g.ellipse(14, 2, 15, 3.6, 0.25, 0, TAU); g.fill(); g.restore(); }
+  g.fillStyle = '#7A4A22'; for (const [dx, dy] of [[-2.6, -33], [2.4, -33.6], [0, -31]]) { g.beginPath(); g.arc(lean + dx, dy, 2.6, 0, TAU); g.fill(); }
+}

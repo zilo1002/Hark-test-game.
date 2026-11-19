@@ -1,0 +1,82 @@
+// ---- v6.1.0 椰风海岛 (宝宝 2026-11-19): levels 76–90, a sixth area with tropical fruit, seafood, palms and
+// second-stage desserts. Built as valley food specs like the night market (68–75), daytime by the sea.
+Object.assign(CFG.items, {
+  mango:       { name: '芒果',     unit: '个', price: 4, step: 4.6 },
+  pineapple:   { name: '菠萝',     unit: '个', price: 5, step: 6.0 },
+  dragonfruit: { name: '火龙果',   unit: '个', price: 5, step: 5.4 },
+  coconut:     { name: '椰子',     unit: '个', price: 5, step: 6.0 },
+  crayfish:    { name: '小龙虾',   unit: '只', price: 4, step: 3.8 },
+  scallop:     { name: '扇贝',     unit: '个', price: 4, step: 3.4 },
+  kelp:        { name: '海带',     unit: '片', price: 3, step: 3.6 },
+  mangopuree:  { name: '芒果冰沙', unit: '杯', price: 20, step: 8.5 },
+  mangocrepe:  { name: '芒果班戟', unit: '份', price: 52, step: 5.0 },
+  canpine:     { name: '菠萝罐头', unit: '罐', price: 30, step: 7.0 },
+  dragonjuice: { name: '火龙果汁', unit: '瓶', price: 30, step: 8.5 },
+  spicycray:   { name: '麻辣小龙虾', unit: '盆', price: 34, step: 6.0 },
+  garlicscallop: { name: '蒜蓉扇贝', unit: '盘', price: 32, step: 4.0 },
+  kelpknot:    { name: '凉拌海带结', unit: '碗', price: 26, step: 5.6 },
+  coconutmilk: { name: '椰奶',     unit: '瓶', price: 20, step: 8.5 },
+  coconutjelly:{ name: '椰子冻',   unit: '份', price: 54, step: 5.0 },
+});
+Object.assign(CFG.crops, {
+  mango: { grow: 9.0 }, pineapple: { grow: 10.0 }, dragonfruit: { grow: 9.5 }, coconut: { grow: 11.0, yield: 2 },
+  crayfish: { grow: 8.0 }, scallop: { grow: 8.0 }, kelp: { grow: 7.0 },
+});
+Object.assign(PLOT, { mango: '种芒果园', pineapple: '种菠萝田', dragonfruit: '种火龙果', coconut: '种椰林', crayfish: '挖小龙虾塘', scallop: '开扇贝滩', kelp: '养海带' });
+Object.assign(HIRE, { coconut: ['gardener', '摘椰工'], crayfish: ['gardener', '捞虾工'], scallop: ['gardener', '赶海工'], kelp: ['gardener', '收海带工'] });
+Object.assign(MACH, { mangopuree: '芒果冰沙机', mangocrepe: '班戟铺', canpine: '罐头机', dragonjuice: '火龙果榨汁机', spicycray: '麻辣锅', garlicscallop: '蒜蓉烤炉', kelpknot: '海带结凉拌台', coconutmilk: '椰奶机', coconutjelly: '椰冻工坊' });
+{
+  const LN = { mango: ['mango', 12, 'mangopuree', 5], pine: ['pineapple', 13, 'canpine', 4], dragon: ['dragonfruit', 12, 'dragonjuice', 4],
+    coco: ['coconut', 22, 'coconutmilk', 4], cray: ['crayfish', 14, 'spicycray', 5], scal: ['scallop', 12, 'garlicscallop', 5], kelp: ['kelp', 11, 'kelpknot', 5] };
+  const ln = (k) => { const [crop, gap, out, ratio] = LN[k]; return { crop, gap, out, ratio }; };
+  const deco = (W, H) => ({ theme: 'farm', beach: true, paths: [[340, 300, Math.round(W * 0.5), 90]], trees: [[W - 60, H - 60, 'palm'], [W - 50, 50, 'palm'], [W * 0.5, 40, 'palm'], [40, H - 30, 'palm']], bushes: [[540, 50], [W - 260, 60]] });
+  const head = (name, mul, W, H, par, bill, porters) => ({ name, foodMarketMultiplier: mul, W, H, start: [W / 2, H / 2], par, bill, ...(porters ? { extraPorters: porters } : {}), customer: { processed: { buyMin: 2, buyMax: porters ? 8 : 6 } } });
+  // one line, two plots (the 雨靴作坊 shape)
+  const one = (name, k, n, p, cap) => ({ ...head(name, 2.15, 1120, 900, 560, 50), foodLines: { A: ln(k) }, goal: { type: 'earn', n: [n, n, n, n] },
+    objects: [{ id: 'F1', type: 'field', crop: 'A', x: 45, y: 80, w: 300, h: 310 }, { id: 'F2', type: 'field', crop: 'A', x: 45, y: 500, w: 300, h: 310, hidden: true }, { id: 'M1', type: 'proc', in: 'A', time: 0.55, x: 680, y: 220, outTo: 'C1' }, { id: 'C1', type: 'counter', items: ['A'], x: 850, y: 520 }],
+    tiles: [{ id: 'a', x: 470, y: 450, price: p, icon: 'cap', label: cap, effect: { up: { key: 'cap', v: 70 } } }, { id: 'b', x: 430, y: 220, price: Math.round(p * 1.9), icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } }, { id: 'c', x: 1040, y: 360, price: Math.round(p * 2.9), icon: 'cashier', label: '海岛店员', req: ['b'], effect: { cashier: ['C1'] } }, { id: 'd', x: 570, y: 660, price: Math.round(p * 3.1), icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } }, { id: 'e', x: 430, y: 680, price: Math.round(p * 2.1), icon: '$plot', ln: 'A', req: ['a'], effect: { show: ['F2'] } }],
+    deco: deco(1120, 900) });
+  // two lines (the 果香雨具集市 shape)
+  const two = (name, a, b, n, p) => ({ ...head(name, 2.15, 1180, 960, 580, 55, 2), foodLines: { A: ln(a), B: ln(b) }, goal: { type: 'earn', n: [n, n, n, n] },
+    objects: [{ id: 'F1', type: 'field', crop: 'A', x: 35, y: 60, w: 280, h: 250 }, { id: 'F2', type: 'field', crop: 'B', x: 35, y: 370, w: 280, h: 250, hidden: true }, { id: 'M1', type: 'proc', in: 'A', time: 0.55, x: 680, y: 170, outTo: 'C1' }, { id: 'M2', type: 'proc', in: 'B', time: 0.55, x: 680, y: 560, outTo: 'C1', hidden: true }, { id: 'C1', type: 'counter', items: ['A', 'B'], x: 900, y: 430 }],
+    tiles: [{ id: 'a', x: 470, y: 450, price: p, icon: 'cap', label: '海岛大背篓', effect: { up: { key: 'cap', v: 75 } } }, { id: 'b', x: 430, y: 160, price: Math.round(p * 1.85), icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } }, { id: 'c', x: 420, y: 400, price: Math.round(p * 1.55), icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } }, { id: 'd', x: 430, y: 560, price: Math.round(p * 1.85), icon: '$mach', ln: 'B', req: ['c'], effect: { show: ['M2'] } }, { id: 'e', x: 1040, y: 360, price: Math.round(p * 2.8), icon: 'cashier', label: '海岛店员', req: ['b'], effect: { cashier: ['C1'] } }, { id: 'f', x: 650, y: 780, price: Math.round(p * 3.2), icon: 'loader', label: '运货员换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } }],
+    deco: deco(1180, 960) });
+  // three lines + an extra plot of line `x` (the 橡胶与鱼丸大集 shape)
+  const three = (name, a, b, c, x, n, p) => ({ ...head(name, 2.15, 1280, 1040, 630, 70, 3), foodLines: { A: ln(a), B: ln(b), C: ln(c) }, goal: { type: 'earn', n: [n, n, n, n] },
+    objects: [{ id: 'F1', type: 'field', crop: 'A', x: 30, y: 35, w: 260, h: 210 }, { id: 'F2', type: 'field', crop: 'B', x: 30, y: 285, w: 260, h: 210, hidden: true }, { id: 'F3', type: 'field', crop: 'C', x: 30, y: 535, w: 260, h: 210, hidden: true }, { id: 'F4', type: 'field', crop: x, x: 350, y: 760, w: 260, h: 210, hidden: true }, { id: 'M1', type: 'proc', in: 'A', time: 0.55, x: 730, y: 105, outTo: 'C1' }, { id: 'M2', type: 'proc', in: 'B', time: 0.55, x: 730, y: 400, outTo: 'C1', hidden: true }, { id: 'M3', type: 'proc', in: 'C', time: 0.55, x: 730, y: 700, outTo: 'C1', hidden: true }, { id: 'C1', type: 'counter', items: ['A', 'B', 'C'], x: 950, y: 450 }],
+    tiles: [{ id: 'a', x: 500, y: 500, price: p, icon: 'cap', label: '海岛大货篮', effect: { up: { key: 'cap', v: 85 } } }, { id: 'b', x: 430, y: 100, price: Math.round(p * 1.8), icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } }, { id: 'c', x: 420, y: 300, price: Math.round(p * 1.45), icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } }, { id: 'd', x: 420, y: 550, price: Math.round(p * 1.45), icon: '$plot', ln: 'C', req: ['c'], effect: { show: ['F3'] } }, { id: 'e', x: 560, y: 400, price: Math.round(p * 1.75), icon: '$mach', ln: 'B', req: ['c'], effect: { show: ['M2'] } }, { id: 'f', x: 560, y: 700, price: Math.round(p * 1.75), icon: '$mach', ln: 'C', req: ['d'], effect: { show: ['M3'] } }, { id: 'g', x: 1110, y: 330, price: Math.round(p * 2.9), icon: 'cashier', label: '海岛掌柜', req: ['b'], effect: { cashier: ['C1'] } }, { id: 'h', x: 700, y: 880, price: Math.round(p * 3), icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } }, { id: 'i', x: 650, y: 820, price: Math.round(p * 1.7), icon: '$plot', ln: x, req: ['f'], effect: { show: ['F4'] } }],
+    deco: deco(1280, 1040) });
+  // a two-stage chain (the 葡萄酒夜市 shape): raw → first good → dessert; optional second line B
+  const chain = (name, a, out2, ico2, lab2, n, p, b) => {
+    const L = { ...head(name, 2.25, 1180, 960, 580, 55, b ? 2 : 0), foodLines: b ? { A: ln(a), B: ln(b) } : { A: ln(a) }, goal: { type: 'earn', n: [n, n, n, n] },
+      objects: [{ id: 'F1', type: 'field', crop: 'A', x: 40, y: 40, w: 300, h: 300 }, { id: 'M1', type: 'proc', in: 'A', time: 0.3, x: 640, y: 160, outTo: 'M2' }, { id: 'M2', type: 'proc', in: 'A+', out: out2, ratio: 2, time: 0.4, x: 760, y: 330, outTo: 'C1' }, { id: 'C1', type: 'counter', items: b ? ['A', 'B'] : ['A'], x: 720, y: 520 }],
+      tiles: [{ id: 'a', x: 500, y: 480, price: p, icon: 'cap', label: '海岛果篮', effect: { up: { key: 'cap', v: 75 } } }, { id: 'b', x: 430, y: 130, price: Math.round(p * 1.85), icon: '$mach', ln: 'A', req: ['a'], effect: { show: ['M1'] } }, { id: 'c', x: 640, y: 260, price: Math.round(p * 2), icon: ico2, label: lab2, req: ['b'], effect: { show: ['M2'] } }, { id: 'g', x: 1090, y: 380, price: Math.round(p * 2.85), icon: 'cashier', label: '甜品店员', req: ['b'], effect: { cashier: ['C1'] } }, { id: 'h', x: 590, y: 520, price: Math.round(p * 3), icon: 'loader', label: '园丁换铲车', req: ['b'], effect: { upgradeWorkers: 'loader' } }],
+      deco: deco(1180, 960) };
+    if (b) {
+      L.objects.splice(1, 0, { id: 'F2', type: 'field', crop: 'B', x: 40, y: 420, w: 300, h: 300, hidden: true });
+      L.objects.push({ id: 'M3', type: 'proc', in: 'B', time: 0.55, x: 640, y: 760, outTo: 'C1', hidden: true });
+      L.tiles.push({ id: 'd', x: 430, y: 560, price: Math.round(p * 1.6), icon: '$plot', ln: 'B', req: ['a'], effect: { show: ['F2'] } }, { id: 'e', x: 520, y: 760, price: Math.round(p * 1.85), icon: '$mach', ln: 'B', req: ['d'], effect: { show: ['M3'] } });
+    }
+    return L;
+  };
+  VL.specs.push(
+    one('芒果小园', 'mango', 65000, 125, '大果篮'),                                         // 76
+    one('小龙虾塘', 'cray', 86000, 130, '大虾篓'),                                          // 77
+    one('菠萝罐头厂', 'pine', 92000, 135, '菠萝筐'),                                        // 78
+    one('蒜蓉扇贝滩', 'scal', 94000, 140, '赶海篓'),                                        // 79
+    chain('芒果班戟铺', 'mango', 'mangocrepe', 'mangocrepe', '班戟铺', 89000, 165),        // 80
+    two('火龙果凉拌铺', 'dragon', 'kelp', 103000, 150),                                     // 81
+    two('椰林虾摊', 'coco', 'cray', 106000, 155),                                           // 82
+    chain('椰子冻工坊', 'coco', 'coconutjelly', 'coconutjelly', '椰冻工坊', 91000, 175),   // 83
+    three('海岛夜宵摊', 'cray', 'scal', 'kelp', 'A', 123000, 175),                         // 84
+    three('热带果汁集', 'mango', 'pine', 'dragon', 'B', 137000, 180),                      // 85
+    two('渔港大排档', 'cray', 'scal', 137000, 170),                                        // 86
+    chain('椰风甜品屋', 'coco', 'coconutjelly', 'coconutjelly', '椰冻工坊', 136000, 185, 'mango'),   // 87
+    three('赶海丰收市集', 'scal', 'dragon', 'pine', 'A', 154000, 190),                     // 88
+    chain('芒果甜品码头', 'mango', 'mangocrepe', 'mangocrepe', '班戟铺', 165000, 195, 'cray'),        // 89
+    three('椰风海岛大庄园', 'coco', 'cray', 'mango', 'B', 169000, 200),                    // 90
+  );
+  // par (3-star time) = the sharp bot × 1.6 (the night market's pars sit 1.5–2.3× its sharp-bot time) (sim on 2026-11-19)
+  const PAR = [450, 410, 430, 450, 540, 480, 510, 650, 610, 620, 540, 640, 670, 650, 770];
+  PAR.forEach((p, i) => { VL.specs[VL.specs.length - 15 + i].par = p; });
+}
