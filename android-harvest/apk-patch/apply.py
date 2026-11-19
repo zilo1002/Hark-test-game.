@@ -378,4 +378,18 @@ patch('js/models.js', [
     ("import { attachPersonModel } from './person-glb.js';", "import { attachPersonModel } from './person-glb.js';\nimport { attachHeroModel } from './hero-glb.js';"),
     ("  if (o.glbSkin) attachPersonModel(__pp, o.glbSkin);", "  if (o.glbSkin === 'hero' && attachHeroModel(__pp)) {}\n  else if (o.glbSkin) attachPersonModel(__pp, o.glbSkin);"),
 ])
+# ---- v6.1.7 (宝宝 2026-11-19 22:12): the original farm owner (the cat-ear chibi maid) comes back as a third look, Q版.
+# The shop switch cycles 女孩 → 男孩 → Q版 → 女孩; the Q版 owner wears the maid model in its original colours.
+patch('js/shop.js', [("export const CHARACTER_IDS = ['girl', 'boy', 'boy_sage', 'boy_navy'];",
+                      "export const CHARACTER_IDS = ['girl', 'boy', 'boy_sage', 'boy_navy', 'q'];")])
+patch('js/ui.js', [
+    ("const next = isBoyCharacter(d.character) ? 'girl' : 'boy';",
+     "const next = isBoyCharacter(d.character) ? 'q' : d.character === 'q' ? 'girl' : 'boy';"),
+    ("    characterSwitch.textContent = isBoyCharacter(d.character) ? '切换为女孩' : '切换为男孩';\n    characterSwitch.setAttribute('aria-label', `当前${isBoyCharacter(d.character) ? '男孩' : '女孩'}，点击切换为${isBoyCharacter(d.character) ? '女孩' : '男孩'}`);",
+     "    { const cur = isBoyCharacter(d.character) ? '男孩' : d.character === 'q' ? 'Q版' : '女孩', nx = cur === '男孩' ? 'Q版' : cur === 'Q版' ? '女孩' : '男孩';\n      characterSwitch.textContent = '切换为' + nx; characterSwitch.setAttribute('aria-label', `当前${cur}，点击切换为${nx}`); }"),
+])
+patch('js/models.js', [
+    ("  if (o.glbSkin === 'hero' && attachHeroModel(__pp)) {}",
+     "  if (o.glbSkin === 'hero' && o.character === 'q') attachPersonModel(__pp, 'hero');\n  else if (o.glbSkin === 'hero' && attachHeroModel(__pp)) {}"),
+])
 print('apk-patch applied')
