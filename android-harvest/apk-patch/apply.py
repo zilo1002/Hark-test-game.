@@ -395,4 +395,29 @@ patch('js/models.js', [
 # ---- v6.1.8 (宝宝 2026-11-19): 黑西装猫猫 in the shop for 2000 gold — on the boy it is his own Hunyuan suit model (hero-glb.js)
 patch('js/shop.js', [("  { id: 'bootsG',   slot: 'feet',",
     "  { id: 'catSuit',  slot: 'top',  name: '黑西装猫猫', price: 2000, style: { catSuit: true, vest: '#1C1C22', bowtie: false, shirt: '#1C1C22', sleeve: '#1C1C22', pants: '#1C1C22' }, sw: ['#1C1C22', '#6B4A3A'] },\n  { id: 'bootsG',   slot: 'feet',")])
+# ---- v6.2.0 (宝宝 2026-11-19 22:47): each look (女孩 / 男孩 / Q版) keeps its own clothes — switching no longer carries the
+# girl's 黑西装 onto the boy (or back); a 一键脱下 button in the clothes shop takes everything off the current look.
+patch('js/shop.js', [("  d.maps = Array.isArray(s.maps) ? [...new Set(s.maps.filter((id) => MAP_IDS.includes(id)))] : [];\n  return d;",
+  "  d.maps = Array.isArray(s.maps) ? [...new Set(s.maps.filter((id) => MAP_IDS.includes(id)))] : [];\n"
+  "  d.eqBy = {};\n  if (s.eqBy && typeof s.eqBy === 'object') for (const c of Object.keys(s.eqBy)) { const e = s.eqBy[c]; if (!e || typeof e !== 'object') continue; const o = {};\n"
+  "    for (const [k] of SLOTS) { const id = e[k], it = itemById(id); o[k] = it && it.slot === k && d.owned.includes(id) ? id : null; } d.eqBy[c] = o; }\n  return d;")])
+patch('js/main.js', [("  setCharacter: (character) => { data.character = Shop.CHARACTER_IDS.includes(character) ? character : 'girl';",
+  "  undressAll: () => { for (const k in data.shop.eq) data.shop.eq[k] = null; Save.save(data); applyLook(); if (preview) preview.thumbs = {}; },\n"
+  "  setCharacter: (character) => { { const sh = data.shop, prev = data.character || 'girl', nx = Shop.CHARACTER_IDS.includes(character) ? character : 'girl';\n"
+  "      sh.eqBy = sh.eqBy || {}; sh.eqBy[prev] = { ...sh.eq }; sh.eq = { hat: null, top: null, neck: null, feet: null, ...(sh.eqBy[nx] || {}) }; }\n"
+  "    data.character = Shop.CHARACTER_IDS.includes(character) ? character : 'girl';")])
+patch('index.html', [('<button class="small swap hidden" id="characterSwitch">切换为男孩</button>',
+  '<button class="small swap hidden" id="characterSwitch">切换为男孩</button><button class="small swap hidden" id="undressAll">一键脱下</button>')])
+patch('style.css', [("#characterSwitch:focus-visible {", "#undressAll { margin: 7px 0 0 8px; min-height: 42px; padding: 7px 14px; border-radius: 13px; background: linear-gradient(#FFFFFF, #E4E0D6); box-shadow: 0 3px 0 #A9A294; color: #5A4A3A; font-size: 15px; font-weight: 900; touch-action: manipulation; }\n#characterSwitch:focus-visible {")])
+patch('js/ui.js', [("    $('shopAct').onclick = () => {",
+  "    $('undressAll').onclick = () => { this.h.undressAll(); this.renderShop(); this.h.tap(); };\n    $('shopAct').onclick = () => {"),
+  ("    characterSwitch.classList.remove('hidden');",
+   "    characterSwitch.classList.remove('hidden');\n    { const u = $('undressAll'); u.classList.toggle('hidden', this.shopTab !== 'outfit' || !Object.values(d.shop.eq).some(Boolean)); }")])
+# ---- v6.2.0 (宝宝 2026-11-19 22:50): more shoes to swap — snug on the body like the boots
+patch('js/shop.js', [("  { id: 'bootsG',   slot: 'feet',",
+  "  { id: 'shoeW',    slot: 'feet', name: '小白球鞋', price: 120, style: { boots: '#F4F4F0' }, sw: ['#F4F4F0', '#9AA8B8'] },\n"
+  "  { id: 'shoeMint', slot: 'feet', name: '薄荷帆布鞋', price: 140, style: { boots: '#7FD6B9' }, sw: ['#7FD6B9', '#FFFFFF'] },\n"
+  "  { id: 'shoePink', slot: 'feet', name: '粉兔兔鞋', price: 160, style: { boots: '#FF9CC0' }, sw: ['#FF9CC0', '#FFFFFF'] },\n"
+  "  { id: 'shoeBlk',  slot: 'feet', name: '黑亮皮鞋', price: 200, style: { boots: '#1C1C22' }, sw: ['#1C1C22', '#6B6B78'] },\n"
+  "  { id: 'bootsG',   slot: 'feet',")])
 print('apk-patch applied')

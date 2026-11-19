@@ -172,12 +172,23 @@ function apply(pp, key) {
   upd.updateMatrixWorld = function (force) { THREE.Object3D.prototype.updateMatrixWorld.call(this, force); rig.update(); };
   root.updateMatrixWorld(true); rig.update();
   const skel = new THREE.Skeleton(bones);
-  const mesh = new THREE.SkinnedMesh(lib.geo, lib.mat);
+  // 6.2.0 (宝宝 2026-11-19): shop clothes sit snug on the body — the base skin under a worn piece is left out, so the
+  // white tank / stockings can never show through the clothes (no more speckled clipping on the girl's 黑西装)
+  const fit = outfit(o || {}), REG = { torso: [1, 2], front: [2], sleeves: [5], legs: [4], boots: [3] }, hid = [];
+  if (lib.shells) for (const k in REG) if (fit[k]) hid.push(...REG[k]);
+  let baseGeo = lib.geo;
+  if (hid.length && lib.geo.attributes._region) {
+    const reg = lib.geo.attributes._region, ix = lib.geo.index.array, keep = [];
+    for (let f = 0; f < ix.length; f += 3) if (!(hid.includes(reg.getX(ix[f])) && hid.includes(reg.getX(ix[f + 1])) && hid.includes(reg.getX(ix[f + 2])))) keep.push(ix[f], ix[f + 1], ix[f + 2]);
+    baseGeo = new THREE.BufferGeometry();
+    for (const n in lib.geo.attributes) baseGeo.setAttribute(n, lib.geo.attributes[n]);
+    baseGeo.setIndex(keep);
+  }
+  const mesh = new THREE.SkinnedMesh(baseGeo, lib.mat);
   mesh.frustumCulled = false; mesh.castShadow = true;
   root.add(mesh); root.add(upd); root.updateMatrixWorld(true);
   mesh.bind(skel, mesh.matrixWorld);
   // shop clothes on the base body
-  const fit = outfit(o || {});
   if (lib.shells) for (const part of ['torso', 'front', 'sleeves', 'legs', 'boots']) {
     if (!fit[part]) continue;
     const sm = new THREE.SkinnedMesh(lib.shells[part], shellMat(part === 'boots' && fit.cuff ? fit.boots : fit[part]));
