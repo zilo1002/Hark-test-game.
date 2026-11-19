@@ -202,10 +202,6 @@ patch('js/render3d.js', [
      "      for (let i = 0; i < 70; i++) { g.fillStyle = ['#FFFFFF', '#F8C8B0', '#E8B880'][i % 3]; g.beginPath(); g.ellipse(-80 + R(i + 4400) * (w.W + 160), i % 2 ? -50 + R(i + 4500) * 30 : w.H + 20 + R(i + 4500) * 30, 2.4, 1.6, R(i) * 3, 0, TAU); g.fill(); }\n"
      "    }\n    g.fillStyle = this.lawn || COL.lawn; g.fillRect(0, 0, w.W, w.H);"),
 ])
-patch('js/shop.js', [("  { id: 'mapNight',  name: '夜市地图', starPrice: 20, map: 'night',  unlockAfter: 60, icon: '🏮', thumb: 'lanterns', desc: '夜色庄园，灯笼与摊位' },",
-    "  { id: 'mapNight',  name: '夜市地图', starPrice: 20, map: 'night',  unlockAfter: 60, icon: '🏮', thumb: 'lanterns', desc: '夜色庄园，灯笼与摊位' },\n"
-    "  { id: 'mapIsland', name: '海岛地图', starPrice: 25, map: 'island', unlockAfter: 75, icon: '🏝️', thumb: 'pond', desc: '椰林沙滩，碧蓝海湾' },")])
-patch('js/main.js', [("night: homeNight, build:", "night: homeNight, island: hm.mode === 'map' && hm.map === 'island', build:")])
 patch('js/home.js', [
     ("let HNIGHT = false;", "let HNIGHT = false;\n" + (ISL / 'home.js.txt').read_text(encoding='utf-8')),
     ("HSEASON, HNIGHT, page].join('|');", "HSEASON, HNIGHT, HISLAND, page].join('|');"),
@@ -214,6 +210,51 @@ patch('js/home.js', [
     ("    if (inPlot(x, y, -6)) continue;\n", "    if (inPlot(x, y, -6) || (HISLAND && (i % 3 || y < ISEA_Y + 20))) continue;\n"),
     ("  // the lane out of the gate, down off the screen\n", "  if (HISLAND) islandSea(g, x0, x1, y0);\n  // the lane out of the gate, down off the screen\n"),
     ("if (p) pine(g, 1.1); else roundTree(g, 0, false);", "if (HISLAND) { if (y > ISEA_Y + 24) palm2d(g, x); } else if (p) pine(g, 1.1); else roundTree(g, 0, false);"),
-    ("  HNIGHT = !!save.night;", "  HNIGHT = !!save.night; HISLAND = !!save.island && !HNIGHT;"),
+    ("  HNIGHT = !!save.night;", "  HNIGHT = !!save.night; HISLAND = page === 4 && !HNIGHT;"),
 ])
+
+# ---- v6.1.1 (宝宝 2026-11-19): 椰风海岛 is a 4th 装扮庄园 estate (15 pieces bought with stars), not a shop map ----
+patch('js/config.js', [("    { id: 'winery',     name: '翻新湖畔酒庄', cost: 5, page: 3 },\n",
+    "    { id: 'winery',     name: '翻新湖畔酒庄', cost: 5, page: 3 },\n"
+    "    // page 4 (v6.1.1): the coconut-breeze island beach estate, opens once level 75 is cleared\n"
+    "    { id: 'pier',       name: '修海边栈桥', cost: 2, page: 4 },\n"
+    "    { id: 'umbrella',   name: '撑沙滩伞',   cost: 2, page: 4 },\n"
+    "    { id: 'sandcastle', name: '堆沙堡',     cost: 2, page: 4 },\n"
+    "    { id: 'surfboards', name: '立冲浪板',   cost: 2, page: 4 },\n"
+    "    { id: 'torches',    name: '点草编火把', cost: 2, page: 4 },\n"
+    "    { id: 'hammock',    name: '挂椰林吊床', cost: 2, page: 4 },\n"
+    "    { id: 'crabs',      name: '引来小螃蟹', cost: 3, page: 4 },\n"
+    "    { id: 'nets',       name: '晒扇贝渔网', cost: 3, page: 4 },\n"
+    "    { id: 'fruitstand', name: '搭热带水果摊', cost: 3, page: 4 },\n"
+    "    { id: 'crayboil',   name: '支小龙虾锅', cost: 3, page: 4 },\n"
+    "    { id: 'sailboat',   name: '停小帆船',   cost: 3, page: 4 },\n"
+    "    { id: 'lifeguard',  name: '建救生塔',   cost: 4, page: 4 },\n"
+    "    { id: 'turtles',    name: '引来海龟',   cost: 4, page: 4 },\n"
+    "    { id: 'tikibar',    name: '盖椰子吧台', cost: 4, page: 4 },\n"
+    "    { id: 'resort',     name: '翻新椰风民宿', cost: 6, page: 4 },\n")])
+patch('js/home.js', [
+    ("let HNIGHT = false;\n", "let HNIGHT = false;\n" + (ISL / 'estate.js.txt').read_text(encoding='utf-8')),
+    ("page === 3 ? SPOTS3 : page === 2 ? SPOTS2 : SPOTS", "page === 4 ? SPOTS4 : page === 3 ? SPOTS3 : page === 2 ? SPOTS2 : SPOTS"),
+    ("center = page === 3 ? 'winery'", "center = page === 4 ? 'resort' : page === 3 ? 'winery'"),
+    ("  if (page === 3) out.push({ x: 92, y: 372, r: 46 });   // the lake", "  if (page === 3 || page === 4) out.push({ x: 92, y: 372, r: 46 });   // the lake / lagoon"),
+    ("  const P2 = page === 2, P3 = page === 3;\n  const spots = P3 ? SPOTS3", "  const P2 = page === 2, P3 = page === 3, P4 = page === 4;\n  const spots = P4 ? SPOTS4 : P3 ? SPOTS3"),
+    ("draw = P3 ? DRAW3", "draw = P4 ? DRAW4 : P3 ? DRAW3"),
+    ("center = P3 ? 'winery'", "center = P4 ? 'resort' : P3 ? 'winery'"),
+    ("  if (P3) {   // the lake, and a cobbled lane up to the winery\n    lake(g, t);", "  if (P4) lagoon(g, t);\n  if (P3) {   // the lake, and a cobbled lane up to the winery\n    lake(g, t);"),
+    ("if (P3) winery(g, done, t);", "if (P4) islandHouse(g, done, t); else if (P3) winery(g, done, t);"),
+    ("const SPOT_R = { manor: 30, lodge: 30, winery: 30,", "const SPOT_R = { manor: 30, lodge: 30, winery: 30, resort: 30, pier: 0, sailboat: 0, turtles: 0,"),
+])
+patch('js/ui.js', [
+    ("const TABS = { 1: '花园庄园', 2: '林场牧场', 3: '湖畔酒庄' };", "const TABS = { 1: '花园庄园', 2: '林场牧场', 3: '湖畔酒庄', 4: '椰风海岛' };"),
+    ("this.page = 3; }   // once past level 38, open on the lakeside winery",
+     "this.page = 3; }   // once past level 38, open on the lakeside winery\n    if (data.unlocked >= 75 && !this._auto4) { this._auto2 = this._auto3 = this._auto4 = true; this.page = 4; }   // v6.1.1: past level 75, open on the island"),
+    ("!((m.page || 1) === 3 && data.unlocked < 38));", "!((m.page || 1) === 3 && data.unlocked < 38) && !((m.page || 1) === 4 && data.unlocked < 75));"),
+    ("    const locked3 = page === 3 && data.unlocked < 38;", "    const locked3 = (page === 3 && data.unlocked < 38) || (page === 4 && data.unlocked < 75);"),
+    ("page === 2 ? '牧场建好啦！' : '酒庄建好啦！')", "page === 2 ? '牧场建好啦！' : page === 4 ? '海岛建好啦！' : '酒庄建好啦！')"),
+    ("this.page = 0; this._auto2 = this._auto3 = false;", "this.page = 0; this._auto2 = this._auto3 = this._auto4 = false;"),
+    ("locked3 ? '过第 38 关开放'", "locked3 ? (page === 4 ? '过第 75 关开放' : '过第 38 关开放')"),
+])
+patch('js/main.js', [("  if (m.page === 3 && data.unlocked < 38) {", "  if ((m.page === 3 && data.unlocked < 38) || (m.page === 4 && data.unlocked < 75)) {")])
+patch('index.html', [('<button data-p="3">湖畔酒庄</button></div>', '<button data-p="3">湖畔酒庄</button><button data-p="4">椰风海岛</button></div>')])
+
 print('apk-patch applied')

@@ -1,0 +1,196 @@
+// ---- v6.1.1 椰风海岛 estate (装扮庄园 page 4): a sand beach estate with a lagoon, bought piece by piece with stars ----
+export const SPOTS4 = {
+  resort: [180, 150], fruitstand: [58, 152], tikibar: [312, 128], crayboil: [54, 246], hammock: [306, 236],
+  umbrella: [150, 266], sandcastle: [252, 292], torches: [196, 318], surfboards: [318, 334], lifeguard: [26, 318],
+  nets: [236, 372], crabs: [282, 414], pier: [130, 358], sailboat: [92, 392], turtles: [58, 356],
+};
+const LAGOON = [92, 372, 86, 42];
+function lagoon(g, t) {
+  const [x, y, rx, ry] = LAGOON;
+  g.fillStyle = '#FFF4D2'; g.beginPath(); g.ellipse(x, y, rx + 8, ry + 7, -0.08, 0, TAU); g.fill();
+  const gr = g.createLinearGradient(0, y - ry, 0, y + ry); gr.addColorStop(0, '#8EEBE6'); gr.addColorStop(0.5, '#3FC9E0'); gr.addColorStop(1, '#2A9FD6');
+  g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, rx, ry, -0.08, 0, TAU); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 2; g.beginPath(); g.ellipse(x, y, rx - 3 + Math.sin(t * 1.4) * 1.5, ry - 3 + Math.sin(t * 1.4) * 1, -0.08, 0, TAU); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1.6;
+  for (let i = 0; i < 6; i++) { const ox = ((i * 37 + t * 6) % (rx * 1.4)) - rx * 0.7, oy = -ry * 0.5 + (i % 3) * ry * 0.4; g.beginPath(); g.moveTo(x + ox - 8, y + oy); g.quadraticCurveTo(x + ox, y + oy - 2, x + ox + 8, y + oy); g.stroke(); }
+}
+function palmS(g, k = 1, lean = 4) {   // a small palm used inside the estate pieces
+  g.save(); g.scale(k, k);
+  g.strokeStyle = '#8E5E2E'; g.lineWidth = 4; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(lean * 0.4, -16, lean, -32); g.stroke();
+  for (let i = 0; i < 7; i++) { g.save(); g.translate(lean, -32); g.rotate(-Math.PI / 2 + (i - 3) * 0.55); g.fillStyle = i % 2 ? '#3E9B2A' : '#5DBB3A'; g.beginPath(); g.ellipse(13, 2, 14, 3.4, 0.25, 0, TAU); g.fill(); g.restore(); }
+  g.fillStyle = '#7A4A22'; for (const [dx, dy] of [[-2.4, -29], [2.2, -29.6]]) { g.beginPath(); g.arc(lean + dx, dy, 2.4, 0, TAU); g.fill(); }
+  g.restore();
+}
+const DRAW4 = {
+  fruitstand(g) {   // a coconut & tropical fruit stall with a striped awning
+    shadow(g, 0, 0, 30, 8);
+    g.fillStyle = '#8E5627'; g.fillRect(-24, -40, 3, 40); g.fillRect(21, -40, 3, 40);
+    rr(g, -26, -18, 52, 18, 2, '#C8874A', OL, 1.3);
+    for (let i = 0; i < 6; i++) { g.fillStyle = i % 2 ? '#FFFFFF' : '#FF8A3D'; g.beginPath(); g.moveTo(-28 + i * 9.4, -40); g.lineTo(-18.6 + i * 9.4, -40); g.lineTo(-18.6 + i * 9.4, -32); g.quadraticCurveTo(-23.3 + i * 9.4, -28, -28 + i * 9.4, -32); g.closePath(); g.fill(); }
+    g.strokeStyle = OL; g.lineWidth = 1.2; g.strokeRect(-28, -46, 56, 6); g.fillStyle = '#FFB02E'; g.fillRect(-28, -46, 56, 6);
+    const fr = [['#7A4A22', 4.2], ['#FFC21A', 3.6], ['#E8458A', 3.8], ['#4FAE32', 3.4], ['#FF9A1A', 3.6], ['#7A4A22', 4.2]];
+    fr.forEach(([c, r], i) => { g.fillStyle = c; g.beginPath(); g.arc(-20 + i * 8, -21, r, 0, TAU); g.fill(); });
+    g.fillStyle = '#FFE14D'; g.beginPath(); g.ellipse(-8, -26, 3, 4.4, 0, 0, TAU); g.fill(); g.fillStyle = '#4FAE32'; g.fillRect(-9, -33, 2, 4);
+  },
+  tikibar(g, t) {   // a thatched coconut bar with stools and a drink
+    shadow(g, 0, 0, 34, 9);
+    rr(g, -26, -22, 52, 22, 2, '#B87436', OL, 1.3);
+    g.strokeStyle = '#7A4A22'; g.lineWidth = 1; for (let x = -20; x < 26; x += 6) { g.beginPath(); g.moveTo(x, -22); g.lineTo(x, 0); g.stroke(); }
+    rr(g, -30, -26, 60, 5, 2, '#E8C27A', OL, 1.2);
+    g.fillStyle = '#8E5627'; g.fillRect(-26, -50, 3, 26); g.fillRect(23, -50, 3, 26);
+    g.fillStyle = '#E8B860'; g.strokeStyle = '#B8863A'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-38, -46); g.lineTo(0, -66); g.lineTo(38, -46); g.lineTo(32, -42); g.lineTo(-32, -42); g.closePath(); g.fill(); g.stroke();
+    for (let x = -34; x < 36; x += 5) { g.strokeStyle = 'rgba(150,100,40,0.6)'; g.beginPath(); g.moveTo(x, -42); g.lineTo(x + 1, -38 - (x % 2 ? 1 : 3)); g.stroke(); }
+    rr(g, -10, -36, 9, 10, 3, '#7A4A22', OL, 1); g.fillStyle = '#FFF4D2'; g.fillRect(-9, -36, 7, 3);
+    g.strokeStyle = '#E8458A'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-4, -36); g.lineTo(0, -42); g.stroke();
+    g.fillStyle = '#FFB02E'; g.beginPath(); g.arc(10, -29, 4, 0, TAU); g.fill(); g.fillStyle = '#FFE14D'; g.beginPath(); g.arc(10, -29, 2.2, 0, TAU); g.fill();
+    for (const x of [-16, 0, 16]) { g.fillStyle = '#8E5627'; g.fillRect(x - 1, 4, 2, 6); rr(g, x - 5, 1, 10, 3, 1.5, '#E8452C', OL, 0.8); }
+  },
+  crayboil(g, t) {   // a big pot of spicy crayfish bubbling over a fire
+    shadow(g, 0, 0, 26, 7);
+    for (let i = 0; i < 3; i++) { g.fillStyle = `rgba(255,${120 + i * 40 + Math.sin(t * 8 + i) * 30 | 0},40,0.9)`; g.beginPath(); g.moveTo(-10 + i * 8, 0); g.lineTo(-6 + i * 8, -10 - Math.sin(t * 9 + i) * 3); g.lineTo(-2 + i * 8, 0); g.fill(); }
+    g.fillStyle = '#3E4048'; g.strokeStyle = OL; g.lineWidth = 1.3; g.beginPath(); g.moveTo(-18, -26); g.lineTo(18, -26); g.lineTo(14, -6); g.lineTo(-14, -6); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#D9402A'; g.beginPath(); g.ellipse(0, -26, 18, 5, 0, 0, TAU); g.fill(); g.stroke();
+    for (let k = 0; k < 6; k++) { g.fillStyle = '#E8452C'; g.strokeStyle = '#8E2A1A'; g.lineWidth = 0.8; g.beginPath(); g.ellipse(-12 + k * 5, -28 - (k % 2) * 2, 3, 1.8, 0.5 * (k % 2 ? 1 : -1), 0, TAU); g.fill(); g.stroke(); }
+    for (let i = 0; i < 3; i++) { const u = (t * 0.6 + i / 3) % 1; g.fillStyle = `rgba(255,255,255,${0.6 * (1 - u)})`; g.beginPath(); g.arc(-6 + i * 6 + Math.sin(u * 6) * 2, -34 - u * 20, 2.4 + u * 4, 0, TAU); g.fill(); }
+    g.fillStyle = '#4FAE32'; g.beginPath(); g.arc(-4, -29, 1.4, 0, TAU); g.arc(6, -30, 1.4, 0, TAU); g.fill();
+  },
+  hammock(g, t) {   // a striped hammock slung between two palms
+    shadow(g, 0, 0, 34, 7);
+    g.save(); g.translate(-26, 0); palmS(g, 1, -4); g.restore();
+    g.save(); g.translate(26, 0); palmS(g, 1, 5); g.restore();
+    const sw = Math.sin(t * 1.2) * 1.6;
+    g.strokeStyle = '#8E5627'; g.lineWidth = 1; g.beginPath(); g.moveTo(-25, -22); g.lineTo(-16, -14 + sw); g.moveTo(26, -22); g.lineTo(16, -14 + sw); g.stroke();
+    for (let i = 0; i < 4; i++) { g.strokeStyle = ['#FF5A78', '#FFE14D', '#3FC9E0', '#FFFFFF'][i]; g.lineWidth = 2; g.beginPath(); g.moveTo(-16, -15 + i * 1.6 + sw); g.quadraticCurveTo(0, -4 + i * 1.6 + sw, 16, -15 + i * 1.6 + sw); g.stroke(); }
+  },
+  umbrella(g, t) {   // a beach umbrella over a towel and two loungers
+    shadow(g, 0, 0, 28, 7);
+    rr(g, -24, -6, 18, 6, 2, '#3FC9E0', '#FFFFFF', 1); rr(g, 6, -6, 18, 6, 2, '#FF8FB0', '#FFFFFF', 1);
+    g.fillStyle = '#FFFFFF'; g.fillRect(-1, -40, 2.4, 40);
+    const n = 8; for (let i = 0; i < n; i++) { const a0 = Math.PI + i / n * Math.PI, a1 = Math.PI + (i + 1) / n * Math.PI; g.fillStyle = i % 2 ? '#FFFFFF' : '#E8283C'; g.beginPath(); g.moveTo(0, -40); g.lineTo(Math.cos(a0) * 26, -36 + Math.sin(a0) * 10); g.lineTo(Math.cos(a1) * 26, -36 + Math.sin(a1) * 10); g.closePath(); g.fill(); }
+    g.fillStyle = '#E8283C'; g.beginPath(); g.arc(0, -41, 2, 0, TAU); g.fill();
+    g.fillStyle = '#FFC21A'; g.beginPath(); g.arc(-14, -10, 4, 0, TAU); g.fill(); g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(-14, -10, 4, 0.3, 1.5); g.lineTo(-14, -10); g.fill();
+  },
+  sandcastle(g) {   // a sand castle with a little flag and a bucket
+    shadow(g, 0, 0, 24, 6);
+    const S = '#EBCB86', D = '#C9A060';
+    rr(g, -20, -12, 40, 12, 2, S, D, 1.2);
+    for (const x of [-16, 12]) { rr(g, x - 5, -26, 10, 16, 1, S, D, 1.2); for (let k = 0; k < 3; k++) g.fillStyle = S, g.fillRect(x - 5 + k * 4, -29, 2.4, 3); }
+    rr(g, -6, -34, 12, 24, 1, S, D, 1.2); for (let k = 0; k < 3; k++) { g.fillStyle = S; g.fillRect(-6 + k * 4.6, -37, 2.6, 3); }
+    g.fillStyle = D; g.beginPath(); g.roundRect(-3, -8, 6, 8, [3, 3, 0, 0]); g.fill();
+    g.strokeStyle = '#5A3414'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, -37); g.lineTo(0, -47); g.stroke(); g.fillStyle = '#E8283C'; g.beginPath(); g.moveTo(0, -47); g.lineTo(7, -44.5); g.lineTo(0, -42); g.fill();
+    g.fillStyle = '#3FA8E0'; g.beginPath(); g.moveTo(22, -9); g.lineTo(30, -9); g.lineTo(28.5, 0); g.lineTo(23.5, 0); g.closePath(); g.fill();
+    g.fillStyle = '#FF8FB0'; g.beginPath(); g.arc(-26, -2, 2.6, 0, TAU); g.fill();
+  },
+  torches(g, t) {   // two bamboo tiki torches with flickering flames
+    for (const x of [-30, 30]) {
+      shadow(g, x, 0, 6, 2.2);
+      g.fillStyle = '#C8A04A'; g.fillRect(x - 1.8, -34, 3.6, 34); g.fillStyle = '#9C7A2E'; for (let y = -30; y < 0; y += 9) g.fillRect(x - 2, y, 4, 1.4);
+      rr(g, x - 4, -40, 8, 7, 2, '#7A4A22', OL, 0.9);
+      const f = Math.sin(t * 10 + x) * 1.6;
+      g.fillStyle = '#FF8A1A'; g.beginPath(); g.moveTo(x - 4, -40); g.quadraticCurveTo(x - 4 + f, -48, x + f * 0.6, -54); g.quadraticCurveTo(x + 4, -47, x + 4, -40); g.closePath(); g.fill();
+      g.fillStyle = '#FFE14D'; g.beginPath(); g.ellipse(x + f * 0.3, -44, 2, 3.6, 0, 0, TAU); g.fill();
+      g.fillStyle = `rgba(255,190,80,${0.18 + 0.08 * Math.sin(t * 6 + x)})`; g.beginPath(); g.arc(x, -46, 12, 0, TAU); g.fill();
+    }
+  },
+  surfboards(g) {   // three surfboards stuck upright in the sand
+    shadow(g, 0, 0, 24, 6);
+    for (const [x, c, s, a] of [[-14, '#FF5A78', '#FFFFFF', -0.12], [0, '#3FC9E0', '#FFE14D', 0], [14, '#FFC21A', '#E8452C', 0.12]]) {
+      g.save(); g.translate(x, 0); g.rotate(a);
+      g.fillStyle = c; g.strokeStyle = OL; g.lineWidth = 1.1; g.beginPath(); g.ellipse(0, -20, 6, 21, 0, 0, TAU); g.fill(); g.stroke();
+      g.fillStyle = s; g.fillRect(-0.8, -40, 1.6, 40);
+      g.restore();
+    }
+  },
+  lifeguard(g) {   // a white lifeguard tower with a red flag and a ring
+    shadow(g, 0, 0, 18, 5);
+    g.strokeStyle = '#F4F0E6'; g.lineWidth = 3; g.beginPath(); g.moveTo(-12, 0); g.lineTo(-8, -26); g.moveTo(12, 0); g.lineTo(8, -26); g.moveTo(-10, -12); g.lineTo(10, -12); g.stroke();
+    rr(g, -12, -40, 24, 14, 2, '#FFFFFF', OL, 1.2); g.fillStyle = '#E8283C'; g.fillRect(-12, -36, 24, 4);
+    g.fillStyle = '#E8283C'; g.strokeStyle = OL; g.beginPath(); g.moveTo(-15, -40); g.lineTo(0, -50); g.lineTo(15, -40); g.closePath(); g.fill(); g.stroke();
+    g.strokeStyle = '#5A3414'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, -50); g.lineTo(0, -62); g.stroke(); g.fillStyle = '#E8283C'; g.beginPath(); g.moveTo(0, -62); g.lineTo(9, -59); g.lineTo(0, -56); g.fill();
+    g.strokeStyle = '#FF8A3D'; g.lineWidth = 3; g.beginPath(); g.arc(14, -16, 5, 0, TAU); g.stroke(); g.strokeStyle = '#FFFFFF'; g.lineWidth = 3; g.beginPath(); g.arc(14, -16, 5, 0, 0.6); g.arc(14, -16, 5, Math.PI, Math.PI + 0.6); g.stroke();
+  },
+  nets(g) {   // a fishing net hung to dry, with a basket of scallops
+    shadow(g, 0, 0, 24, 6);
+    g.fillStyle = '#8E5627'; g.fillRect(-22, -32, 3, 32); g.fillRect(19, -32, 3, 32);
+    g.strokeStyle = 'rgba(70,90,110,0.85)'; g.lineWidth = 0.8;
+    for (let i = 0; i <= 8; i++) { g.beginPath(); g.moveTo(-19 + i * 4.75, -30); g.quadraticCurveTo(-19 + i * 4.75 + 1, -18, -19 + i * 4.75, -8); g.stroke(); }
+    for (let j = 0; j < 5; j++) { g.beginPath(); g.moveTo(-19, -28 + j * 5); g.quadraticCurveTo(0, -24 + j * 5, 19, -28 + j * 5); g.stroke(); }
+    for (const [x, y] of [[-12, -16], [6, -12], [12, -22]]) { g.fillStyle = '#FF8A3D'; g.beginPath(); g.arc(x, y, 2.4, 0, TAU); g.fill(); }
+    rr(g, -8, -7, 16, 7, 3, '#C8A04A', OL, 0.9);
+    for (let k = 0; k < 3; k++) { g.fillStyle = ['#FFD6C8', '#FFB8A0', '#FFE0D0'][k]; g.beginPath(); g.arc(-4 + k * 4, -8, 3, Math.PI, 0); g.fill(); }
+  },
+  crabs(g, t) {   // little red crabs scuttling sideways on the sand
+    for (const [x0, y, k] of [[-14, 0, 1], [12, -8, 0.8], [2, 6, 0.7]]) {
+      const x = x0 + Math.sin(t * 1.2 + x0) * 5;
+      g.save(); g.translate(x, y); g.scale(k, k);
+      g.strokeStyle = '#B8301E'; g.lineWidth = 1.1; for (const s of [-1, 1]) for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(s * 4, -3 + i * 1.6); g.lineTo(s * 9, -1 + i * 2.4 + Math.sin(t * 12 + i) * 0.6); g.stroke(); }
+      g.fillStyle = '#E8452C'; g.strokeStyle = '#8E2A1A'; g.lineWidth = 0.8; g.beginPath(); g.ellipse(0, -4, 6, 4, 0, 0, TAU); g.fill(); g.stroke();
+      for (const s of [-1, 1]) { g.fillStyle = '#E8452C'; g.beginPath(); g.arc(s * 8, -9, 2.6, 0, TAU); g.fill(); g.stroke(); g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(s * 2, -8.4, 1.4, 0, TAU); g.fill(); g.fillStyle = '#222'; g.beginPath(); g.arc(s * 2, -8.4, 0.7, 0, TAU); g.fill(); }
+      g.restore();
+    }
+  },
+  pier(g) {   // a plank pier out into the lagoon
+    g.fillStyle = 'rgba(20,80,110,0.25)'; g.fillRect(-26, -2, 52, 6);
+    for (let i = 0; i < 9; i++) rr(g, -26 + i * 6, -8, 5, 10, 1, i % 2 ? '#D9A05A' : '#C8874A', '#7A4A22', 0.8);
+    g.fillStyle = '#7A4A22'; for (const x of [-24, -2, 20]) g.fillRect(x, 2, 3, 7);
+    g.strokeStyle = '#FF8A3D'; g.lineWidth = 2.4; g.beginPath(); g.arc(22, -12, 4, 0, TAU); g.stroke();
+  },
+  sailboat(g, t) {   // a little sailboat bobbing on the lagoon
+    const b = Math.sin(t * 1.6) * 1.2;
+    g.save(); g.translate(0, b);
+    g.fillStyle = '#FFFFFF'; g.strokeStyle = OL; g.lineWidth = 1.3; g.beginPath(); g.moveTo(-20, -6); g.lineTo(20, -6); g.quadraticCurveTo(14, 3, 0, 3); g.quadraticCurveTo(-14, 3, -20, -6); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#3FA8E0'; g.fillRect(-18, -6, 36, 2.4);
+    g.strokeStyle = '#7A4A22'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(0, -6); g.lineTo(0, -42); g.stroke();
+    g.fillStyle = '#FFFFFF'; g.strokeStyle = '#B9C6D0'; g.lineWidth = 1; g.beginPath(); g.moveTo(1.5, -40); g.quadraticCurveTo(16, -24, 18, -9); g.lineTo(1.5, -9); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#FF8A3D'; g.beginPath(); g.moveTo(-1.5, -36); g.lineTo(-1.5, -10); g.lineTo(-14, -10); g.closePath(); g.fill();
+    g.restore();
+    g.strokeStyle = 'rgba(255,255,255,0.65)'; g.lineWidth = 1; g.beginPath(); g.ellipse(0, 4, 24, 3, 0, 0, Math.PI); g.stroke();
+  },
+  turtles(g, t) {   // two sea turtles paddling in the lagoon
+    for (const [x, y, s] of [[-10, 0, 1], [12, -7, -1]]) {
+      g.save(); g.translate(x + Math.sin(t * 0.7 + x) * 2.4, y); g.scale(s, 1);
+      const p = Math.sin(t * 3 + x) * 0.4;
+      g.fillStyle = '#7FC86A'; for (const [fx, fy, r] of [[-5, -6, -0.6 + p], [5, -6, 0.6 - p], [-5, 2, 0.6 - p], [5, 2, -0.6 + p]]) { g.save(); g.translate(fx, fy); g.rotate(r); g.beginPath(); g.ellipse(0, 0, 4, 1.8, fx < 0 ? -0.4 : 0.4, 0, TAU); g.fill(); g.restore(); }
+      g.beginPath(); g.ellipse(9, -2, 3, 2.4, 0, 0, TAU); g.fill();
+      g.fillStyle = '#4E8A3A'; g.strokeStyle = '#2E5A22'; g.lineWidth = 0.8; g.beginPath(); g.ellipse(0, -2, 7, 5.4, 0, 0, TAU); g.fill(); g.stroke();
+      g.strokeStyle = 'rgba(200,230,150,0.7)'; g.beginPath(); g.moveTo(-3.6, -5); g.lineTo(3.6, -5); g.moveTo(-4.4, 1); g.lineTo(4.4, 1); g.moveTo(0, -7.4); g.lineTo(0, 3.4); g.stroke();
+      g.fillStyle = '#222'; g.beginPath(); g.arc(10.4, -2.8, 0.7, 0, TAU); g.fill();
+      g.restore();
+    }
+  },
+};
+function islandHouse(g, painted, t) {   // the beach guesthouse: a weathered shack on stilts until restored, then a bright thatched bungalow
+  shadow(g, 0, 0, 90, 14);
+  g.strokeStyle = OL; g.lineWidth = 1.8;
+  const wood = painted ? '#E8B86A' : '#A89C86', dark = painted ? '#B8863A' : '#7E7468', roof = painted ? '#F2C76A' : '#8E8676';
+  g.fillStyle = painted ? '#8E5627' : '#6E6255'; for (const x of [-64, -22, 22, 64]) g.fillRect(x - 3, -16, 6, 16);   // stilts
+  rr(g, -76, -20, 152, 8, 2, dark, OL);   // deck
+  for (let x = -70; x <= 70; x += 10) { g.fillStyle = painted ? '#FFFFFF' : '#B0A690'; g.fillRect(x - 1, -34, 2.4, 14); }
+  g.fillStyle = painted ? '#FFFFFF' : '#B0A690'; g.fillRect(-76, -35, 40, 3); g.fillRect(36, -35, 40, 3);
+  rr(g, -54, -74, 108, 54, 2, wood, OL);
+  g.strokeStyle = painted ? 'rgba(140,90,30,0.4)' : 'rgba(70,50,30,0.35)'; g.lineWidth = 1; for (let y = -68; y < -20; y += 7) { g.beginPath(); g.moveTo(-54, y); g.lineTo(54, y); g.stroke(); }
+  g.strokeStyle = OL; g.lineWidth = 1.8;
+  g.fillStyle = painted ? '#3FC9E0' : '#5E4A36'; g.beginPath(); g.roundRect(-11, -50, 22, 30, [11, 11, 0, 0]); g.fill(); g.stroke();
+  for (const x of [-36, 36]) {
+    g.fillStyle = painted ? '#A8EAFF' : '#6E6255'; g.beginPath(); g.rect(x - 9, -60, 18, 16); g.fill(); g.stroke();
+    if (painted) { g.fillStyle = '#FF8FB0'; for (let k = 0; k < 4; k++) { g.beginPath(); g.arc(x - 7 + k * 4.6, -42, 2.4, 0, TAU); g.fill(); } g.fillStyle = '#4FAE32'; g.fillRect(x - 9, -41, 18, 2); }
+    else { g.fillStyle = '#9C7A55'; g.save(); g.translate(x, -52); g.rotate(-0.5); g.fillRect(-11, -1.5, 22, 3); g.restore(); }
+  }
+  // big thatched roof
+  g.fillStyle = roof; g.beginPath(); g.moveTo(-74, -70); g.quadraticCurveTo(-30, -116, 0, -126); g.quadraticCurveTo(30, -116, 74, -70); g.quadraticCurveTo(0, -60, -74, -70); g.closePath(); g.fill(); g.stroke();
+  g.strokeStyle = painted ? 'rgba(170,110,30,0.55)' : 'rgba(80,70,60,0.45)'; g.lineWidth = 1.1;
+  for (let k = -6; k <= 6; k++) { g.beginPath(); g.moveTo(k * 2, -122); g.quadraticCurveTo(k * 6, -96, k * 11.6, -67); g.stroke(); }
+  for (let x = -70; x <= 70; x += 6) { g.beginPath(); g.moveTo(x, -68 + Math.abs(x) * 0.02); g.lineTo(x + 1, -62 + (x % 4 ? 0 : 2)); g.stroke(); }
+  g.strokeStyle = OL; g.lineWidth = 1.8;
+  if (painted) {   // sign, flower garlands, a palm on each side, a hanging coconut lantern
+    g.save(); g.translate(-66, 2); palmS(g, 1.15, -5); g.restore();
+    g.save(); g.translate(68, 2); palmS(g, 1.1, 5); g.restore();
+    g.fillStyle = '#FFFFFF'; g.beginPath(); g.roundRect(-26, -96, 52, 14, 4); g.fill(); g.stroke();
+    g.font = FONT(9); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1E7A9A'; g.fillText('椰风民宿', 0, -89);
+    for (let k = 0; k < 13; k++) { const x = -60 + k * 10; g.fillStyle = ['#FF5A78', '#FFE14D', '#FF8A3D', '#FFFFFF'][k % 4]; g.beginPath(); g.arc(x, -70 + Math.sin(k / 12 * Math.PI) * 5, 3, 0, TAU); g.fill(); }
+    g.fillStyle = `rgba(255,210,120,${0.3 + 0.12 * Math.sin(t * 3)})`; g.beginPath(); g.arc(46, -26, 9, 0, TAU); g.fill();
+  } else {
+    g.fillStyle = '#B0A690'; g.beginPath(); g.roundRect(-26, -96, 52, 14, 4); g.fill(); g.stroke();
+    g.font = FONT(9); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#6E6458'; g.fillText('椰风民宿', 0, -89);
+  }
+}

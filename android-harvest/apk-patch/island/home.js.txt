@@ -1,6 +1,6 @@
-// v6.1.0 海岛地图: sand instead of meadow, a blue bay along the top, palms instead of woods. Look only.
+// v6.1.0/6.1.1 椰风海岛 estate page: sand instead of meadow, a blue bay along the top, palms instead of woods.
 let HISLAND = false;
-const ISLAND_GROUND = ['#F2DDA4', '#E9D093', '#9FDA62', '#8CD150', '#C9A060', '#FFB02E'];
+const ISLAND_GROUND = ['#F2DDA4', '#E9D093', '#F7E9BE', '#F0DDA8', '#C9A060', '#FFB02E'];
 const ISEA_Y = 34;   // design-space y where the bay's beach line runs (just above the plot)
 function islandSea(g, x0, x1, y0) {
   const gr = g.createLinearGradient(0, y0, 0, ISEA_Y);
