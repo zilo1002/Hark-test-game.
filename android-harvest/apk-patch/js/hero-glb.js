@@ -175,24 +175,39 @@ function apply(pp, key) {
   upd.updateMatrixWorld = function (force) { THREE.Object3D.prototype.updateMatrixWorld.call(this, force); rig.update(); };
   root.updateMatrixWorld(true); rig.update();
   const skel = new THREE.Skeleton(bones);
-  // 6.2.0 (宝宝 2026-11-19): shop clothes sit snug on the body — the base skin under a worn piece is left out, so the
-  // white tank / stockings can never show through the clothes (no more speckled clipping on the girl's 黑西装)
-  const fit = outfit(o || {}), REG = { torso: [1, 2], front: [2], sleeves: [5], legs: [4], boots: [3] }, hid = [];
-  if (lib.shells) for (const k in REG) if (fit[k]) hid.push(...REG[k]);
-  let baseGeo = lib.geo;
-  if (hid.length && lib.geo.attributes._region) {
-    const reg = lib.geo.attributes._region, ix = lib.geo.index.array, keep = [];
-    for (let f = 0; f < ix.length; f += 3) if (!(hid.includes(reg.getX(ix[f])) && hid.includes(reg.getX(ix[f + 1])) && hid.includes(reg.getX(ix[f + 2])))) keep.push(ix[f], ix[f + 1], ix[f + 2]);
+  // 6.2.3 (宝宝 2026-11-20): shop clothes are dyed straight onto the body's own surface (per-region tint in the shader),
+  // so they are truly skin-tight: no shells, no gaps between top and trousers, nothing poking through at the knees
+  const fit = outfit(o || {}), REGC = { 1: fit.torso, 2: fit.front || fit.torso, 3: fit.boots, 4: fit.legs, 5: fit.sleeves };
+  let baseGeo = lib.geo, baseMat = lib.mat;
+  if (lib.geo.attributes._region && Object.values(REGC).some(Boolean)) {
+    const reg = lib.geo.attributes._region, n = reg.count, t = new Float32Array(n * 4), cache = {};
+    for (let i = 0; i < n; i++) { const h = REGC[Math.round(reg.getX(i))]; if (!h) continue; const c = cache[h] || (cache[h] = new THREE.Color(h)); t[i * 4] = c.r; t[i * 4 + 1] = c.g; t[i * 4 + 2] = c.b; t[i * 4 + 3] = 1; }
+    // little untagged islands on the legs (the knees) take the colour round them, so no white patches show through
+    { const ix = lib.geo.index.array, pos = lib.geo.attributes.position, yTop = M.hip[1] * HS;
+      for (let pass = 0; pass < 6; pass++) {
+        const sum = new Float32Array(n * 4), cnt = new Uint16Array(n), tot = new Uint16Array(n);
+        for (let f = 0; f < ix.length; f += 3) for (let a = 0; a < 3; a++) { const v = ix[f + a]; if (t[v * 4 + 3]) continue;
+          for (let b = 1; b < 3; b++) { const w = ix[f + (a + b) % 3]; tot[v]++; if (t[w * 4 + 3]) { cnt[v]++; for (let c = 0; c < 3; c++) sum[v * 4 + c] += t[w * 4 + c]; } } }
+        let changed = 0;
+        for (let v = 0; v < n; v++) if (!t[v * 4 + 3] && tot[v] && cnt[v] / tot[v] >= 0.6 && pos.getY(v) < yTop) { for (let c = 0; c < 3; c++) t[v * 4 + c] = sum[v * 4 + c] / cnt[v]; t[v * 4 + 3] = 1; changed++; }
+        if (!changed) break;
+      } }
     baseGeo = new THREE.BufferGeometry();
-    for (const n in lib.geo.attributes) baseGeo.setAttribute(n, lib.geo.attributes[n]);
-    baseGeo.setIndex(keep);
+    for (const k in lib.geo.attributes) baseGeo.setAttribute(k, lib.geo.attributes[k]);
+    baseGeo.setIndex(lib.geo.index); baseGeo.setAttribute('tint', new THREE.BufferAttribute(t, 4));
+    baseMat = lib.mat.clone();
+    baseMat.onBeforeCompile = (sh) => {
+      sh.vertexShader = 'attribute vec4 tint;\nvarying vec4 vTint;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vTint = tint;');
+      sh.fragmentShader = 'varying vec4 vTint;\n' + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, vTint.rgb * (0.82 + 0.25 * dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114))), vTint.a);');
+    };
+    baseMat.customProgramCacheKey = () => 'hero-tint';
   }
-  const mesh = new THREE.SkinnedMesh(baseGeo, lib.mat);
+  const mesh = new THREE.SkinnedMesh(baseGeo, baseMat);
   mesh.frustumCulled = false; mesh.castShadow = true;
   root.add(mesh); root.add(upd); root.updateMatrixWorld(true);
   mesh.bind(skel, mesh.matrixWorld);
   // shop clothes on the base body
-  if (lib.shells) for (const part of ['torso', 'front', 'sleeves', 'legs', 'boots']) {
+  if (lib.shells && !baseGeo.attributes.tint) for (const part of ['torso', 'front', 'sleeves', 'legs', 'boots']) {
     if (!fit[part]) continue;
     const sm = new THREE.SkinnedMesh(lib.shells[part], shellMat(part === 'boots' && fit.cuff ? fit.boots : fit[part]));
     sm.frustumCulled = false; sm.userData.tint = fit[part]; root.add(sm); sm.bind(skel, mesh.matrixWorld);
