@@ -420,4 +420,14 @@ patch('js/shop.js', [("  { id: 'bootsG',   slot: 'feet',",
   "  { id: 'shoePink', slot: 'feet', name: '粉兔兔鞋', price: 160, style: { boots: '#FF9CC0' }, sw: ['#FF9CC0', '#FFFFFF'] },\n"
   "  { id: 'shoeBlk',  slot: 'feet', name: '黑亮皮鞋', price: 200, style: { boots: '#1C1C22' }, sw: ['#1C1C22', '#6B6B78'] },\n"
   "  { id: 'bootsG',   slot: 'feet',")])
+# ---- v6.2.1 (宝宝 2026-11-20 00:55): after buying or switching look the shop grid no longer flashes broken-image icons —
+# a picture still being drawn keeps the item's last picture (or stays blank), then swaps in when ready
+patch('js/ui.js', [
+  ("<img alt=\"\" data-th=\"${it.id}\" src=\"${(this.h.thumbCached ? this.h.thumbCached(it) : this.h.thumb(it)) || ''}\">",
+   "<img alt=\"\" data-th=\"${it.id}\" src=\"${(() => { const u = this.h.thumbCached ? this.h.thumbCached(it) : this.h.thumb(it); const L = this.__lastTh || (this.__lastTh = {}); if (u) { L[it.id] = u; return u; } return L[it.id] ? L[it.id] + '#old' : 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='; })()}\">"),
+  ("pend = [...g.querySelectorAll('img[data-th]')].filter((im) => !im.getAttribute('src'));",
+   "pend = [...g.querySelectorAll('img[data-th]')].filter((im) => { const s = im.getAttribute('src') || ''; return !s || s.endsWith('#old') || s.startsWith('data:image/gif'); });"),
+  ("try { im.src = this.h.thumb(x) || ''; } catch (_) {}",
+   "try { const u = this.h.thumb(x); if (u) { im.src = u; (this.__lastTh || (this.__lastTh = {}))[x.id] = u; } } catch (_) {}"),
+])
 print('apk-patch applied')
