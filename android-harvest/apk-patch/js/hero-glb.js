@@ -24,6 +24,11 @@ const MODELS = {
     hip: [0.06, 0.44, -0.028], knee: [0.062, 0.225, -0.011], sh: [0.092, 0.68, -0.05], el: [0.115, 0.54, -0.052], wr: [0.122, 0.41, -0.003],
     spine: [0, 0.54, -0.023], neck: [0, 0.715, -0.059], head: [0, 0.87, -0.055], headHalf: [0.115, 0.13, 0.123], hairPivot: [0, 0.72, -0.08] },
 };
+// 6.1.8 (宝宝 2026-11-19): 黑西装猫猫 — his clothed look (black suit, cat ears, big fluffy tail) as a whole model;
+// worn instead of his base body, never layered. The tail hangs from the hips and sways (bone 13).
+MODELS.boy_suit = { file: 'hero_boy_suit.glb', hs: 44, legAmp: 0.55, armAmp: 0.75,
+  hip: [0.055, 0.44, -0.03], knee: [0.06, 0.24, -0.019], sh: [0.095, 0.655, -0.022], el: [0.125, 0.565, -0.016], wr: [0.142, 0.49, 0],
+  spine: [0, 0.53, -0.009], neck: [0, 0.725, 0.003], head: [0, 0.865, -0.007], headHalf: [0.11, 0.115, 0.115], hairPivot: [0, 0.4, -0.1] };
 const PROC_HEAD = [7.7 * 1.08, 7.7 * 1.04, 7.7 * 0.98];   // the procedural head the hats were made for
 const BASE_OVERALLS = '#4F79A9';
 const HAT_S = 1.15, HAT_DY = 2.4;
@@ -76,7 +81,7 @@ function outfit(o) {
 }
 const isBoy = (o) => String((o && o.character) || '').startsWith('boy');
 function keyFor(o) {
-  if (isBoy(o)) return 'boy';
+  if (isBoy(o)) return o.catSuit ? 'boy_suit' : 'boy';
   const f = outfit(o || {});
   return Object.keys(f).length ? 'girl_base' : 'girl';     // any shop top / boots → the base body, the default look comes off
 }

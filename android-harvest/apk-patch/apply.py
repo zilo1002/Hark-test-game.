@@ -392,4 +392,7 @@ patch('js/models.js', [
     ("  if (o.glbSkin === 'hero' && attachHeroModel(__pp)) {}",
      "  if (o.glbSkin === 'hero' && o.character === 'q') attachPersonModel(__pp, 'hero');\n  else if (o.glbSkin === 'hero' && attachHeroModel(__pp)) {}"),
 ])
+# ---- v6.1.8 (宝宝 2026-11-19): 黑西装猫猫 in the shop for 2000 gold — on the boy it is his own Hunyuan suit model (hero-glb.js)
+patch('js/shop.js', [("  { id: 'bootsG',   slot: 'feet',",
+    "  { id: 'catSuit',  slot: 'top',  name: '黑西装猫猫', price: 2000, style: { catSuit: true, vest: '#1C1C22', bowtie: false, shirt: '#1C1C22', sleeve: '#1C1C22', pants: '#1C1C22' }, sw: ['#1C1C22', '#6B4A3A'] },\n  { id: 'bootsG',   slot: 'feet',")])
 print('apk-patch applied')
