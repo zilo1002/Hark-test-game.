@@ -328,3 +328,35 @@ patch('js/render3d.js', [
      "  }\n"
      "  drawStack(c, o, labels, isPlayer) {\n"),
 ])
+
+# ---- v6.1.3 (宝宝 2026-11-19 10:16): "普通搬运工站着不干活；升级小车也就拿一点，还得等" ----
+# a) the 加工品搬运工 waited at an emptied tray until he held 40% of his (truck-sized) load; now he leaves
+#    after 3 s with whatever he has.
+# b) a farmhand with a big basket waited until the whole basket fit on the wooden board; now he unloads
+#    whatever fits, and while the board is full he goes back to harvesting instead of standing there.
+patch('js/world.js', [
+    ("      if (left === 0 && w.incoming === 0 && (have >= Math.ceil(w.cap * CFG.v47.porterGo) || (low && have >= CFG.v47.porterMin))) w.state = 'deliver';",
+     "      if (left === 0 && w.incoming === 0 && have > 0) w.porterIdle = (w.porterIdle || 0) + dt; else w.porterIdle = 0;\n"
+     "      if (left === 0 && w.incoming === 0 && (have >= Math.ceil(w.cap * CFG.v47.porterGo) || (low && have >= CFG.v47.porterMin) || w.porterIdle > 3)) { w.state = 'deliver'; w.porterIdle = 0; }"),
+    ("    if (s.kind === 'stand') { const need = w.stack.length || w.cap; return s.pile.total + s.pile.pending + need <= s.pile.cap; }",
+     "    if (s.kind === 'stand') { const need = w.stack.length || w.cap; return s.pile.total + s.pile.pending + (w.standCarrier ? Math.min(need, 30) : need) <= s.pile.cap; }"),
+    ("        if (s.kind === 'stand' && s.pile.total + s.pile.pending + (w.stack.length || w.cap) > s.pile.cap) { w.blocked = s; continue; }",
+     "        if (s.kind === 'stand' && s.pile.total + s.pile.pending + (w.standCarrier ? Math.min(w.stack.length || w.cap, 30) : (w.stack.length || w.cap)) > s.pile.cap) { w.blocked = s; continue; }"),
+    ("    if (this.smart && !w.feedFor && !w.fullBatch && w.state === 'collect' && w.stack.length >= Math.ceil(w.cap * CFG.v46.holdAt)) {",
+     "    if (this.smart && !w.feedFor && !w.fullBatch && !w.standCarrier && w.state === 'collect' && w.stack.length >= Math.ceil(w.cap * CFG.v46.holdAt)) {"),
+    ("      else if (this.smart && anyTakes) { const o = this.deskSpot(w) || this.post(w, srcs); tx = o.x;",
+     "      else if (this.smart && anyTakes && w.standCarrier && w.stack.length < w.cap) { w.state = 'collect'; }   // v6.1.3: board full → keep harvesting\n"
+     "      else if (this.smart && anyTakes) { const o = this.deskSpot(w) || this.post(w, srcs); tx = o.x;"),
+])
+# c) the 加工品搬运工 / 理货员 picked up the machine's output one piece at a time and every new piece restarted
+#    his wait, so with a slow machine he never left (and the goods counter sat empty). Now he leaves 4 s after
+#    his first piece, or at once with 5+ when the goods counter is running low.
+patch('js/world.js', [
+    ("    } else if (w.clerk) w.clerkCollectAge = 0;\n",
+     "    } else if (w.clerk) w.clerkCollectAge = 0;\n"
+     "    if ((w.tally || w.porter) && w.state === 'collect' && w.stack.length > 0) {\n"
+     "      w.holdAge = (w.holdAge || 0) + dt;\n"
+     "      const sk = sinks[0], low = sk && sk.stock && sk.stock.length + sk.incoming < CFG.v47.porterLow;\n"
+     "      if (w.incoming === 0 && (w.holdAge >= 4 || (low && w.stack.length >= CFG.v47.porterMin))) { w.state = 'deliver'; w.holdAge = 0; }\n"
+     "    } else if (w.tally || w.porter) w.holdAge = 0;\n"),
+])
