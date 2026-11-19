@@ -459,4 +459,99 @@ patch('style.css', [("#undressAll {", "#undressOne, #undressAll {"),
 patch('style.css', [("@media (orientation: landscape) and (max-height: 420px) { .pv { flex-basis: 150px; } .pv canvas { height: 140px; }",
   "@media (orientation: landscape) and (max-height: 420px) { .pv { flex-basis: 210px; } .pv canvas { height: 210px; }")])
 patch('style.css', [("#undressOne, #undressAll {", "#characterSwitch, #undressOne, #undressAll { display: inline-flex; align-items: center; vertical-align: middle; }\n#undressOne, #undressAll {")])
+# ---- v6.2.5 (宝宝 2026-11-20 02:25): the 系统设置 page gets what other games have — volume, language, save backup
+# (export / import a save code), and 帮助与支持: privacy policy, terms of service, contact support, credits, about & update
+DOCS_JS = r"""
+const DOCS = {
+  privacy: ['隐私政策', `<p><b>半亩·丰收 隐私政策</b><br>生效日期：2026年11月20日</p>
+<p><b>1. 我们不收集你的个人信息。</b>游戏不需要注册或登录，不会读取姓名、手机号、位置、通讯录、相册或设备标识。</p>
+<p><b>2. 存档只在你的手机里。</b>金币、星星、衣服、庄园等进度只保存在本机的应用存储中，不会上传。卸载游戏或清除应用数据会删除存档，可以先用「导出存档码」备份。</p>
+<p><b>3. 联网只用于更新。</b>只有你在「关于与更新」里点「检查更新」时，游戏才会访问 GitHub 查询新版本并下载安装包。游戏里没有广告、统计或第三方追踪。</p>
+<p><b>4. 权限。</b>震动：用于操作时的震动反馈（可在设置里关掉）。网络：仅用于检查和下载更新。</p>
+<p><b>5. 未成年人。</b>游戏适合全年龄，不收集任何人的个人信息，包括未成年人。</p>
+<p><b>6. 政策变更。</b>如有调整，会随新版本一起更新，并在这里写明生效日期。</p>
+<p><b>7. 联系我们。</b>有任何问题，请在「联系支持」里找到我们。</p>`],
+  terms: ['服务条款', `<p><b>半亩·丰收 服务条款</b><br>生效日期：2026年11月20日</p>
+<p><b>1. 使用。</b>本游戏免费提供给你个人娱乐使用。请不要破解、篡改或用于商业用途。</p>
+<p><b>2. 虚拟物品。</b>金币、星星、衣服、装饰、宠物等都是游戏内的虚拟物品，只能在游戏里使用，没有现实货币价值，不能兑换或退款。</p>
+<p><b>3. 存档。</b>存档保存在你的设备上，我们无法替你找回。卸载、清除数据或换手机前，请先导出存档码。</p>
+<p><b>4. 更新与变化。</b>游戏会持续更新，玩法、数值和内容可能调整；我们会尽量保留你的进度。</p>
+<p><b>5. 免责声明。</b>游戏按「现状」提供。我们会尽力修好问题，但不保证没有错误或一直可用。</p>
+<p><b>6. 条款变更。</b>条款更新会随新版本发布，继续游戏即表示同意新的条款。</p>`],
+  credits: ['致谢', `<p><b>半亩·丰收</b></p>
+<p>人物与宠物模型：腾讯混元 3D 生成，再在游戏里绑定骨骼、换装。</p>
+<p>3D 引擎：three.js（MIT 许可）。</p>
+<p>谢谢每一位帮忙试玩、录视频找穿模的小伙伴 ♥</p>`],
+};
+"""
+patch('index.html', [
+  ('    <label class="row"><span>震动</span><input type="checkbox" id="optVib"><i class="sw"></i></label>',
+   '    <label class="row"><span>震动</span><input type="checkbox" id="optVib"><i class="sw"></i></label>\n'
+   '    <label class="row"><span>音量</span><input type="range" id="optVol" min="0" max="100" step="5"><b id="optVolV" class="volv">50</b></label>\n'
+   '    <div class="row"><span>语言</span><b class="volv">简体中文</b></div>'),
+  ('    <button class="small danger" id="btnReset">重置全部进度</button>',
+   '    <div class="rowh">存档</div>\n'
+   '    <div class="brow2"><button class="small" id="btnExport">导出存档码</button><button class="small" id="btnImport">导入存档码</button></div>\n'
+   '    <div class="rowh">帮助与支持</div>\n'
+   '    <button class="linkrow" id="lnPrivacy">隐私政策<i>›</i></button>\n'
+   '    <button class="linkrow" id="lnTerms">服务条款<i>›</i></button>\n'
+   '    <button class="linkrow" id="lnSupport">联系支持<i>›</i></button>\n'
+   '    <button class="linkrow" id="lnCredits">致谢<i>›</i></button>\n'
+   '    <button class="linkrow" id="lnAbout">关于与更新<i>›</i></button>\n'
+   '    <button class="small danger" id="btnReset">重置全部进度</button>'),
+  ('<div id="about" class="modal hidden">',
+   '<div id="doc" class="modal hidden"><div class="card sheet">\n'
+   '  <div class="mhead"><h2 id="docT"></h2><button class="xclose" data-close aria-label="关闭">✕</button></div>\n'
+   '  <div class="mbody docBody" id="docB"></div>\n'
+   '  <div class="mfoot" id="docF"></div>\n'
+   '</div></div>\n\n<div id="about" class="modal hidden">'),
+])
+patch('style.css', [('#undressOne, #undressAll {',
+  '#optVol { flex: 1; margin: 0 10px; accent-color: #E79A2A; min-width: 0; }\n'
+  '.volv { min-width: 34px; text-align: right; color: #6B5A3A; font-weight: 900; }\n'
+  '.brow2 { display: flex; gap: 8px; margin: 4px 0 8px; } .brow2 .small { flex: 1; }\n'
+  '.linkrow { display: flex; width: 100%; justify-content: space-between; align-items: center; padding: 11px 6px; border: 0; border-bottom: 1px solid rgba(90,74,58,.12); background: none; color: #4A3A28; font-size: 16px; font-weight: 800; text-align: left; }\n'
+  '.linkrow i { font-style: normal; color: #B0A08A; font-size: 20px; }\n'
+  '.docBody { font-size: 14.5px; line-height: 1.65; color: #4A3A28; } .docBody p { margin: 0 0 10px; }\n'
+  '.docBody textarea { width: 100%; box-sizing: border-box; height: 120px; font-size: 12px; border-radius: 10px; border: 2px solid #E4D9C2; padding: 8px; word-break: break-all; }\n'
+  '#docF { display: flex; gap: 8px; } #docF .big { flex: 1; }\n'
+  '#undressOne, #undressAll {')])
+patch('js/audio.js', [
+  ("this.master.gain.value = 0.5;", "this.master.gain.value = this.vol ?? 0.5;"),
+  ("  unlock() {", "  setVol(v) { this.vol = v; if (this.master) this.master.gain.value = v; }\n  unlock() {"),
+])
+patch('js/main.js', [
+  ("snd.on = data.settings.sound; hap.on = data.settings.vib;", "snd.on = data.settings.sound; hap.on = data.settings.vib; snd.vol = (data.settings.vol ?? 50) / 100;"),
+  ("if (k === 'vib') { hap.on = v;", "if (k === 'vol') snd.setVol(v / 100); if (k === 'vib') { hap.on = v;"),
+  ("  undressSlot: (k) => {",
+   "  exportSave: () => { Save.save(data); return btoa(unescape(encodeURIComponent(JSON.stringify(data)))); },\n"
+   "  importSave: (code) => { let d; try { d = JSON.parse(decodeURIComponent(escape(atob(String(code).replace(/\\s+/g, ''))))); } catch (_) { return false; }\n"
+   "    if (!d || typeof d !== 'object' || !d.shop || !d.settings || !d.stars) return false;\n"
+   "    Save.save(d); data = Save.load(); Save.save(data); world = null; setTimeout(() => location.reload(), 300); return true; },\n"
+   "  undressSlot: (k) => {"),
+])
+patch('js/ui.js', [
+  ("// DOM layer: HUD, banners, pause menu, home panel, level select, settings, win card.",
+   "// DOM layer: HUD, banners, pause menu, home panel, level select, settings, win card.\n" + DOCS_JS.replace('\\n', '\\n')),
+  ("this.el.menu, this.el.env, this.el.about]", "this.el.menu, this.el.env, this.el.about, $('doc')]"),
+  ("    $('optVib').onchange = (e) => h.setting('vib', e.target.checked);",
+   "    $('optVib').onchange = (e) => h.setting('vib', e.target.checked);\n"
+   "    $('optVol').oninput = (e) => { const v = +e.target.value; $('optVolV').textContent = v; h.setting('vol', v); };\n"
+   "    $('optVol').onchange = () => h.tap();\n"
+   "    for (const [id, k] of [['lnPrivacy', 'privacy'], ['lnTerms', 'terms'], ['lnCredits', 'credits']]) $(id).onclick = () => { h.tap(); this.openDoc(DOCS[k][0], DOCS[k][1]); };\n"
+   "    $('lnAbout').onclick = () => { h.tap(); this.openAbout(); };\n"
+   "    $('lnSupport').onclick = () => { h.tap(); this.openDoc('联系支持', `<p>遇到 bug、穿模、存档问题，或者有想要的新内容，都可以告诉我们。</p><p><b>反馈页面：</b>在 GitHub 上提交问题（Issues），记得写上版本号 ${this.appVersion() ? 'v' + this.appVersion() : ''}，最好附上截图或录屏。</p><p>常见问题：<br>· 换手机 / 重装前，先在设置里「导出存档码」并保存好。<br>· 画面卡顿可以把画质调到「低」。<br>· 没有声音请检查设置里的「声音」和「音量」。</p>`, [['打开反馈页面', () => this.openExternal('https://github.com/zilo1002/Hark-test-game./issues')]]); };\n"
+   "    $('btnExport').onclick = () => { h.tap(); const code = h.exportSave(); this.openDoc('导出存档码', '<p>把下面这串存档码复制保存好（发给自己、记到备忘录都行）。换手机或重装后，用「导入存档码」就能找回进度。</p><textarea id=\"saveCode\" readonly></textarea><p id=\"copyNote\"></p>', [['复制', () => { const t = $('saveCode'); t.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (_) {} try { navigator.clipboard && navigator.clipboard.writeText(t.value).then(() => { $('copyNote').textContent = '已复制 ✓'; }); } catch (_) {} $('copyNote').textContent = ok ? '已复制 ✓' : '如果没复制上，长按上面的文字全选复制'; }]]); $('saveCode').value = code; };\n"
+   "    $('btnImport').onclick = () => { h.tap(); this.openDoc('导入存档码', '<p>把之前导出的存档码粘贴到下面。<b>导入会覆盖现在的进度</b>，导入后游戏会自动重新载入。</p><textarea id=\"saveIn\" placeholder=\"在这里长按粘贴存档码\"></textarea><p id=\"impNote\"></p>', [['导入', () => { const v = $('saveIn').value.trim(); if (!v) { $('impNote').textContent = '先粘贴存档码哦'; return; } const b = $('docF').querySelector('.big'); if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = '再点一次：确定覆盖'; return; } $('impNote').textContent = h.importSave(v) ? '导入成功，正在重新载入…' : '这串存档码不对，检查一下是不是复制完整了'; delete b.dataset.armed; b.textContent = '导入'; }]]); };"),
+  ("  openSettings(focus) {",
+   "  openDoc(title, html, actions = []) {\n"
+   "    $('docT').textContent = title; $('docB').innerHTML = html; const f = $('docF'); f.innerHTML = '';\n"
+   "    for (const [label, fn] of actions) { const b = document.createElement('button'); b.className = 'big'; b.textContent = label; b.onclick = fn; f.appendChild(b); }\n"
+   "    const c = document.createElement('button'); c.className = 'big' + (actions.length ? ' off' : ''); c.textContent = '好的'; c.setAttribute('data-close', ''); f.appendChild(c);\n"
+   "    this.openModal($('doc'));\n  }\n  openSettings(focus) {"),
+  ("    $('optSound').checked = d.settings.sound; $('optVib').checked = d.settings.vib;",
+   "    $('optSound').checked = d.settings.sound; $('optVib').checked = d.settings.vib; $('optVol').value = d.settings.vol ?? 50; $('optVolV').textContent = d.settings.vol ?? 50;"),
+])
+patch('js/ui.js', [("$('mSaveSub').textContent = `震动${d.settings.vib ? '开' : '关'} · 重置进度`;", "$('mSaveSub').textContent = `音量 ${d.settings.vol ?? 50} · 存档备份 · 隐私与支持`;")])
+patch('index.html', [('<button class="tile" id="mSave"><b>震动 · 存档</b>', '<button class="tile" id="mSave"><b>设置与支持</b>')])
 print('apk-patch applied')
