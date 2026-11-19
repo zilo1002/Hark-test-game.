@@ -258,3 +258,73 @@ patch('js/main.js', [("  if (m.page === 3 && data.unlocked < 38) {", "  if ((m.p
 patch('index.html', [('<button data-p="3">湖畔酒庄</button></div>', '<button data-p="3">湖畔酒庄</button><button data-p="4">椰风海岛</button></div>')])
 
 print('apk-patch applied')
+
+# ---- v6.1.2 (宝宝 2026-11-19 10:02) ----
+# 1) "普通售货员不干活": the walking clerk stood by the raw board holding a load while the raw counter sat
+#    between its 30/80 top-up marks. Now he tops the counter up whenever a batch fits (up to rawFull + 40),
+#    and when there is nothing to carry he stands at the desk (north end, where the old desk figure stood)
+#    facing the customers, instead of loitering by the board.
+patch('js/world.js', [
+    ("    const n = this.rawStock(s);\n    if (!this.procs.length) return n < CFG.counter.stockMax;\n",
+     "    const n = this.rawStock(s);\n    if (!this.procs.length) return n < CFG.counter.stockMax;\n"
+     "    if (w.clerk && !w.porter) return n + Math.max(1, Math.min(w.stack.length || w.cap, w.cap)) <= CFG.v46.rawFull + 40;\n"),
+    ("          if (!counter.sale2 && this.procs.length) room = Math.min(room, CFG.v46.rawFull + 4 - this.rawStock(counter));",
+     "          if (!counter.sale2 && this.procs.length) room = Math.min(room, CFG.v46.rawFull + 40 - this.rawStock(counter));"),
+    ("  idlePost(w, srcs) {\n",
+     "  deskSpot(w) { const k = w.clerk && !w.porter && this.objs[w.to[0]]; return k && k.kind === 'counter' && !k.hidden ? { x: k.x + 4, y: k.y - 44 } : null; }\n"
+     "  idlePost(w, srcs) {\n    { const d = this.deskSpot(w); if (d) return d; }\n"),
+    ("      else if (this.smart && anyTakes) { const o = this.post(w, srcs); tx = o.x;",
+     "      else if (this.smart && anyTakes) { const o = this.deskSpot(w) || this.post(w, srcs); tx = o.x;"),
+])
+patch('js/render3d.js', [
+    ("    if (sp > 8) o.ang = angLerp(o.ang, Math.atan2(c.vx, c.vy), Math.min(1, dt * 12));\n    const app =",
+     "    if (sp > 8) o.ang = angLerp(o.ang, Math.atan2(c.vx, c.vy), Math.min(1, dt * 12));\n"
+     "    else if (c.clerk && this.world.deskSpot) { const d = this.world.deskSpot(c); if (d && Math.hypot(d.x - c.x, d.y - c.y) < 26) o.ang = angLerp(o.ang, 0.3, Math.min(1, dt * 6)); }   // v6.1.2: the clerk at the desk faces the till\n"
+     "    const app ="),
+])
+# 2) the raw counter's single crop sits as 6 even towers (4 for big goods) that grow upward together,
+#    instead of one 4x3 block in the middle. The processed counter keeps its tall single stack.
+patch('js/render3d.js', [
+    ("        const type = singleKind[0], n = Math.min(c.stock.length, 120);\n        for (let j = 0; j < n; j++) {\n",
+     "        const type = singleKind[0], n = Math.min(c.stock.length, 120);\n"
+     "        const big = (M.ITEM_HALF[type] || 2) >= 3.3, towers = big ? [[-7.5, -13], [7.5, -13], [-7.5, 13], [7.5, 13]] : [[-7.5, -21], [7.5, -21], [-7.5, 0], [7.5, 0], [-7.5, 21], [7.5, 21]];\n"
+     "        if (!c.sale2) for (let j = 0; j < n; j++) {\n"
+     "          const p = j % towers.length, k = (j / towers.length) | 0, cell = k % 4, lay = (k / 4) | 0, [tx, tz] = towers[p], sp = big ? 2.6 : 2.1;\n"
+     "          this.item(type, c.x + tx + (cell % 2 ? sp : -sp), c.y + tz + ((cell / 2) | 0 ? sp * 0.86 : -sp * 0.86), K.deskH + 1 + lay * CFG.items[type].step * 0.8 + (M.ITEM_HALF[type] || 2), (j % 3) * 0.2 + 0.785, 0.85);\n"
+     "        }\n"
+     "        else for (let j = 0; j < n; j++) {\n"),
+])
+# 3) the carried stack leans out in front of the big chibi head and any hat (and the owl) instead of
+#    passing through them: above chest height every layer is pushed forward far enough to clear the face,
+#    and above the hat's lower edge far enough to clear the hat's front.
+patch('js/render3d.js', [
+    ("    let top = { x: b.x, y: b.y, z: b.z };\n",
+     "    let top = { x: b.x, y: b.y, z: b.z };\n"
+     "    const clr = b.sway !== undefined && o.pp && o.pp.glbModel ? this.headClear(o) : null, nearF = 12 + (deep - 1) * 3 - (deep - 1) / 2 * b.spread;\n"),
+    ("      const headingSway = c.moving ? Math.sin(c.walk + i * 0.12) * 0.025 : 0;\n      this.item(type, x, y, z,",
+     "      let px = x, py = y;\n"
+     "      if (clr) {\n"
+     "        const need = (f) => Math.max(0, f + half + 1 - nearF), sm = (a, b2, v) => Math.max(0, Math.min(1, (v - a) / (b2 - a)));\n"
+     "        const push = Math.max(need(clr.face) * sm(clr.chin - 6, clr.chin + 6, z), clr.hat ? need(clr.hat) * sm(clr.hatBot - 14, clr.hatBot, z) : 0);\n"
+     "        px += b.fx * push; py += b.fz * push;\n"
+     "      }\n"
+     "      const headingSway = c.moving ? Math.sin(c.walk + i * 0.12) * 0.025 : 0;\n      this.item(type, px, py, z,"),
+    ("  drawStack(c, o, labels, isPlayer) {\n",
+     "  // v6.1.2: how far forward the model's face and its hat / owl reach (world units, cached per look)\n"
+     "  headClear(o) {\n"
+     "    const pp = o.pp, head = pp.head, key = head.children.length + ':' + (pp.o && pp.o.hat || '');\n"
+     "    if (o._clr && o._clrKey === key) return o._clr;\n"
+     "    const s = (o.root ? o.root.scale.x : 1) * pp.root.scale.x || 1.15;\n"
+     "    const clr = { face: 15.8 * s, chin: 24 * s, hat: 0, hatBot: 1e9 };\n"
+     "    pp.root.updateMatrixWorld(true);\n"
+     "    const inv = new THREE.Matrix4().copy(pp.root.matrixWorld).invert(), bb = new THREE.Box3();\n"
+     "    for (const ch of head.children) {\n"
+     "      if (!ch.userData.hat && !(pp.root.userData.owl && ch === pp.root.userData.owl)) continue;\n"
+     "      ch.traverse((m) => { if (!m.isMesh) return; bb.setFromObject(m); if (bb.isEmpty()) return; bb.applyMatrix4(inv);\n"
+     "        if (bb.max.z * s > clr.face) { clr.hat = Math.max(clr.hat, bb.max.z * s); clr.hatBot = Math.min(clr.hatBot, bb.min.y * s); } });\n"
+     "    }\n"
+     "    if (clr.hat <= clr.face) clr.hat = 0;\n"
+     "    o._clr = clr; o._clrKey = key; return clr;\n"
+     "  }\n"
+     "  drawStack(c, o, labels, isPlayer) {\n"),
+])
