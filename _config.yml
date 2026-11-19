@@ -1,5 +1,8 @@
-# 半亩·丰收 is Android-only now (宝宝 2026-11-19): keep the game source out of the GitHub Pages site.
+# 半亩·丰收 is Android-only (宝宝 2026-11-19): the web site is turned off, nothing is published to GitHub Pages.
 exclude:
+  - index.html
+  - css
+  - js
   - harvest
   - android-harvest
   - sim
