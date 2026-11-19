@@ -76,9 +76,7 @@ patch('js/render3d.js', [
 ])
 patch('js/home3d.js', [("person = M.makePerson(look);", "person = M.makePerson({ ...look, glbSkin: 'hero' });")])
 patch('js/preview3d.js', [("const pp = M.makePerson(personStyle);", "const pp = M.makePerson({ ...personStyle, glbSkin: what.uni !== undefined ? 'staff' : 'hero' });")])
-# the farm owner has one look: no boy/girl switch in the shop
-patch('js/shop.js', [("export const isBoyCharacter = (id) => String(id || '').startsWith('boy');", "export const isBoyCharacter = (id) => false;")])
-patch('js/ui.js', [("    characterSwitch.classList.remove('hidden');", "    characterSwitch.classList.add('hidden');")])
+# (6.1.6: the boy/girl switch is back — 宝宝 2026-11-19 — so the shop's 切换为男孩/女孩 button stays)
 
 # v5.9.1: a piece she already wears is previewed on its own over the farm look, so worn pieces don't all show the same full outfit
 patch('js/ui.js', [
@@ -257,7 +255,6 @@ patch('js/ui.js', [
 patch('js/main.js', [("  if (m.page === 3 && data.unlocked < 38) {", "  if ((m.page === 3 && data.unlocked < 38) || (m.page === 4 && data.unlocked < 75)) {")])
 patch('index.html', [('<button data-p="3">湖畔酒庄</button></div>', '<button data-p="3">湖畔酒庄</button><button data-p="4">椰风海岛</button></div>')])
 
-print('apk-patch applied')
 
 # ---- v6.1.2 (宝宝 2026-11-19 10:02) ----
 # 1) "普通售货员不干活": the walking clerk stood by the raw board holding a load while the raw counter sat
@@ -373,3 +370,12 @@ patch('js/models.js', [
     ("    head.add(mesh(box(8, 0.9, 6), '#1A1A3A', 0, 2.6, 8.4));",
      "    head.add(mesh(box(8, 0.9, 3.4), '#1A1A3A', 0, 2.6, 7.4));"),
 ])
+
+# ---- v6.1.6 (宝宝 2026-11-19): the farm owner is her own Hunyuan girl (default look) or boy (切换为男孩/女孩),
+# on a finer 14-bone skeleton; shop clothes are fitted onto the bare base body and replace the default look (hero-glb.js).
+# Employees and customers keep the cat-ear maid model.
+patch('js/models.js', [
+    ("import { attachPersonModel } from './person-glb.js';", "import { attachPersonModel } from './person-glb.js';\nimport { attachHeroModel } from './hero-glb.js';"),
+    ("  if (o.glbSkin) attachPersonModel(__pp, o.glbSkin);", "  if (o.glbSkin === 'hero' && attachHeroModel(__pp)) {}\n  else if (o.glbSkin) attachPersonModel(__pp, o.glbSkin);"),
+])
+print('apk-patch applied')

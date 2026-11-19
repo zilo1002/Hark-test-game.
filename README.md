@@ -2,7 +2,7 @@
 
 > 走进田地收获、加工、装箱并出售，解锁新关卡、雇工和庄园。3D 种田，安卓 APK。
 
-现有 90 关；当前 Android 版本为 6.1.5（versionCode 95）。只有安卓客户端，APK 在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 下载。版本、测试状态和关卡说明见 [harvest/README.md](./harvest/README.md)。
+现有 90 关；当前 Android 版本为 6.1.6（versionCode 96）。只有安卓客户端，APK 在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 下载。版本、测试状态和关卡说明见 [harvest/README.md](./harvest/README.md)。
 
 ## ✨ 功能亮点
 - 90 关，每关一个新作物、新机器或新玩法，按用时得 1–3 颗星。
