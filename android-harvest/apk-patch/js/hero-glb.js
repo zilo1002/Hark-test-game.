@@ -29,6 +29,8 @@ const MODELS = {
 MODELS.boy_suit = { file: 'hero_boy_suit.glb', hs: 44, legAmp: 0.55, armAmp: 0.75,
   hip: [0.055, 0.44, -0.03], knee: [0.06, 0.24, -0.019], sh: [0.095, 0.655, -0.022], el: [0.125, 0.565, -0.016], wr: [0.142, 0.49, 0],
   spine: [0, 0.53, -0.009], neck: [0, 0.725, 0.003], head: [0, 0.865, -0.007], headHalf: [0.11, 0.115, 0.115], hairPivot: [0, 0.4, -0.1] };
+// 6.2.2 (宝宝 2026-11-20): her big wavy hair poked through the hats — on the girls the hats are made bigger to sit over the hair
+MODELS.girl.hatS = MODELS.girl_base.hatS = 1.45; MODELS.girl.hatDY = MODELS.girl_base.hatDY = 2.9;
 const PROC_HEAD = [7.7 * 1.08, 7.7 * 1.04, 7.7 * 0.98];   // the procedural head the hats were made for
 const BASE_OVERALLS = '#4F79A9';
 const HAT_S = 1.15, HAT_DY = 2.4;
@@ -115,7 +117,8 @@ function apply(pp, key) {
   // hats were made for the bigger procedural head: sit them down onto the hair and a touch wider (head-local units)
   for (const c of head.children) if (c.userData.hat && !c.userData.heroFit) {
     c.userData.heroFit = true;
-    c.position.set(c.position.x * HAT_S, 4 + (c.position.y - 4) * HAT_S - HAT_DY, c.position.z * HAT_S); c.scale.multiplyScalar(HAT_S);
+    const hs = M.hatS || HAT_S, dy = M.hatDY != null ? M.hatDY : HAT_DY;
+    c.position.set(c.position.x * hs, 4 + (c.position.y - 4) * hs - dy, c.position.z * hs + (M.hatDZ || 0)); c.scale.multiplyScalar(hs);
   }
   // scarf, bow tie and basket were made round the procedural chest (neck at y 8.6, radius ~6.6): shrink them onto the model's
   const kk = (M.sh[0] * HS + 0.6) / 6.6;

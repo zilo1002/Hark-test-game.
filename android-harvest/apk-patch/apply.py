@@ -430,4 +430,7 @@ patch('js/ui.js', [
   ("try { im.src = this.h.thumb(x) || ''; } catch (_) {}",
    "try { const u = this.h.thumb(x); if (u) { im.src = u; (this.__lastTh || (this.__lastTh = {}))[x.id] = u; } } catch (_) {}"),
 ])
+# ---- v6.2.2 (宝宝 2026-11-20 01:10): the straw hat's brim edge stood up like a halo — lay it flat round the brim
+patch('js/models.js', [("    head.add(mesh(tor(6.6, 0.28, 6, 40), '#F5D996', 0, 5.0, 0));",
+  "    { const rim = mesh(tor(6.6, 0.28, 6, 40), '#F5D996', 0, 5.0, 0); rim.rotation.x = Math.PI / 2; head.add(rim); }")])
 print('apk-patch applied')
