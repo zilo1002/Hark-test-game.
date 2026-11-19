@@ -360,3 +360,29 @@ patch('js/world.js', [
      "      if (w.incoming === 0 && (w.holdAge >= 4 || (low && w.stack.length >= CFG.v47.porterMin))) { w.state = 'deliver'; w.holdAge = 0; }\n"
      "    } else if (w.tally || w.porter) w.holdAge = 0;\n"),
 ])
+
+# ---- v6.1.3 (宝宝 2026-11-19 10:24) ----
+# d) 收银升级 puts a 2nd cashier behind the 加工品 counter; instead of a 2nd figure standing there, that
+#    cashier now walks and carries finished goods to the counter (a 2nd porter), going back to the till
+#    when there is nothing to carry.
+# e) a machine whose unlock costs 0 gold builds itself the moment it becomes available (no 0-gold tile).
+patch('js/world.js', [
+    ("      const U = CFG.v43.cup; c.upLv++; c.serveRate *= U.serve; c.interval *= U.interval; c.clerks = 2;\n",
+     "      const U = CFG.v43.cup; c.upLv++; c.serveRate *= U.serve; c.interval *= U.interval; c.clerks = 2;\n"
+     "      if (c.cashier && !c.walkClerk && !c.helper) {   // v6.1.3: the 2nd cashier carries goods\n"
+     "        const from = [...new Set(this.tiles.filter((x) => x.effect && x.effect.worker && (x.effect.worker.to || []).includes(id)).flatMap((x) => x.effect.worker.from || []))].filter((s) => this.objs[s]);\n"
+     "        if (from.length) { const hw = this.addWorker(from, [id], c.x - 24, c.y - 6, false, null); hw.porter = true; hw.helper = true; c.helper = hw; this.refreshStats(); }\n"
+     "      }\n"),
+    ("  deskSpot(w) { const k = w.clerk && !w.porter && this.objs[w.to[0]];",
+     "  deskSpot(w) { if (w.helper) { const h = this.objs[w.to[0]]; return h && !h.hidden ? { x: h.x - 24, y: h.y - 6 } : null; }\n"
+     "    const k = w.clerk && !w.porter && this.objs[w.to[0]];"),
+    ("      if (v && !t.visible && !silent) { t.appearT = this.t; this.emit('tileAppear', { x: t.x, y: t.y }); }\n      t.visible = v;\n    }\n",
+     "      if (v && !t.visible && !silent) { t.appearT = this.t; this.emit('tileAppear', { x: t.x, y: t.y }); }\n      t.visible = v;\n    }\n"
+     "    // v6.1.3 (宝宝): a 0-gold machine needs no unlock tile — build it as soon as it is available\n"
+     "    const free = this.tiles.find((t) => t.visible && !t.done && !t.repeat && (t.price || 0) <= 0 && t.effect && t.effect.show && t.effect.show.some((id) => this.objs[id] && this.objs[id].kind === 'proc'));\n"
+     "    if (free) { free.visible = false; this.completeTile(free, silent); }\n"),
+])
+patch('js/render3d.js', [
+    ("      if (c.cashier && c.clerks === 2 && !o.clerk2) {",
+     "      if (c.cashier && c.clerks === 2 && !o.clerk2 && !c.helper) {"),
+])

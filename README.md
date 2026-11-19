@@ -2,7 +2,7 @@
 
 > 种菜，卖菜，雇人替你干活。水墨风放置种田 + 3D 收获加工，纯静态网页，打开即玩。
 
-另一个小游戏：**[半亩·丰收](./harvest/)** —— 走进田地收获、加工、装箱并出售，解锁新关卡、雇工和庄园。现有 90 关；当前 Android 版本为 6.1.3（versionCode 93）。只有安卓客户端（网页版已于 2026-11-19 下线），APK 可在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 查看。版本、测试状态和关卡说明见 [harvest/README.md](./harvest/README.md)。
+另一个小游戏：**[半亩·丰收](./harvest/)** —— 走进田地收获、加工、装箱并出售，解锁新关卡、雇工和庄园。现有 90 关；当前 Android 版本为 6.1.4（versionCode 94）。只有安卓客户端（网页版已于 2026-11-19 下线），APK 可在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 查看。版本、测试状态和关卡说明见 [harvest/README.md](./harvest/README.md)。
 
 ## ✨ 功能亮点
 - **种**：点一块空地，选种子播下。作物分三个生长阶段，成熟时会泛起微光、轻轻晃动。
