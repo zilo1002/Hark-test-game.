@@ -202,6 +202,17 @@ function apply(pp, skin) {
       d.position.copy(p).applyMatrix4(mesh.matrixWorld).applyMatrix4(inv); d.scale.set(1, 1, 0.5); torso.add(d);
     }
   }
+  // v6.0.0: the owl companion stands on top of the head, on the hat when there is one (head-local units)
+  const owl = root.userData.owl;
+  if (owl) {
+    head.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(head.matrixWorld).invert(), bb = new THREE.Box3();
+    let top = 8.6;                                   // the hair dome between the ears
+    for (const c of head.children) if (c.userData.hat) { bb.setFromObject(c); if (!bb.isEmpty()) { bb.applyMatrix4(inv); top = Math.max(top, bb.max.y); } }
+    head.add(owl);
+    const s = 0.5; owl.scale.set(s / head.scale.x, s / head.scale.y, s / head.scale.z);
+    owl.position.set(0, top - 0.4, -0.3); owl.rotation.set(0, 0, 0);
+  }
   // restore the current pose
   body.rotation.copy(sv.b); torso.rotation.copy(sv.t); head.rotation.copy(sv.h); body.position.y = sv.by;
   arms.forEach((a, i) => a.rotation.copy(sv.a[i])); legs.forEach((l, i) => l.rotation.copy(sv.l[i]));

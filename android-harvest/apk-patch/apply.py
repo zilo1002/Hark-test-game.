@@ -141,7 +141,6 @@ patch('js/render3d.js', [
     ("pigtails: !cu.vip && cu.hue % 3 === 2 });",
      "pigtails: !cu.vip && cu.hue % 3 === 2, glbSkin: cu.vip ? 'vip' : 'cust' + (cu.hue % 8), glbOutfit: null });"),
 ])
-print('apk-patch applied')
 
 # v5.9.7: loading screen with a progress bar + 开始游戏, shop thumbnails pre-rendered on their own renderer, shop grid fills lazily
 exec((here / 'loading.py.txt').read_text(encoding='utf-8'))
@@ -167,3 +166,8 @@ patch('js/render3d.js', [
     ("      if (c.cashier && !o.cashier) { o.cashier = M.makePerson(",
      "      if (c.walkClerk && o.cashier) { this.levelRoot.remove(o.cashier.root); o.cashier = null; o.noDesk = true; }\n      if (c.cashier && !c.walkClerk && !o.cashier) { o.cashier = M.makePerson("),
 ])
+# v6.0.0 (宝宝 2026-11-19): the farmer's head is too big for a shoulder owl, so the owl stands on top of the head / hat.
+patch('js/models.js', [("    body.add(owl.root);\n  }", "    body.add(owl.root); root.userData.owl = owl.root;\n  }")])
+patch('js/ui.js', [("'已停在农夫肩头'", "'站在农夫头顶'"), ("'带上后会停在农夫肩头'", "'带上后会站在农夫头顶（帽子上）'")])
+patch('js/shop.js', [("name: '白绒肩头猫头鹰'", "name: '白绒头顶猫头鹰'")])
+print('apk-patch applied')
