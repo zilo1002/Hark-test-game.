@@ -433,4 +433,30 @@ patch('js/ui.js', [
 # ---- v6.2.2 (宝宝 2026-11-20 01:10): the straw hat's brim edge stood up like a halo — lay it flat round the brim
 patch('js/models.js', [("    head.add(mesh(tor(6.6, 0.28, 6, 40), '#F5D996', 0, 5.0, 0));",
   "    { const rim = mesh(tor(6.6, 0.28, 6, 40), '#F5D996', 0, 5.0, 0); rim.rotation.x = Math.PI / 2; head.add(rim); }")])
+# ---- v6.2.4 (宝宝 2026-11-20 02:07): each look's own clothes are real shop pieces (free, already owned), so trying on
+# shoes only swaps the shoes, a hat only the hat — and her own dress / boots can be picked back from the shop
+patch('js/shop.js', [("  { id: 'bootsY',   slot: 'feet',",
+  "  { id: 'origTop',   slot: 'top',  name: '原装衣服', price: 0, style: {}, sw: ['#2A2A30', '#B03A48'] },\n"
+  "  { id: 'origShoes', slot: 'feet', name: '原装鞋子', price: 0, style: {}, sw: ['#2A2A30'] },\n"
+  "  { id: 'bootsY',   slot: 'feet',"),
+  ("  d.owned = Array.isArray(s.owned) ? s.owned.filter((id) => { const it = itemById(id); return it && !it.map; }) : [];",
+   "  d.owned = Array.isArray(s.owned) ? s.owned.filter((id) => { const it = itemById(id); return it && !it.map; }) : [];\n  for (const id of ['origTop', 'origShoes']) if (!d.owned.includes(id)) d.owned.push(id);")])
+# ---- v6.2.4 (宝宝 2026-11-20 02:11): trying on a piece you already wear keeps the rest of the outfit (it used to show that
+# piece alone); a 脱下X button takes off just the selected piece's slot (一键脱下 stays); the big try-on preview is bigger
+patch('js/ui.js', [
+  ("const worn = d.shop.eq[it.slot] === it.id, eq = worn ? {} : { ...d.shop.eq }; eq[it.slot] = it.id;", "const eq = { ...d.shop.eq }; eq[it.slot] = it.id;"),
+  ("const worn = it && it.slot && d.shop.eq[it.slot] === it.id, eq = worn ? {} : { ...d.shop.eq }; if (it && it.slot) eq[it.slot] = it.id;", "const eq = { ...d.shop.eq }; if (it && it.slot) eq[it.slot] = it.id;"),
+  ("    $('undressAll').onclick = () => { this.h.undressAll(); this.renderShop(); this.h.tap(); };",
+   "    $('undressAll').onclick = () => { this.h.undressAll(); this.renderShop(); this.h.tap(); };\n    $('undressOne').onclick = () => { const it = itemById(this.shopSel || ''); if (it && it.slot) { this.h.undressSlot(it.slot); this.renderShop(); this.h.tap(); } };"),
+  ("    { const u = $('undressAll'); u.classList.toggle('hidden', this.shopTab !== 'outfit' || !Object.values(d.shop.eq).some(Boolean)); }",
+   "    { const u = $('undressAll'); u.classList.toggle('hidden', this.shopTab !== 'outfit' || !Object.values(d.shop.eq).some(Boolean)); }\n    { const u1 = $('undressOne'), si = itemById(this.shopSel || ''), sl = si && si.slot, nm = { hat: '帽子', top: '衣服', neck: '围巾', feet: '鞋子' }; u1.classList.toggle('hidden', !sl || !d.shop.eq[sl]); if (sl) u1.textContent = '脱下' + (nm[sl] || ''); }"),
+])
+patch('js/main.js', [("  undressAll: () => {", "  undressSlot: (k) => { data.shop.eq[k] = null; Save.save(data); applyLook(); if (preview) preview.thumbs = {}; },\n  undressAll: () => {")])
+patch('index.html', [('<button class="small swap hidden" id="undressAll">一键脱下</button>', '<button class="small swap hidden" id="undressOne">脱下</button><button class="small swap hidden" id="undressAll">一键脱下</button>')])
+patch('style.css', [("#undressAll {", "#undressOne, #undressAll {"),
+  (".shopCard .pv { flex: 0 0 150px;", ".shopCard .pv { flex: 0 0 230px;"), (".twopane .shopCard .pv { flex-basis: 140px; }", ".twopane .shopCard .pv { flex-basis: 230px; }"),
+  (".port .shopCard .pv { height: 124px; flex: 0 0 124px; }", ".port .shopCard .pv { height: 200px; flex: 0 0 200px; }")])
+patch('style.css', [("@media (orientation: landscape) and (max-height: 420px) { .pv { flex-basis: 150px; } .pv canvas { height: 140px; }",
+  "@media (orientation: landscape) and (max-height: 420px) { .pv { flex-basis: 210px; } .pv canvas { height: 210px; }")])
+patch('style.css', [("#undressOne, #undressAll {", "#characterSwitch, #undressOne, #undressAll { display: inline-flex; align-items: center; vertical-align: middle; }\n#undressOne, #undressAll {")])
 print('apk-patch applied')

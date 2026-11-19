@@ -20,7 +20,7 @@ const MODELS = {
   girl_base: { file: 'hero_girl_base.glb', hs: 42, legAmp: 0.7, armAmp: 1,
     hip: [0.07, 0.45, -0.029], knee: [0.075, 0.235, -0.027], sh: [0.095, 0.685, -0.05], el: [0.14, 0.555, -0.042], wr: [0.178, 0.43, -0.01],
     spine: [0, 0.55, -0.023], neck: [0, 0.73, -0.04], head: [0, 0.885, -0.025], headHalf: [0.13, 0.125, 0.118], hairPivot: [0, 0.73, -0.1] },
-  boy: { file: 'hero_boy.glb', hs: 43, legAmp: 0.7, armAmp: 1,
+  boy: { file: 'hero_boy.glb', hs: 43, legAmp: 0.46, armAmp: 0.5, bobK: 0.45, waist: [0.585, 0.085, 0.12],   // 6.2.4: calmer, human stride
     hip: [0.06, 0.44, -0.028], knee: [0.062, 0.225, -0.011], sh: [0.092, 0.68, -0.05], el: [0.115, 0.54, -0.052], wr: [0.122, 0.41, -0.003],
     spine: [0, 0.54, -0.023], neck: [0, 0.715, -0.059], head: [0, 0.87, -0.055], headHalf: [0.115, 0.13, 0.123], hairPivot: [0, 0.72, -0.08] },
 };
@@ -30,11 +30,12 @@ MODELS.boy_suit = { file: 'hero_boy_suit.glb', hs: 44, legAmp: 0.55, armAmp: 0.7
   hip: [0.055, 0.44, -0.03], knee: [0.06, 0.24, -0.019], sh: [0.095, 0.655, -0.022], el: [0.125, 0.565, -0.016], wr: [0.142, 0.49, 0],
   spine: [0, 0.53, -0.009], neck: [0, 0.725, 0.003], head: [0, 0.865, -0.007], headHalf: [0.11, 0.115, 0.115], hairPivot: [0, 0.4, -0.1] };
 // 6.2.2 (宝宝 2026-11-20): her big wavy hair poked through the hats — on the girls the hats are made bigger to sit over the hair
-MODELS.girl.hatS = MODELS.girl_base.hatS = 1.45; MODELS.girl.hatDY = MODELS.girl_base.hatDY = 2.9;
+MODELS.girl.hatS = MODELS.girl_base.hatS = 1.85; MODELS.girl.hatDY = MODELS.girl_base.hatDY = 3.9;
 const PROC_HEAD = [7.7 * 1.08, 7.7 * 1.04, 7.7 * 0.98];   // the procedural head the hats were made for
 const BASE_OVERALLS = '#4F79A9';
 const HAT_S = 1.15, HAT_DY = 2.4;
 const STATE = {};
+const _bp = new THREE.Vector3();
 
 const V3 = (a, s = 1) => new THREE.Vector3(a[0] * s, a[1] * s, a[2] * s);
 function load(key) {
@@ -43,6 +44,12 @@ function load(key) {
     try {
       let src = null; gltf.scene.traverse((o) => { if (o.isMesh && !src) src = o; });
       const geo = src.geometry.clone(); geo.scale(M.hs, M.hs, M.hs);
+      // 6.2.4 (宝宝 2026-11-20): the boy's middle looked pinched (shorts wider than his waist) — fill out the waist a little
+      if (M.waist && geo.attributes._region) { const pos = geo.attributes.position, reg = geo.attributes._region, [yc, half, k] = M.waist;
+        for (let i = 0; i < pos.count; i++) { const r = Math.round(reg.getX(i)); if (r !== 1 && r !== 2) continue;
+          const d = Math.abs(pos.getY(i) / M.hs - yc) / half; if (d >= 1) continue; const f = 1 + k * (0.5 + 0.5 * Math.cos(Math.PI * d));
+          pos.setX(i, pos.getX(i) * f); pos.setZ(i, pos.getZ(i) * (1 + (f - 1) * 0.5)); }
+        pos.needsUpdate = true; geo.computeVertexNormals(); }
       const map = src.material.map; if (map) map.colorSpace = THREE.SRGBColorSpace;
       st.lib = { geo, mat: new THREE.MeshLambertMaterial({ map, side: THREE.DoubleSide }), shells: geo.attributes._region ? makeShells(geo, M.hs) : null };
       for (const [pp] of st.pending.splice(0)) { pp.body.visible = true; apply(pp, key); }
@@ -79,13 +86,16 @@ function outfit(o) {
   if (o.vest) { out.torso = o.vest; out.sleeves = o.sleeve || o.shirt || '#FFFFFF'; if (o.pants) out.legs = o.pants; }
   if (o.apron) { out.torso = out.torso || o.shirt; out.sleeves = out.sleeves || o.sleeve || o.shirt; out.front = o.apron; out.dot = o.apronDot; }
   if (o.boots) { out.boots = o.boots; if (o.bootGold) out.cuff = '#FFF2A0'; }
+  // 6.2.4: the boy's own clothes (原装衣服) — blue overalls on a cream shirt, so he is never left bare-chested
+  if (isBoy(o) && !o.catSuit && !out.torso) { out.torso = BASE_OVERALLS; out.legs = BASE_OVERALLS; out.sleeves = '#FFF6E0'; }
   return out;
 }
 const isBoy = (o) => String((o && o.character) || '').startsWith('boy');
 function keyFor(o) {
   if (isBoy(o)) return o.catSuit ? 'boy_suit' : 'boy';
   const f = outfit(o || {});
-  return Object.keys(f).length ? 'girl_base' : 'girl';     // any shop top / boots → the base body, the default look comes off
+  // 6.2.4 (宝宝 2026-11-20): only a shop TOP takes her default dress off; new shoes alone go on over her own outfit
+  return (f.torso || f.legs || f.front) ? 'girl_base' : 'girl';
 }
 
 const shellMat = (c) => new THREE.MeshLambertMaterial({ color: c, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -142,7 +152,8 @@ function apply(pp, key) {
   const local = []; for (let i = 0; i < 14; i++) local.push(new THREE.Matrix4());
   rig.update = () => {
     // body: its own place in the figure (bob, lean)
-    const B = local[0].compose(body.position, euler(body.rotation), _one);
+    _bp.copy(body.position); _bp.y *= (M.bobK || 1);
+    const B = local[0].compose(_bp, euler(body.rotation), _one);
     for (let i = 0; i < 2; i++) {
       const l = legs[i], rx = l.rotation.x * M.legAmp;
       local[1 + i].copy(B).multiply(_m.compose(J.hip[i], euler(l.rotation, M.legAmp, 1, M.legAmp), _one));
@@ -179,17 +190,28 @@ function apply(pp, key) {
   // so they are truly skin-tight: no shells, no gaps between top and trousers, nothing poking through at the knees
   const fit = outfit(o || {}), REGC = { 1: fit.torso, 2: fit.front || fit.torso, 3: fit.boots, 4: fit.legs, 5: fit.sleeves };
   let baseGeo = lib.geo, baseMat = lib.mat;
-  if (lib.geo.attributes._region && Object.values(REGC).some(Boolean)) {
-    const reg = lib.geo.attributes._region, n = reg.count, t = new Float32Array(n * 4), cache = {};
-    for (let i = 0; i < n; i++) { const h = REGC[Math.round(reg.getX(i))]; if (!h) continue; const c = cache[h] || (cache[h] = new THREE.Color(h)); t[i * 4] = c.r; t[i * 4 + 1] = c.g; t[i * 4 + 2] = c.b; t[i * 4 + 3] = 1; }
+  let feet = null;
+  if (!lib.geo.attributes._region && fit.boots) {   // a whole model with no clothing tags: the shoes dye just the feet
+    const pos = lib.geo.attributes.position, n = pos.count, t = new Float32Array(n * 4), c = new THREE.Color(fit.boots), yb = (M.bootY || 0.11) * HS;
+    for (let i = 0; i < n; i++) if (pos.getY(i) < yb) { t[i * 4] = c.r; t[i * 4 + 1] = c.g; t[i * 4 + 2] = c.b; t[i * 4 + 3] = 1; }
+    feet = t;
+  }
+  if (feet || (lib.geo.attributes._region && Object.values(REGC).some(Boolean))) {
+    const reg = lib.geo.attributes._region, n = lib.geo.attributes.position.count, t = new Float32Array(n * 4), cache = {};
+    if (!reg) t.set(feet); else for (let i = 0; i < n; i++) { const h = REGC[Math.round(reg.getX(i))]; if (!h) continue; const c = cache[h] || (cache[h] = new THREE.Color(h)); t[i * 4] = c.r; t[i * 4 + 1] = c.g; t[i * 4 + 2] = c.b; t[i * 4 + 3] = 1; }
     // little untagged islands on the legs (the knees) take the colour round them, so no white patches show through
-    { const ix = lib.geo.index.array, pos = lib.geo.attributes.position, yTop = M.hip[1] * HS;
-      for (let pass = 0; pass < 6; pass++) {
+    if (reg) { const ix = lib.geo.index.array, pos = lib.geo.attributes.position, yTop = (fit.legs ? M.hip[1] + 0.12 : M.hip[1]) * HS, thr = fit.legs ? 0.34 : 0.6;
+      const wm = new Map(); for (let v = 0; v < n; v++) { const k = Math.round(pos.getX(v) * 2000) + ',' + Math.round(pos.getY(v) * 2000) + ',' + Math.round(pos.getZ(v) * 2000); const a = wm.get(k); if (a) a.push(v); else wm.set(k, [v]); }
+      const welds = [...wm.values()].filter((g) => g.length > 1);
+      for (let pass = 0; pass < 8; pass++) {
         const sum = new Float32Array(n * 4), cnt = new Uint16Array(n), tot = new Uint16Array(n);
         for (let f = 0; f < ix.length; f += 3) for (let a = 0; a < 3; a++) { const v = ix[f + a]; if (t[v * 4 + 3]) continue;
           for (let b = 1; b < 3; b++) { const w = ix[f + (a + b) % 3]; tot[v]++; if (t[w * 4 + 3]) { cnt[v]++; for (let c = 0; c < 3; c++) sum[v * 4 + c] += t[w * 4 + c]; } } }
         let changed = 0;
-        for (let v = 0; v < n; v++) if (!t[v * 4 + 3] && tot[v] && cnt[v] / tot[v] >= 0.6 && pos.getY(v) < yTop) { for (let c = 0; c < 3; c++) t[v * 4 + c] = sum[v * 4 + c] / cnt[v]; t[v * 4 + 3] = 1; changed++; }
+        for (let v = 0; v < n; v++) if (!t[v * 4 + 3] && tot[v] && cnt[v] / tot[v] >= thr && pos.getY(v) < yTop) { for (let c = 0; c < 3; c++) t[v * 4 + c] = sum[v * 4 + c] / cnt[v]; t[v * 4 + 3] = 1; changed++; }
+        // UV seams split a point into several vertices: a seam twin takes the colour too, so the fill crosses into the next patch
+        for (const g of welds) { let src = -1; for (const v of g) if (t[v * 4 + 3]) { src = v; break; } if (src < 0) continue;
+          for (const v of g) if (!t[v * 4 + 3] && pos.getY(v) < yTop) { t[v * 4] = t[src * 4]; t[v * 4 + 1] = t[src * 4 + 1]; t[v * 4 + 2] = t[src * 4 + 2]; t[v * 4 + 3] = 1; changed++; } }
         if (!changed) break;
       } }
     baseGeo = new THREE.BufferGeometry();
