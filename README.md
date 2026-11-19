@@ -1,8 +1,8 @@
 # 半亩
 
-> 种菜，卖菜，雇人替你干活。水墨风放置种田 + 3D 收获加工，纯静态网页，打开即玩。
+> 种菜，卖菜，雇人替你干活。水墨风放置种田 + 3D 收获加工，安卓 APK。
 
-另一个小游戏：**[半亩·丰收](./harvest/)** —— 走进田地收获、加工、装箱并出售，解锁新关卡、雇工和庄园。现有 90 关；当前 Android 版本为 6.1.4（versionCode 94）。只有安卓客户端（网页版已于 2026-11-19 下线），APK 可在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 查看。版本、测试状态和关卡说明见 [harvest/README.md](./harvest/README.md)。
+另一个小游戏：**[半亩·丰收](./harvest/)** —— 走进田地收获、加工、装箱并出售，解锁新关卡、雇工和庄园。现有 90 关；当前 Android 版本为 6.1.5（versionCode 95）。只有安卓客户端（网页版已于 2026-11-19 下线），APK 可在 [Releases](https://github.com/zilo1002/Hark-test-game./releases/latest) 查看。版本、测试状态和关卡说明见 [harvest/README.md](./harvest/README.md)。
 
 ## ✨ 功能亮点
 - **种**：点一块空地，选种子播下。作物分三个生长阶段，成熟时会泛起微光、轻轻晃动。
@@ -30,13 +30,12 @@
 | 格式 | 读取 | 写入 | 备注 |
 |------|------|------|------|
 | Android APK | ✅ | ✅ | Releases 下载，WebView 壳，离线可玩 |
-| 浏览器在线 | ✅ | ✅ | GitHub Pages，存档在 localStorage |
-| 本地静态服务器 | ✅ | ✅ | `python3 -m http.server`，手机同 Wi-Fi 可用电脑局域网 IP 访问 |
+| 本地开发 | ✅ | ✅ | 改源码时用 `python3 -m http.server` 预览 |
 | 直接双击 index.html | ❌ | ❌ | file:// 不允许加载 ES 模块 |
 
 ## 🔒 隐私与安全
 - 不收集任何数据：没有后端、没有统计脚本、没有外部请求，整个游戏加载后完全离线运行。
-- 所有存档只保存在本机浏览器的 localStorage 里，清除浏览器数据会同时清掉存档；设置（右上角齿轮）里可一键清空存档。
+- 所有存档只保存在手机本机，卸载 App 会同时清掉存档；设置（右上角齿轮）里可一键清空存档。
 - 本地运行源码可完整审查，无任何混淆。
 
 ## ⌨️ 快捷键
@@ -93,21 +92,20 @@
 - 美术：全部线描 SVG 字符串内嵌 + 几何体拼的 3D 模型，零图片资源
 - 动效：CSS 动画 + Canvas/粒子效果
 - 持久化：localStorage + 离线收益快进结算
-- 部署：GitHub Actions 构建 APK 并发布 Release、部署 GitHub Pages，全相对路径，游戏放在 `/harvest/` 子目录运行
+- 发布：GitHub Actions 构建 APK 并发布到 Releases
 
 ## 💡 使用提示
-- **双击 `index.html` 打不开**：浏览器不允许 file:// 加载 ES 模块，必须起本地静态服务器：
+- **改源码时预览**：浏览器不允许 file:// 加载 ES 模块，要起本地服务器：
 
   ```bash
   cd 本仓库目录
   python3 -m http.server
   ```
 
-  然后打开 <http://localhost:8000>。手机和电脑在同一 Wi-Fi 下，也可用电脑的局域网 IP 访问。
+  然后打开 <http://localhost:8000>。
 - **调平衡只改 `js/config.js` / `harvest/js/config.js`**，改完跑一遍 `node sim/balance.mjs`（半亩）或 `node harvest/sim/balance.mjs`（丰收）：用一个“普通玩家”机器人跑多个随机种子，输出各关用时与星星。
 - **安卓更新**：去 Releases 下载最新 APK 安装，覆盖安装即可，存档保留。
 - **版本号逢 10 进位**：4.9.9 之后是 5.0.0，没有 4.9.10；5.1.9 之后是 5.2.0。
-- **Pages 部署状态**在仓库的 **Actions → pages build and deployment** 查看；「半亩·丰收」已用根目录 `_config.yml` 排除在 Pages 之外（只有安卓客户端），`harvest/` 只作为 APK 的源码保留。
 
 ## License
 - 半亩·丰收 的奶牛 / 绵羊 3D 模型来自 Quaternius 的 Farm Animal Pack（CC0，https://quaternius.com/packs/farmanimal.html）。

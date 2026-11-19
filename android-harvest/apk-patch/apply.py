@@ -287,47 +287,14 @@ patch('js/render3d.js', [
 patch('js/render3d.js', [
     ("        const type = singleKind[0], n = Math.min(c.stock.length, 120);\n        for (let j = 0; j < n; j++) {\n",
      "        const type = singleKind[0], n = Math.min(c.stock.length, 120);\n"
-     "        const big = (M.ITEM_HALF[type] || 2) >= 3.3, towers = big ? [[-7.5, -13], [7.5, -13], [-7.5, 13], [7.5, 13]] : [[-7.5, -21], [7.5, -21], [-7.5, 0], [7.5, 0], [-7.5, 21], [7.5, 21]];\n"
+     "        const big = (M.ITEM_HALF[type] || 2) >= 3.3, towers = [[-7.5, -13], [7.5, -13], [-7.5, 13], [7.5, 13]];   // 6.1.5: 4 towers (宝宝: the white tissue box sits beside them)\n"
      "        if (!c.sale2) for (let j = 0; j < n; j++) {\n"
      "          const p = j % towers.length, k = (j / towers.length) | 0, cell = k % 4, lay = (k / 4) | 0, [tx, tz] = towers[p], sp = big ? 2.6 : 2.1;\n"
      "          this.item(type, c.x + tx + (cell % 2 ? sp : -sp), c.y + tz + ((cell / 2) | 0 ? sp * 0.86 : -sp * 0.86), K.deskH + 1 + lay * CFG.items[type].step * 0.8 + (M.ITEM_HALF[type] || 2), (j % 3) * 0.2 + 0.785, 0.85);\n"
      "        }\n"
      "        else for (let j = 0; j < n; j++) {\n"),
 ])
-# 3) the carried stack leans out in front of the big chibi head and any hat (and the owl) instead of
-#    passing through them: above chest height every layer is pushed forward far enough to clear the face,
-#    and above the hat's lower edge far enough to clear the hat's front.
-patch('js/render3d.js', [
-    ("    let top = { x: b.x, y: b.y, z: b.z };\n",
-     "    let top = { x: b.x, y: b.y, z: b.z };\n"
-     "    const clr = b.sway !== undefined && o.pp && o.pp.glbModel ? this.headClear(o) : null, nearF = 12 + (deep - 1) * 3 - (deep - 1) / 2 * b.spread;\n"),
-    ("      const headingSway = c.moving ? Math.sin(c.walk + i * 0.12) * 0.025 : 0;\n      this.item(type, x, y, z,",
-     "      let px = x, py = y;\n"
-     "      if (clr) {\n"
-     "        const need = (f) => Math.max(0, f + half + 1 - nearF), sm = (a, b2, v) => Math.max(0, Math.min(1, (v - a) / (b2 - a)));\n"
-     "        const push = Math.max(need(clr.face) * sm(clr.chin - 6, clr.chin + 6, z), clr.hat ? need(clr.hat) * sm(clr.hatBot - 14, clr.hatBot, z) : 0);\n"
-     "        px += b.fx * push; py += b.fz * push;\n"
-     "      }\n"
-     "      const headingSway = c.moving ? Math.sin(c.walk + i * 0.12) * 0.025 : 0;\n      this.item(type, px, py, z,"),
-    ("  drawStack(c, o, labels, isPlayer) {\n",
-     "  // v6.1.2: how far forward the model's face and its hat / owl reach (world units, cached per look)\n"
-     "  headClear(o) {\n"
-     "    const pp = o.pp, head = pp.head, key = head.children.length + ':' + (pp.o && pp.o.hat || '');\n"
-     "    if (o._clr && o._clrKey === key) return o._clr;\n"
-     "    const s = (o.root ? o.root.scale.x : 1) * pp.root.scale.x || 1.15;\n"
-     "    const clr = { face: 15.8 * s, chin: 24 * s, hat: 0, hatBot: 1e9 };\n"
-     "    pp.root.updateMatrixWorld(true);\n"
-     "    const inv = new THREE.Matrix4().copy(pp.root.matrixWorld).invert(), bb = new THREE.Box3();\n"
-     "    for (const ch of head.children) {\n"
-     "      if (!ch.userData.hat && !(pp.root.userData.owl && ch === pp.root.userData.owl)) continue;\n"
-     "      ch.traverse((m) => { if (!m.isMesh) return; bb.setFromObject(m); if (bb.isEmpty()) return; bb.applyMatrix4(inv);\n"
-     "        if (bb.max.z * s > clr.face) { clr.hat = Math.max(clr.hat, bb.max.z * s); clr.hatBot = Math.min(clr.hatBot, bb.min.y * s); } });\n"
-     "    }\n"
-     "    if (clr.hat <= clr.face) clr.hat = 0;\n"
-     "    o._clr = clr; o._clrKey = key; return clr;\n"
-     "  }\n"
-     "  drawStack(c, o, labels, isPlayer) {\n"),
-])
+# 3) (6.1.2's forward lean of the carried stack was dropped in 6.1.5; hats got shorter brims instead)
 
 # ---- v6.1.3 (宝宝 2026-11-19 10:16): "普通搬运工站着不干活；升级小车也就拿一点，还得等" ----
 # a) the 加工品搬运工 waited at an emptied tray until he held 40% of his (truck-sized) load; now he leaves
@@ -385,4 +352,24 @@ patch('js/world.js', [
 patch('js/render3d.js', [
     ("      if (c.cashier && c.clerks === 2 && !o.clerk2) {",
      "      if (c.cashier && c.clerks === 2 && !o.clerk2 && !c.helper) {"),
+])
+
+# ---- v6.1.5 (宝宝 2026-11-19 10:38): shorter hat brims instead of leaning the stack; the staff cap's star sits on the cap ----
+patch('js/models.js', [
+    ("    head.add(mesh(cyl(8.4, 8.4, 0.9, 40), '#D2A85B', 0, 4.7, 0));",
+     "    head.add(mesh(cyl(6.9, 6.9, 0.9, 40), '#D2A85B', 0, 4.7, 0));"),
+    ("    head.add(mesh(box(8, 0.9, 6), o.capColor || '#3B7FE0', 0, 2.6, 8.4));",
+     "    head.add(mesh(box(8, 0.9, 3.4), o.capColor || '#3B7FE0', 0, 2.6, 7.4));"),
+    ("    head.add(mesh(cyl(10.5, 11.5, 1.1, 12), o.capColor || '#FFC21A', 0, 3.6, -1.4, 1, 1, 1.05));",
+     "    head.add(mesh(cyl(9.2, 9.8, 1.1, 12), o.capColor || '#FFC21A', 0, 3.6, -1.4, 1, 1, 1.05));"),
+    ("    head.add(mesh(cyl(9.1, 9.1, 0.9, 24), '#A0622D', 0, 4.9, 0, 1, 1, 0.82));\n    for (const side of [-1, 1]) head.add(mesh(sph(1.3, 16, 12), '#A0622D', side * 8.0, 5.2, 0, 1.5, 0.75, 2.5));",
+     "    head.add(mesh(cyl(7.4, 7.4, 0.9, 24), '#A0622D', 0, 4.9, 0, 1, 1, 0.82));\n    for (const side of [-1, 1]) head.add(mesh(sph(1.3, 16, 12), '#A0622D', side * 6.6, 5.2, 0, 1.3, 0.75, 2.0));"),
+    ("    head.add(mesh(box(15, 1.2, 15), '#2A2A3A', 0, 8.0, -0.4, 1, 1, 1));",
+     "    head.add(mesh(box(13, 1.2, 13), '#2A2A3A', 0, 8.0, -0.4, 1, 1, 1));"),
+    ("    head.add(mesh(box(8, 0.9, 6), '#2A2A5A', 0, 2.6, 8.4));",
+     "    head.add(mesh(box(8, 0.9, 3.4), '#2A2A5A', 0, 2.6, 7.4));"),
+    ("    st.position.set(0, 6.4, 7.6); st.scale.set(1, 1, 0.55); head.add(st);",
+     "    st.position.set(0, 6.0, 6.75); st.rotation.x = -0.58; st.scale.set(1, 1, 0.45); head.add(st);   // 6.1.5: flat on the crown, not floating in front"),
+    ("    head.add(mesh(box(8, 0.9, 6), '#1A1A3A', 0, 2.6, 8.4));",
+     "    head.add(mesh(box(8, 0.9, 3.4), '#1A1A3A', 0, 2.6, 7.4));"),
 ])
