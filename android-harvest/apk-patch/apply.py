@@ -554,4 +554,18 @@ patch('js/ui.js', [
 ])
 patch('js/ui.js', [("$('mSaveSub').textContent = `震动${d.settings.vib ? '开' : '关'} · 重置进度`;", "$('mSaveSub').textContent = `音量 ${d.settings.vol ?? 50} · 存档备份 · 隐私与支持`;")])
 patch('index.html', [('<button class="tile" id="mSave"><b>震动 · 存档</b>', '<button class="tile" id="mSave"><b>设置与支持</b>')])
+
+# ---- v6.2.6 (宝宝 2026-11-20 12:47): the boy is gone — only 农场主 (her girl) and Q版 are left; 黑西装猫猫 stays as a shop
+# piece the girl (and Q版) wear; old saves on a boy come back as the girl. The 制服 tab has no switch button.
+patch('js/shop.js', [("export const CHARACTER_IDS = ['girl', 'boy', 'boy_sage', 'boy_navy', 'q'];", "export const CHARACTER_IDS = ['girl', 'q'];")])
+patch('js/hero-glb.js', [("for (const k in MODELS) if (!STATE[k]) load(k);", "for (const k in MODELS) if (!STATE[k] && !k.startsWith('boy')) load(k);")])
+patch('js/ui.js', [
+  ("const next = isBoyCharacter(d.character) ? 'q' : d.character === 'q' ? 'girl' : 'boy';", "const next = d.character === 'q' ? 'girl' : 'q';"),
+  ("characterSwitch.classList.remove('hidden');", "characterSwitch.classList.toggle('hidden', this.shopTab === 'uni');"),
+  ("const cur = isBoyCharacter(d.character) ? '男孩' : d.character === 'q' ? 'Q版' : '女孩', nx = cur === '男孩' ? 'Q版' : cur === 'Q版' ? '女孩' : '男孩';",
+   "const cur = d.character === 'q' ? 'Q版' : '农场主', nx = cur === 'Q版' ? '农场主' : 'Q版';"),
+])
+for f in ('hero_boy.glb', 'hero_boy_suit.glb'):
+    fp = dst / 'models' / f
+    if fp.exists(): fp.unlink()
 print('apk-patch applied')
