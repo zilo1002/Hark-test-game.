@@ -470,7 +470,7 @@ const DOCS = {
 <p><b>4. 权限。</b>震动：用于操作时的震动反馈（可在设置里关掉）。网络：仅用于检查和下载更新。</p>
 <p><b>5. 未成年人。</b>游戏适合全年龄，不收集任何人的个人信息，包括未成年人。</p>
 <p><b>6. 政策变更。</b>如有调整，会随新版本一起更新，并在这里写明生效日期。</p>
-<p><b>7. 联系我们。</b>有任何问题，请在「联系支持」里找到我们。</p>`],
+<p><b>7. 联系我们。</b>有任何问题，请发邮件到 898298758m@gmail.com。</p>`],
   terms: ['服务条款', `<p><b>半亩·丰收 服务条款</b><br>生效日期：2026年11月20日</p>
 <p><b>1. 使用。</b>本游戏免费提供给你个人娱乐使用。请不要破解、篡改或用于商业用途。</p>
 <p><b>2. 虚拟物品。</b>金币、星星、衣服、装饰、宠物等都是游戏内的虚拟物品，只能在游戏里使用，没有现实货币价值，不能兑换或退款。</p>
@@ -540,7 +540,7 @@ patch('js/ui.js', [
    "    $('optVol').onchange = () => h.tap();\n"
    "    for (const [id, k] of [['lnPrivacy', 'privacy'], ['lnTerms', 'terms'], ['lnCredits', 'credits']]) $(id).onclick = () => { h.tap(); this.openDoc(DOCS[k][0], DOCS[k][1]); };\n"
    "    $('lnAbout').onclick = () => { h.tap(); this.openAbout(); };\n"
-   "    $('lnSupport').onclick = () => { h.tap(); this.openDoc('联系支持', `<p>遇到 bug、穿模、存档问题，或者有想要的新内容，都可以告诉我们。</p><p><b>反馈页面：</b>在 GitHub 上提交问题（Issues），记得写上版本号 ${this.appVersion() ? 'v' + this.appVersion() : ''}，最好附上截图或录屏。</p><p>常见问题：<br>· 换手机 / 重装前，先在设置里「导出存档码」并保存好。<br>· 画面卡顿可以把画质调到「低」。<br>· 没有声音请检查设置里的「声音」和「音量」。</p>`, [['打开反馈页面', () => this.openExternal('https://github.com/zilo1002/Hark-test-game./issues')]]); };\n"
+   "    $('lnSupport').onclick = () => { h.tap(); this.openDoc('联系支持', `<p>遇到 bug、穿模、存档问题，或者有想要的新内容，都可以告诉我们。</p><p><b>客服邮箱：</b>898298758m@gmail.com</p><p>发邮件时记得写上版本号 ${this.appVersion() ? 'v' + this.appVersion() : ''}，最好附上截图或录屏。也可以在 GitHub 反馈页面提交问题。</p><p>常见问题：<br>· 换手机 / 重装前，先在设置里「导出存档码」并保存好。<br>· 画面卡顿可以把画质调到「低」。<br>· 没有声音请检查设置里的「声音」和「音量」。</p>`, [['发邮件', () => this.openExternal('mailto:898298758m@gmail.com?subject=' + encodeURIComponent('半亩·丰收 反馈 v' + (this.appVersion() || '')))], ['反馈页面', () => this.openExternal('https://github.com/zilo1002/Hark-test-game./issues')]]); };\n"
    "    $('btnExport').onclick = () => { h.tap(); const code = h.exportSave(); this.openDoc('导出存档码', '<p>把下面这串存档码复制保存好（发给自己、记到备忘录都行）。换手机或重装后，用「导入存档码」就能找回进度。</p><textarea id=\"saveCode\" readonly></textarea><p id=\"copyNote\"></p>', [['复制', () => { const t = $('saveCode'); t.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (_) {} try { navigator.clipboard && navigator.clipboard.writeText(t.value).then(() => { $('copyNote').textContent = '已复制 ✓'; }); } catch (_) {} $('copyNote').textContent = ok ? '已复制 ✓' : '如果没复制上，长按上面的文字全选复制'; }]]); $('saveCode').value = code; };\n"
    "    $('btnImport').onclick = () => { h.tap(); this.openDoc('导入存档码', '<p>把之前导出的存档码粘贴到下面。<b>导入会覆盖现在的进度</b>，导入后游戏会自动重新载入。</p><textarea id=\"saveIn\" placeholder=\"在这里长按粘贴存档码\"></textarea><p id=\"impNote\"></p>', [['导入', () => { const v = $('saveIn').value.trim(); if (!v) { $('impNote').textContent = '先粘贴存档码哦'; return; } const b = $('docF').querySelector('.big'); if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = '再点一次：确定覆盖'; return; } $('impNote').textContent = h.importSave(v) ? '导入成功，正在重新载入…' : '这串存档码不对，检查一下是不是复制完整了'; delete b.dataset.armed; b.textContent = '导入'; }]]); };"),
   ("  openSettings(focus) {",
