@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId = "com.zilo.banmuharvest"
-        minSdk = 24
+        minSdk = 28
         targetSdk = 34
         versionCode = 71
         versionName = "5.5.1"

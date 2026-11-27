@@ -569,3 +569,10 @@ for f in ('hero_boy.glb', 'hero_boy_suit.glb'):
     fp = dst / 'models' / f
     if fp.exists(): fp.unlink()
 print('apk-patch applied')
+
+# 6.2.6: download updates inside the app (installer opens by itself, the APK is deleted on next launch)
+patch('js/ui.js', [
+    ("this._updUrl = asset.browser_download_url;", "this._updUrl = asset.browser_download_url; this._updVer = ver;"),
+    ("      n.textContent = '已打开浏览器下载，下载完成后点一下安装包就能安装。';\n      this.openExternal(url);",
+     "      let inApp = false;\n      try { const w = window.AndroidApp; if (w && typeof w.downloadUpdate === 'function') inApp = !!w.downloadUpdate(url, this._updVer || ''); } catch (e) { inApp = false; }\n      if (inApp) { n.textContent = '正在下载新版本（通知栏能看进度），下好会自动打开安装，直接覆盖安装、进度保留；装好后旧安装包自动删除。'; return; }\n      n.textContent = '已打开浏览器下载，下载完成后点一下安装包就能安装。';\n      this.openExternal(url);"),
+])

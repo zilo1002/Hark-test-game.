@@ -1,6 +1,6 @@
 # Builds the 半亩·丰收 Android APK on every push to main and publishes it as a GitHub Release asset.
 # Same build as local: android-harvest/build-apk.sh (direct Android SDK build: aapt2 → javac → d8 → zipalign → apksigner),
-# with the game in harvest/ bundled into the APK's assets, signed with the checked-in android-harvest/debug.keystore
+# with the game in harvest/ bundled into the APK's assets, signed with the checked-in android-harvest/release.keystore ("Zilozarael", v3 key rotation from the old debug.keystore)
 # so every new release installs over the previous one.
 name: Build APK
 
