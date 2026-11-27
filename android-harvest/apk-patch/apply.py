@@ -576,3 +576,34 @@ patch('js/ui.js', [
     ("      n.textContent = '已打开浏览器下载，下载完成后点一下安装包就能安装。';\n      this.openExternal(url);",
      "      let inApp = false;\n      try { const w = window.AndroidApp; if (w && typeof w.downloadUpdate === 'function') inApp = !!w.downloadUpdate(url, this._updVer || ''); } catch (e) { inApp = false; }\n      if (inApp) { n.textContent = '正在下载新版本（通知栏能看进度），下好会自动打开安装，直接覆盖安装、进度保留；装好后旧安装包自动删除。'; return; }\n      n.textContent = '已打开浏览器下载，下载完成后点一下安装包就能安装。';\n      this.openExternal(url);"),
 ])
+
+# 6.2.8 (her feedback 2026-11-27):
+# • picking up goods no longer makes the farm owner / staff bow (one nod per piece was annoying);
+#   they still bow once when they set a load down. Picking up processed goods buzzes lightly instead.
+patch('js/render3d.js', [
+    ("if (o.lastStackN !== undefined && stackN !== o.lastStackN && !cutting && !fishing && !c.vehicle) o.bendT = this.wt;",
+     "if (o.lastStackN !== undefined && stackN < o.lastStackN && !cutting && !fishing && !c.vehicle) o.bendT = this.wt;"),
+])
+patch('js/world.js', [
+    ("if (isPlayer) { this.emit('pick', { item: pl.type }); this.comboGain++; }",
+     "if (isPlayer) { this.emit('pick', { item: pl.type, proc: !!(pl.owner && pl.owner.kind === 'proc') }); this.comboGain++; }"),
+])
+patch('js/main.js', [
+    ("      case 'pick': snd.play('pick');",
+     "      case 'pick': if (e.proc && time - (handleEvents.pickHapT || -9) > 0.09) { handleEvents.pickHapT = time; hap.buzz(16, 200); } snd.play('pick');"),
+])
+# • 第4关 土豆地 gets a farmhand (雇园丁) like the other early levels
+patch('js/config.js', [
+    ("        { id: 'f', x: 480, y: 260, price: 160, icon: 'cashier', label: '店员', req: ['b'], effect: { cashier: ['C1', 'C2'] } },\n      ],\n      deco: { theme: 'farm', paths: [[440, 390, 340, 100]]",
+     "        { id: 'f', x: 480, y: 260, price: 160, icon: 'cashier', label: '店员', req: ['b'], effect: { cashier: ['C1', 'C2'] } },\n        { id: 'g', x: 180, y: 440, price: 140, icon: 'worker', label: '雇园丁', req: ['b'], effect: { worker: { from: ['P1'], to: ['C1', 'C2'] } } },\n      ],\n      deco: { theme: 'farm', paths: [[440, 390, 340, 100]]"),
+])
+# • star maps (山谷 / 夜市) are on sale from the start: shown in the star shop and the 装扮 tray, bought with stars;
+#   the home map-switch button shows as soon as a second map is owned (or the valley opens)
+patch('js/shop.js', [
+    ("export const mapUnlocked = (data, map) => { const m = mapByMap(map); return !!m && (data.unlocked || 0) >= m.unlockAfter; };",
+     "export const mapUnlocked = (data, map) => !!mapByMap(map);"),
+])
+patch('js/ui.js', [
+    ("$('btnValley').classList.toggle('hidden', !valleyOpen(data));",
+     "$('btnValley').classList.toggle('hidden', !valleyOpen(data) && !MAPS.some((m) => mapOwned(data, m.map)));"),
+])
