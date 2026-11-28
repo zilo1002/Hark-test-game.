@@ -618,3 +618,35 @@ patch('js/render3d.js', [
     ("for (let j = 0; j < items.length && j < 120; j++) {", "for (let j = 0; j < items.length; j++) {"),
 ])
 patch('js/config.js', [("cashDx: -58, cashDy: 62, stockMax: 300 },", "cashDx: -58, cashDy: 62, stockMax: 600 },")])
+
+# 6.3.0 (her feedback 2026-11-28 19:14: "进到游戏里还是卡卡的"): the loading screen also warms up the 3D
+# scene before 开始游戏 shows — it builds the level the player will play next off-screen and draws it a few
+# frames, so shaders, textures and the person/pet models are uploaded to the GPU during the progress bar
+# instead of on the first seconds of play. Thumbnails now fill 0–80%, the warm-up 80–100%.
+patch('js/main.js', [
+    ("    const f = (MODELS - need.size) / MODELS * 0.45 + (items.length ? i / items.length : 0) * 0.55;",
+     "    const f = ((MODELS - need.size) / MODELS * 0.45 + (items.length ? i / items.length : 0) * 0.55) * 0.8;"),
+    ("    if (i >= items.length) { finish(); return; }",
+     "    if (i >= items.length) { warm(); return; }"),
+    ("  const startThumbs = () => {",
+     "  let warmed = false;\n"
+     "  const warm = () => {\n"
+     "    if (warmed || finished) return; warmed = true; txt.textContent = '准备场景中…';\n"
+     "    if (mode === 'play' && world) { let k = 0; const w8 = () => { k++; bar.style.width = Math.round(80 + k * 4) + '%'; pct.textContent = Math.round(80 + k * 4) + '%'; if (k < 5) setTimeout(w8, 120); else finish(); }; w8(); return; }\n"
+     "    let tw = null, k = 0;\n"
+     "    try {\n"
+     "      const L = CFG.levels.length, li = data.cur ? data.cur.li : Math.min(data.unlocked || 0, L - 1);\n"
+     "      tw = new World(li, { crew: Crew.levelCrew(data.crew, li), pet: petOpt(), companion: companionOpt(), season: Seasons.isValleyLi(li) ? Seasons.valleySeason(data) : Seasons.currentSeason(), rain: false });\n"
+     "      R.setFestival(Fest.currentFestival()); R.setWorld(tw); R.follow(0, true);\n"
+     "      try { if (R.gl && R.gl.compile) R.gl.compile(R.scene, R.camera); } catch (_) {}\n"
+     "    } catch (_) { tw = null; }\n"
+     "    const wf = () => {\n"
+     "      if (finished) return;\n"
+     "      k++; const p = Math.round(80 + k * 2.5); bar.style.width = p + '%'; pct.textContent = p + '%';\n"
+     "      if (tw && mode !== 'play') { try { R.draw(tw, fx, null, k / 30, {}); } catch (_) { tw = null; } }\n"
+     "      if (k < 8 && tw) requestAnimationFrame(wf); else { if (mode !== 'play') R.setMode('home'); finish(); }\n"
+     "    };\n"
+     "    requestAnimationFrame(wf);\n"
+     "  };\n"
+     "  const startThumbs = () => {"),
+])
