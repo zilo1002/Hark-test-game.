@@ -607,3 +607,14 @@ patch('js/ui.js', [
     ("$('btnValley').classList.toggle('hidden', !valleyOpen(data));",
      "$('btnValley').classList.toggle('hidden', !valleyOpen(data) && !MAPS.some((m) => mapOwned(data, m.map)));"),
 ])
+
+# 6.2.9 (her feedback 2026-11-28): no bow at all — not on pickup, not after delivering (set-down) either;
+# and goods on the counters stack as high as the stock goes (the drawing stopped at 120 a kind, the
+# counter held at most 300) — now everything in stock is drawn and a counter holds up to 600.
+patch('js/render3d.js', [
+    ("if (o.lastStackN !== undefined && stackN < o.lastStackN && !cutting && !fishing && !c.vehicle) o.bendT = this.wt;",
+     "/* 6.2.9: no bow on pickup or set-down */"),
+    ("const type = singleKind[0], n = Math.min(c.stock.length, 120);", "const type = singleKind[0], n = c.stock.length;"),
+    ("for (let j = 0; j < items.length && j < 120; j++) {", "for (let j = 0; j < items.length; j++) {"),
+])
+patch('js/config.js', [("cashDx: -58, cashDy: 62, stockMax: 300 },", "cashDx: -58, cashDy: 62, stockMax: 600 },")])
